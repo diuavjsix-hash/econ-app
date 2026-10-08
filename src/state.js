@@ -2,6 +2,7 @@ import { normalizeSlope } from './graph/math.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
 import { CURVE_PRESETS, MAX_BEND } from './graph/curve.js';
 import { canReparent, objectsOf } from './objects.js';
+import { DEFAULT_AXIS_GAP, MIN_AXIS_GAP, MAX_AXIS_GAP } from './graph/display.js';
 
 const COLORS = ['#6068e8', '#e69451', '#43a999', '#cf7299', '#849353', '#699bd1'];
 
@@ -10,7 +11,7 @@ export function createStore() {
   let state = {
     lines: [], curves: [], points: [], groups: [], objectOrder: [],
     selectedId: null, activeTool: 'select', mouseSelected: false, pointSnap: false, pointCoordinates: false, showGrid: true,
-    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' },
+    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
   let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1;
   const listeners = new Set();
@@ -18,6 +19,7 @@ export function createStore() {
     document: structuredClone({
       ...Object.fromEntries(['lines', 'curves', 'points', 'groups'].map((key) => [key, state[key].map(({ collapsed, ...object }) => object)])),
       objectOrder: state.objectOrder, quadrantMode: state.quadrantMode, axisNames: state.axisNames, showGrid: state.showGrid,
+      axisGapEnabled: state.axisGapEnabled, axisGap: state.axisGap,
     }),
     selectedId: state.selectedId,
   });
@@ -90,6 +92,8 @@ export function createStore() {
       return true;
     },
     update(patch) {
+      if (typeof patch.axisGapEnabled === 'boolean') state.axisGapEnabled = patch.axisGapEnabled;
+      if (Number.isFinite(patch.axisGap)) state.axisGap = Math.max(MIN_AXIS_GAP, Math.min(MAX_AXIS_GAP, patch.axisGap));
       if (typeof patch.showGrid === 'boolean') state.showGrid = patch.showGrid;
       if (typeof patch.pointSnap === 'boolean') state.pointSnap = patch.pointSnap;
       if (typeof patch.pointCoordinates === 'boolean') state.pointCoordinates = patch.pointCoordinates;

@@ -7,7 +7,7 @@
 | 필드 | 설명 |
 | --- | --- |
 | `schemaVersion` | 현재 3. 점·폴더·계층 및 우상향/우하향 방향 코드를 포함 |
-| `coordinateSystem` | 원점 배치·사분면·방향·축 표시·축 이름 |
+| `coordinateSystem` | 원점 배치·사분면·방향·축 표시·축 이름·축 간격 |
 | `showGrid` | 격자 표시 여부 |
 | `lines` | 모든 직선 |
 | `curves` | 모든 곡선 |
@@ -16,6 +16,8 @@
 | `objectOrder` | 모든 종류를 섞은 생성 순서의 ID 배열 |
 
 `coordinateSystem.origin`과 `quadrants` 조합은 `bottom-left` / `[1]`, `bottom-center` / `[1,2]`, `center` / `[1,2,3,4]`입니다. `xPositive`는 `right`, `yPositive`는 `up`, `axesVisible`은 현재 항상 true입니다. `axisNames`의 x·y는 문자열이며 빈 문자열은 이름만 숨긴다는 뜻입니다.
+
+`coordinateSystem.lineAxisGap`은 `{enabled: false, distance: 0.75}`가 기본입니다. `enabled`가 true이면 직선·곡선에서 `|x| < distance` 또는 `|y| < distance`인 구간을 숨깁니다. `distance`는 내부 좌표 단위의 0.25~2입니다. 축·격자·점·보조선에는 적용하지 않습니다. 원래 `lines`·`curves` 기하 데이터와 접선 연장은 그대로 출력합니다. schemaVersion 3의 추가 표시 필드이며, 이 필드가 없는 이전 문서는 간격 비활성으로 해석합니다.
 
 선택 상태, 다음 ID 카운터, 화면 크기·배율, UI 입력 포커스, 마우스 선택(`mouseSelected`), 되돌리기·다시 실행 기록과 메타데이터(`canUndo`, `canRedo`, `historyRevision`)는 출력하지 않습니다. 복원 기능을 구현할 경우 사분면 조합에서 내부 `quadrantMode`를 결정하고 ID 카운터 충돌을 방지해야 합니다. 파일의 표시 메타데이터와 기하 데이터를 검증 없이 DOM에 삽입해서는 안 됩니다.
 
@@ -105,7 +107,8 @@ C = (anchor.x + span, anchor.y + span * ( slope + bend))
     "xPositive": "right",
     "yPositive": "up",
     "axesVisible": true,
-    "axisNames": {"x": "수량 Q", "y": "가격 P"}
+    "axisNames": {"x": "수량 Q", "y": "가격 P"},
+    "lineAxisGap": {"enabled": false, "distance": 0.75}
   },
   "showGrid": true,
   "lines": [{

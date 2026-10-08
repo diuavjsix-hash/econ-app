@@ -1,6 +1,7 @@
 import { directionOf, interceptOf } from './graph/math.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
 import { curveControlPoints, curveTangentRays } from './graph/curve.js';
+import { DEFAULT_AXIS_GAP } from './graph/display.js';
 
 export function serializeDocument(state) {
   return {
@@ -11,7 +12,11 @@ export function serializeDocument(state) {
       id: point.id, type: 'point', name: point.name, color: point.color, parentId: point.parentId,
       anchor: { ...point.anchor }, guides: { ...point.guides }, showCoordinates: Boolean(point.showCoordinates),
     })),
-    coordinateSystem: { origin: QUADRANT_MODES[state.quadrantMode].origin, quadrants: QUADRANT_MODES[state.quadrantMode].quadrants, xPositive: 'right', yPositive: 'up', axesVisible: true, axisNames: { ...state.axisNames } },
+    coordinateSystem: {
+      origin: QUADRANT_MODES[state.quadrantMode].origin, quadrants: QUADRANT_MODES[state.quadrantMode].quadrants,
+      xPositive: 'right', yPositive: 'up', axesVisible: true, axisNames: { ...state.axisNames },
+      lineAxisGap: { enabled: Boolean(state.axisGapEnabled), distance: state.axisGap ?? DEFAULT_AXIS_GAP },
+    },
     showGrid: state.showGrid,
     lines: state.lines.map((line) => {
       const direction = directionOf(line.slope);

@@ -51,6 +51,11 @@ app.innerHTML = `
         <h2 id="axes-title">축</h2>
         <label for="horizontal-axis-name">수평축<input id="horizontal-axis-name" type="text" value="x" placeholder="x" maxlength="80" autocomplete="off" /></label>
         <label for="vertical-axis-name">수직축<input id="vertical-axis-name" type="text" value="y" placeholder="y" maxlength="80" autocomplete="off" /></label>
+        <label class="point-snap-setting axis-gap-toggle" for="axis-gap-toggle"><span>축에서 선 띄우기</span><input id="axis-gap-toggle" type="checkbox" role="switch" aria-controls="axis-gap-settings" /><span class="switch-track" aria-hidden="true"></span></label>
+        <div id="axis-gap-settings" class="axis-gap-settings" hidden>
+          <div class="slope-heading"><label for="axis-gap-slider">간격</label><output id="axis-gap-value" for="axis-gap-slider">0.75</output></div>
+          <input id="axis-gap-slider" type="range" min="0.25" max="2" step="0.05" value="0.75" aria-label="축과 선 사이 간격" />
+        </div>
       </section>
       <h2 id="tools-title">도구</h2>
       <button id="line-tool" class="tool-button" aria-label="직선 추가"><span class="tool-icon">${icon('line')}</span><strong>직선</strong>${icon('plus', 'add-icon')}</button>
