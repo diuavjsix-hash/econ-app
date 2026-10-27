@@ -24,7 +24,7 @@ test('undo and redo restore mixed objects and disable when their stacks are empt
   assert.equal(store.getState().canRedo, false);
 });
 
-test('one gesture restores movement, shape, names and guides in one step', () => {
+test('one gesture restores movement, shape and names in one step', () => {
   const store = createStore();
   store.addCurve();
   const original = store.getState().curves[0];
@@ -46,7 +46,7 @@ test('clear all is reversible and retains axes, viewport and mouse preferences',
   store.update({ axisNames: { x: 'Q', y: 'P' }, quadrantMode: 'all', showGrid: false, pointCoordinates: true });
   const line = store.addLine();
   const point = store.addPoint({ x: -2, y: 3 });
-  store.updateSelected({ guides: { vertical: 'dashed' }, showCoordinates: true });
+  store.updateSelected({ showCoordinates: true });
   const folder = store.addGroup();
   store.moveObject(line, folder);
   store.moveObject(point, line);
@@ -119,7 +119,9 @@ test('viewport, axis names and grid restore, and undo closes a pending gesture',
 test('history is bounded and mouse selection controls the cursor independently of snapping', () => {
   const store = createStore();
   store.update({ mouseSelected: true });
-  assert.equal(store.getState().pointSnap, false);
+  assert.equal(store.getState().pointSnap, true);
+  store.update({ pointSnap: false });
+  assert.equal(store.getState().mouseSelected, true);
   assert.equal(store.getState().canUndo, false);
   store.addLine();
   assert.equal(store.getState().mouseSelected, false);
@@ -128,4 +130,25 @@ test('history is bounded and mouse selection controls the cursor independently o
   while (store.undo()) count++;
   assert.equal(count, 100);
   assert.equal('canUndo' in serializeDocument(store.getState()), false);
+});
+
+test('point tool clears line and curve selection without editing geometry or history, while retaining point settings', () => {
+  const store = createStore();
+  const line = store.addLine();
+  const curve = store.addCurve();
+  const original = serializeDocument(store.getState());
+  for (const id of [line, curve]) {
+    store.selectObject(id);
+    store.update({ mouseSelected: true });
+    assert.equal(store.getState().selectedId, null);
+    assert.deepEqual(serializeDocument(store.getState()), original);
+    store.update({ mouseSelected: false });
+  }
+  store.undo();
+  assert.equal(store.getState().curves.length, 0, 'tool selection adds no undo step');
+  const point = store.addPoint({ x: 2, y: 3 });
+  store.update({ mouseSelected: true });
+  assert.equal(store.getState().selectedId, point, 'point options remain editable');
+  store.selectObject(line);
+  assert.equal(store.getState().selectedId, line, 'explicitly selecting a line restores its editing controls');
 });

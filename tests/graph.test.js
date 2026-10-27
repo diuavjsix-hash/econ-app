@@ -79,7 +79,7 @@ test('JSON captures every line and internal coordinates after moving and changin
   store.updateSelected({ slope: 2, anchor: { x: 1, y: 3 } });
   store.update({ showGrid: false });
   const exported = JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(exported.schemaVersion, 3);
+  assert.equal(exported.schemaVersion, 6);
   assert.equal(exported.coordinateSystem.axesVisible, true);
   assert.equal(exported.showGrid, false);
   assert.equal(exported.lines.length, 2);

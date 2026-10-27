@@ -13,12 +13,6 @@ export function mountPointTool(root, store) {
   coordinatesToggle.addEventListener('change', () => store.update({ pointCoordinates: coordinatesToggle.checked }));
   showCoordinates.addEventListener('change', () => store.updateSelected({ showCoordinates: showCoordinates.checked }));
   button.addEventListener('change', () => store.update({ activeTool: button.checked ? 'point' : 'select' }));
-  for (const [id, key] of [['point-horizontal', 'horizontal'], ['point-vertical', 'vertical'], ['point-guide-extent', 'extent']]) {
-    root.querySelector(`#${id}`).addEventListener('change', (event) => store.updateSelected({ guides: { [key]: event.target.value } }));
-  }
-  root.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') store.update({ activeTool: 'select' });
-  });
   return store.subscribe(({ points, selectedId, activeTool, mouseSelected, pointSnap, pointCoordinates }) => {
     mouseSettings.hidden = !mouseSelected;
     mouseButton.setAttribute('aria-pressed', String(mouseSelected));
@@ -30,8 +24,6 @@ export function mountPointTool(root, store) {
     settings.hidden = !point;
     if (!point) return;
     showCoordinates.checked = point.showCoordinates;
-    root.querySelector('#point-horizontal').value = point.guides.horizontal;
-    root.querySelector('#point-vertical').value = point.guides.vertical;
-    root.querySelector('#point-guide-extent').value = point.guides.extent;
+
   });
 }

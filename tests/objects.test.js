@@ -2,8 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
 import { canReparent, objectsOf } from '../src/objects.js';
-import { pointGuides, pointCoordinatesLabel } from '../src/graph/point.js';
-import { createViewport } from '../src/graph/viewport.js';
+import { pointCoordinatesLabel } from '../src/graph/point.js';
 import { serializeDocument } from '../src/export.js';
 
 test('curve directions change independently of custom names and hierarchy', () => {
@@ -24,7 +23,7 @@ test('curve directions change independently of custom names and hierarchy', () =
   assert.equal(store.getState().lines[0].name, '수요곡선');
 });
 
-test('points preserve internal coordinates and edit names and guides without affecting other objects', () => {
+test('points preserve internal coordinates and edit names and coordinates without affecting other objects', () => {
   const store = createStore();
   const line = store.addLine();
   const originalLine = store.getState().lines[0];
@@ -39,7 +38,7 @@ test('points preserve internal coordinates and edit names and guides without aff
   const state = store.getState();
   assert.deepEqual(state.points[0].anchor, { x: 1.25, y: -3 });
   assert.equal(state.points[0].name, '균형점 E');
-  assert.deepEqual(state.points[0].guides, { horizontal: 'dashed', vertical: 'solid', extent: 'full' });
+  assert.equal('guides' in state.points[0], false);
   assert.deepEqual(state.points[1].anchor, { x: 4, y: 5 });
   assert.equal(state.points[1].id, second);
   assert.deepEqual(state.lines[0], originalLine);
@@ -77,35 +76,11 @@ test('coordinate creation preference applies to new points and per-point visibil
   assert.equal(store.getState().points[1].showCoordinates, true);
 });
 
-test('point guides project to axes or cover the domain in all quadrants without pixel state', () => {
-  for (const mode of ['first', 'upper', 'all']) {
-    const { bounds } = createViewport(640, 480, mode);
-    const point = { anchor: { x: mode === 'first' ? 2 : -2, y: mode === 'all' ? -2 : 2 }, guides: { horizontal: 'dashed', vertical: 'solid', extent: 'axes' } };
-    const projected = pointGuides(point, bounds);
-    assert.equal(projected.length, 2);
-    for (const guide of projected) {
-      if (guide.axis === 'horizontal') {
-        assert.equal(guide.start.y, point.anchor.y);
-        assert.equal(guide.end.y, point.anchor.y);
-        assert.ok(guide.start.x === 0 || guide.end.x === 0);
-      } else {
-        assert.equal(guide.start.x, point.anchor.x);
-        assert.equal(guide.end.x, point.anchor.x);
-        assert.ok(guide.start.y === 0 || guide.end.y === 0);
-      }
-    }
-    point.guides.extent = 'full';
-    const full = pointGuides(point, bounds);
-    assert.equal(full[0].start.x, bounds.xMin);
-    assert.equal(full[0].end.x, bounds.xMax);
-    assert.equal(full[1].start.y, bounds.yMin);
-    assert.equal(full[1].end.y, bounds.yMax);
-    point.guides.horizontal = point.guides.vertical = 'none';
-    assert.deepEqual(pointGuides(point, bounds), []);
-  }
-  const bounds = { xMin: 0, xMax: 5, yMin: 0, yMax: 5 };
-  const edge = { anchor: { x: 8, y: 2 }, guides: { horizontal: 'solid', vertical: 'solid', extent: 'axes' } };
-  assert.deepEqual(pointGuides(edge, bounds), [{ axis: 'horizontal', style: 'solid', start: { x: 0, y: 2 }, end: { x: 5, y: 2 } }]);
+test('points no longer store or export guide settings', () => {
+  const store = createStore(); store.addPoint({ x: 2, y: 4 });
+  store.updateSelected({ guides: { horizontal: 'dashed', vertical: 'solid', extent: 'full' } });
+  assert.equal('guides' in store.getState().points[0], false);
+  assert.equal('guides' in serializeDocument(store.getState()).points[0], false);
 });
 
 test('mixed hierarchy supports nesting and extraction, prevents cycles, and preserves geometry', () => {
@@ -161,7 +136,7 @@ test('deleting a parent lifts its children and keeps their own descendants and u
   assert.notEqual(newPoint, point);
 });
 
-test('JSON version 3 exports point labels, guide styles and mixed parent links in creation order', () => {
+test('JSON version 6 exports point labels and mixed parent links in creation order', () => {
   const store = createStore();
   const line = store.addLine();
   store.updateSelected({ name: '수요 <test>' });
@@ -173,7 +148,7 @@ test('JSON version 3 exports point labels, guide styles and mixed parent links i
   store.moveObject(curve, line);
   store.moveObject(point, line);
   const exported = JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(exported.schemaVersion, 3);
+  assert.equal(exported.schemaVersion, 6);
   assert.deepEqual(exported.objectOrder, [line, curve, point, folder]);
   assert.equal(exported.lines[0].parentId, folder);
   assert.equal(exported.curves[0].parentId, line);
@@ -181,8 +156,8 @@ test('JSON version 3 exports point labels, guide styles and mixed parent links i
   assert.equal(exported.points[0].parentId, line);
   assert.equal(exported.points[0].name, 'E');
   assert.deepEqual(exported.points[0].anchor, { x: -2.5, y: 4.75 });
-  assert.deepEqual(exported.points[0].guides, { horizontal: 'dashed', vertical: 'solid', extent: 'axes' });
+  assert.equal('guides' in exported.points[0], false);
   assert.equal(exported.groups[0].parentId, null);
-  exported.points[0].guides.horizontal = 'none';
-  assert.equal(store.getState().points[0].guides.horizontal, 'dashed');
+  exported.points[0].anchor.x = 100;
+  assert.equal(store.getState().points[0].anchor.x, -2.5);
 });

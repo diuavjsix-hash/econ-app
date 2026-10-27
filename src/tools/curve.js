@@ -6,7 +6,7 @@ export function mountCurveTool(root, store) {
   const slider = root.querySelector('#bend-slider');
   const presets = root.querySelectorAll('[data-curve-variant]');
   root.querySelector('#curve-tool').addEventListener('click', () => {
-    const graph = root.querySelector('#graph');
+    const graph = root.querySelector('.diagram-card.is-active .graph-container');
     const { bounds } = createViewport(graph.clientWidth, graph.clientHeight, store.getState().quadrantMode);
     store.addCurve({
       anchor: { x: (bounds.xMin + bounds.xMax) / 2, y: (bounds.yMin + bounds.yMax) / 2 },

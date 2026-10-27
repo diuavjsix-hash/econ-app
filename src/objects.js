@@ -1,6 +1,6 @@
-export const OBJECT_LABELS = { line: '직선', curve: '곡선', point: '점', group: '폴더' };
+export const OBJECT_LABELS = { line: '직선', curve: '곡선', point: '점', dashed: '점선', ruler: '자', group: '폴더' };
 export function objectsOf(state) {
-  const objects = [...state.lines, ...state.curves, ...(state.points ?? []), ...(state.groups ?? [])];
+  const objects = [...state.lines, ...state.curves, ...(state.points ?? []), ...(state.dashedLines ?? []), ...(state.rulers ?? []), ...(state.groups ?? [])];
   const order = new Map((state.objectOrder ?? []).map((id, index) => [id, index]));
   return objects.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 }

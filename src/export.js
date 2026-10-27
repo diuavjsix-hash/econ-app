@@ -2,16 +2,23 @@ import { directionOf, interceptOf } from './graph/math.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
 import { curveControlPoints, curveTangentRays } from './graph/curve.js';
 
-export function serializeDocument(state) {
+function serializeDiagram(state) {
+  const baseOrigin = QUADRANT_MODES[state.quadrantMode].origin;
+  const origin = baseOrigin === 'center' ? 'center' : `${state.flipY ? 'top' : 'bottom'}-${baseOrigin.endsWith('center') ? 'center' : state.flipX ? 'right' : 'left'}`;
   return {
-    schemaVersion: 3,
     objectOrder: [...state.objectOrder],
     groups: state.groups.map(({ id, name, parentId }) => ({ id, type: 'group', name, parentId })),
     points: state.points.map((point) => ({
       id: point.id, type: 'point', name: point.name, color: point.color, parentId: point.parentId,
-      anchor: { ...point.anchor }, guides: { ...point.guides }, showCoordinates: Boolean(point.showCoordinates),
+      anchor: { ...point.anchor }, showCoordinates: Boolean(point.showCoordinates),
     })),
-    coordinateSystem: { origin: QUADRANT_MODES[state.quadrantMode].origin, quadrants: QUADRANT_MODES[state.quadrantMode].quadrants, xPositive: 'right', yPositive: 'up', axesVisible: true, axisNames: { ...state.axisNames } },
+    dashedLines: state.dashedLines.map(({ id, name, color, parentId, anchor, end }) => ({
+      id, type: 'dashed', name, color, parentId, anchor: { ...anchor }, end: { ...end },
+    })),
+    rulers: state.rulers.map(({ id, name, color, parentId, anchor, end, style, showMeasurement }) => ({
+      id, type: 'ruler', name, color, parentId, anchor: { ...anchor }, end: { ...end }, style, showMeasurement,
+    })),
+    coordinateSystem: { origin, quadrants: [...QUADRANT_MODES[state.quadrantMode].quadrants], xPositive: state.flipX ? 'left' : 'right', yPositive: state.flipY ? 'down' : 'up', axesVisible: true, axisNames: { ...state.axisNames } },
     showGrid: state.showGrid,
     lines: state.lines.map((line) => {
       const direction = directionOf(line.slope);
@@ -32,6 +39,20 @@ export function serializeDocument(state) {
         extensions: { type: 'tangent-rays', rays: curveTangentRays(curve) },
       },
     })),
+  };
+}
+
+export function serializeDocument(state) {
+  return {
+    schemaVersion: 6,
+    // Retain the active diagram's fields for consumers of the earlier format.
+    ...serializeDiagram(state),
+    activeDiagramId: state.activeDiagramId,
+    layout: {
+      preset: state.layout.preset,
+      slots: state.layout.slots.map(({ row, column }, index) => ({ diagramId: state.diagrams[index].id, row, column })),
+    },
+    diagrams: state.diagrams.map(diagram => ({ id: diagram.id, name: diagram.name, ...serializeDiagram(diagram) })),
   };
 }
 

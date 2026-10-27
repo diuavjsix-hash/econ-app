@@ -1,6 +1,6 @@
 import { clipLine } from './math.js';
 import { clipCurveWithExtensions } from './curve.js';
-import { pointGuides } from './point.js';
+import { clipSegment } from './ruler.js';
 
 export const SNAP_RADIUS = 10;
 export const INTERSECTION_RADIUS = 16;
@@ -110,7 +110,7 @@ function intersections(a, b) {
 }
 
 /** Use exactly the visible straight, quadratic and tangent geometry; no stored pixels. */
-export function buildSnapTargets(state, bounds, excludePointId = null) {
+export function buildSnapTargets(state, bounds, excludeObjectId = null) {
   const shapes = [];
   for (const line of state.lines) {
     const points = clipLine(line, bounds);
@@ -119,10 +119,12 @@ export function buildSnapTargets(state, bounds, excludePointId = null) {
   for (const curve of state.curves) {
     shapes.push(...clipCurveWithExtensions(curve, bounds).map((points) => piece(curve.id, points)));
   }
-  for (const point of state.points ?? []) {
-    if (point.id === excludePointId) continue;
-    for (const guide of pointGuides(point, bounds)) shapes.push(straightPiece(`guide-${point.id}-${guide.axis}`, guide.start, guide.end));
+  for (const ruler of state.dashedLines ?? []) {
+    if (ruler.id === excludeObjectId) continue;
+    const segment = clipSegment(ruler.anchor, ruler.end, bounds);
+    if (segment) shapes.push(straightPiece(ruler.id, ...segment));
   }
+
   if (bounds.yMin <= 0 && bounds.yMax >= 0) shapes.push(straightPiece('axis-x', { x: bounds.xMin, y: 0 }, { x: bounds.xMax, y: 0 }));
   if (bounds.xMin <= 0 && bounds.xMax >= 0) shapes.push(straightPiece('axis-y', { x: 0, y: bounds.yMin }, { x: 0, y: bounds.yMax }));
   const crossings = [];

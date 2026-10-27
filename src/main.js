@@ -1,5 +1,8 @@
+import { mountHandTool } from './tools/hand.js';
+import { mountDuplicateTool } from './tools/duplicate.js';
+import { mountDashedTool } from './tools/dashed.js';
 import { createStore } from './state.js';
-import { mountGraph } from './graph/canvas.js';
+import { mountWorkspace } from './workspace.js';
 import { mountLineTool } from './tools/line.js';
 import { mountExport } from './export.js';
 import { mountQuadrants } from './quadrants.js';
@@ -10,10 +13,13 @@ import { mountPointTool } from './tools/point.js';
 import { mountHistory } from './history.js';
 
 const icons = {
+  hand: '<path d="M8 12V5a2 2 0 0 1 4 0v6-7a2 2 0 0 1 4 0v7-5a2 2 0 0 1 4 0v8c0 5-2 8-6 8h-2c-2 0-3-1-5-4l-3-5a2 2 0 0 1 3-2l3 3"/>',
+  duplicate: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>',
   graph: '<path d="M5 4v15h15M9 15l4-5 6-4"/>',
   line: '<path d="M5 19 19 5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/>',
   curve: '<path d="M4 5c2 10 6 14 16 14"/>',
   point: '<circle cx="12" cy="12" r="4"/>',
+  ruler: '<path d="m3 16 13-13 5 5-13 13zM6 13l3 3M10 9l3 3M14 5l3 3"/>',
   mouse: '<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v7M6 10h12"/>',
   folder: '<path d="M3 7h7l2 2h9v11H3zM3 7V4h7l2 3"/>',
   grid: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16M15 4v16"/>',
@@ -34,34 +40,69 @@ app.innerHTML = `
     <div class="history-actions" role="group" aria-label="편집 기록">
       <button id="undo-action" class="icon-button" aria-label="되돌리기" title="되돌리기 (Ctrl+Z)" disabled>${icon('undo')}</button>
       <button id="redo-action" class="icon-button" aria-label="다시 실행" title="다시 실행 (Ctrl+Shift+Z / Ctrl+Y)" disabled>${icon('redo')}</button>
-      <button id="clear-all" class="icon-button" aria-label="전체 삭제" title="전체 삭제" disabled>${icon('trash')}</button>
+      <button id="clear-all" class="icon-button" aria-label="선택한 그래프의 도형 전체 삭제" title="선택한 그래프의 도형 전체 삭제" disabled>${icon('trash')}</button>
     </div>
-    <button id="choose-quadrants" class="export-button" aria-label="사분면 선택">1사분면</button>
+    <button id="choose-quadrants" class="export-button" aria-label="작업 영역 설정">배치 · 1개</button>
     <button id="export-json" class="export-button">${icon('export')}JSON</button>
   </header>
   <main class="app-layout">
     <section class="workspace" aria-label="그래프">
       <div class="canvas-card">
         <button id="grid-toggle" class="icon-button grid-toggle" aria-label="격자 표시" aria-pressed="true" title="격자 표시 전환">${icon('grid')}</button>
-        <div class="graph-container" id="graph"></div>
+        <div class="diagram-grid" id="graph"></div>
       </div>
     </section>
     <aside class="tools-panel" aria-labelledby="tools-title">
+      <section class="diagram-settings axis-settings" aria-labelledby="diagram-settings-title">
+        <h2 id="diagram-settings-title">선택한 그래프</h2>
+        <label for="diagram-name">이름<input id="diagram-name" type="text" maxlength="80" autocomplete="off" /></label>
+        <label class="setting-row" for="diagram-quadrant">사분면<select id="diagram-quadrant"><option value="first">1사분면</option><option value="upper">1·2사분면</option><option value="all">전체 사분면</option></select></label>
+        <label class="setting-row" for="diagram-x-direction">x 증가<select id="diagram-x-direction"><option value="right">오른쪽 →</option><option value="left">왼쪽 ←</option></select></label>
+        <label class="setting-row" for="diagram-y-direction">y 증가<select id="diagram-y-direction"><option value="up">위쪽 ↑</option><option value="down">아래쪽 ↓</option></select></label>
+      </section>
       <section class="axis-settings" aria-labelledby="axes-title">
         <h2 id="axes-title">축</h2>
         <label for="horizontal-axis-name">수평축<input id="horizontal-axis-name" type="text" value="x" placeholder="x" maxlength="80" autocomplete="off" /></label>
         <label for="vertical-axis-name">수직축<input id="vertical-axis-name" type="text" value="y" placeholder="y" maxlength="80" autocomplete="off" /></label>
       </section>
       <h2 id="tools-title">도구</h2>
+      <button id="hand-tool" class="tool-button" aria-pressed="true" title="도형 선택·이동"><span class="tool-icon">${icon('hand')}</span><strong>손</strong></button>
       <button id="line-tool" class="tool-button" aria-label="직선 추가"><span class="tool-icon">${icon('line')}</span><strong>직선</strong>${icon('plus', 'add-icon')}</button>
       <button id="curve-tool" class="tool-button" aria-label="곡선 추가"><span class="tool-icon">${icon('curve')}</span><strong>곡선</strong>${icon('plus', 'add-icon')}</button>
-      <button id="mouse-tool" class="tool-button" aria-pressed="false" aria-expanded="false" aria-controls="mouse-settings"><span class="tool-icon">${icon('mouse')}</span><strong>마우스</strong><span class="mouse-chevron" aria-hidden="true">⌄</span></button>
-      <section id="mouse-settings" aria-label="마우스 설정" hidden>
-        <label class="point-snap-setting" for="point-snap-toggle"><span>마우스 조정</span><input id="point-snap-toggle" type="checkbox" role="switch" /><span class="switch-track" aria-hidden="true"></span></label>
-        <label class="point-snap-setting" for="point-tool"><span>점 생성</span><input id="point-tool" type="checkbox" role="switch" aria-describedby="point-create-hint" /><span class="switch-track" aria-hidden="true"></span></label>
-        <p id="point-create-hint" class="mouse-hint">활성화 시 우클릭하면 점이 생성됩니다.</p>
+      <button id="mouse-tool" class="tool-button" aria-pressed="false" aria-expanded="false" aria-controls="mouse-settings"><span class="tool-icon">${icon('point')}</span><strong>점</strong><span class="mouse-chevron" aria-hidden="true">⌄</span></button>
+      <section id="mouse-settings" aria-label="점 도구 설정" hidden>
+        <label class="point-snap-setting" for="point-snap-toggle"><span>마우스 조정</span><input id="point-snap-toggle" type="checkbox" role="switch" checked /><span class="switch-track" aria-hidden="true"></span></label>
+        <label class="point-snap-setting" for="point-tool"><span>점 생성</span><input id="point-tool" type="checkbox" role="switch" checked aria-describedby="point-create-hint" /><span class="switch-track" aria-hidden="true"></span></label>
+        <p id="point-create-hint" class="mouse-hint">활성화 시 좌클릭하면 점이 생성됩니다.</p>
         <label class="point-snap-setting" for="point-coordinates-toggle"><span>좌표 함께 표시</span><input id="point-coordinates-toggle" type="checkbox" role="switch" /><span class="switch-track" aria-hidden="true"></span></label>
       </section>
+      <button id="dashed-tool" class="tool-button" aria-pressed="false" aria-expanded="false" aria-controls="dashed-options"><span class="tool-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="3 3" aria-hidden="true"><path d="M4 20 20 4"/></svg></span><strong>점선</strong><span class="mouse-chevron" aria-hidden="true">⌄</span></button>
+      <section id="dashed-options" aria-label="점선 도구 설정" hidden>
+        <label class="point-snap-setting" for="dashed-snap-toggle"><span>마우스 보정</span><input id="dashed-snap-toggle" type="checkbox" role="switch" checked /><span class="switch-track" aria-hidden="true"></span></label>
+        <label class="setting-row" for="dashed-mode">방향<select id="dashed-mode"><option value="free">자유</option><option value="horizontal">수평</option><option value="vertical">수직</option></select></label>
+        <p class="mouse-hint">두 곳을 클릭하거나 드래그하세요. Shift: 수평·수직</p>
+      </section>
+      <button id="duplicate-tool" class="tool-button" aria-pressed="false" aria-expanded="false" aria-controls="duplicate-options"><span class="tool-icon">${icon('duplicate')}</span><strong>복제</strong><span class="mouse-chevron" aria-hidden="true">⌄</span></button>
+      <section id="duplicate-options" aria-label="복제 설정" hidden>
+        <label class="copy-target-label" for="duplicate-target">대상<select id="duplicate-target"><option value="">도형 선택</option></select></label>
+        <div id="duplicate-slope-options" hidden>
+          <h3 class="copy-caption">기울기</h3>
+          <div class="copy-factors" role="group" aria-label="복제 기울기">
+            <button data-copy-factor="1" aria-pressed="true"><strong>그대로</strong><span>×1 · 평행</span></button>
+            <button data-copy-factor="2" aria-pressed="false"><strong>더 가파르게</strong><span>×2</span></button>
+            <button data-copy-factor="0.5" aria-pressed="false"><strong>더 완만하게</strong><span>×½</span></button>
+          </div>
+        </div>
+        <p id="duplicate-preview" class="copy-preview"></p>
+        <details class="copy-details"><summary>복제 옵션</summary>
+          <label id="duplicate-pivot-row" class="setting-row" for="duplicate-pivot">기준<select id="duplicate-pivot"><option value="intercept">세로축 절편 유지</option><option value="anchor">현재 기준점 유지</option></select></label>
+          <label class="setting-row" for="duplicate-placement">배치<select id="duplicate-placement"><option value="same">같은 위치</option><option value="right">가로축 +1</option><option value="up">세로축 +1</option></select></label>
+          <label id="duplicate-children-row" class="copy-children" for="duplicate-children"><input id="duplicate-children" type="checkbox" checked />하위 항목 함께</label>
+        </details>
+        <button id="duplicate-action" class="export-button primary-button copy-action" disabled>복제</button>
+        <p id="duplicate-status" class="mouse-hint" role="status" aria-live="polite"></p>
+      </section>
+      <button id="ruler-tool" class="tool-button" disabled aria-disabled="true" title="비활성화"><span class="tool-icon">${icon('ruler')}</span><strong>자</strong><span class="tool-unavailable">비활성화</span></button>
       <section class="object-section" aria-label="도형 목록">
         <div class="object-heading"><h2>도형</h2><button id="add-group" class="icon-button" aria-label="폴더 추가" title="폴더 추가">${icon('folder')}</button></div>
         <div id="object-list" class="object-list" role="tree" aria-label="그래프 목록"></div>
@@ -88,20 +129,22 @@ app.innerHTML = `
       </section>
       <section id="point-settings" class="point-settings" aria-label="점 설정" hidden>
         <label class="point-snap-setting" for="point-show-coordinates"><span>좌표 표시</span><input id="point-show-coordinates" type="checkbox" role="switch" /><span class="switch-track" aria-hidden="true"></span></label>
-        <h2>보조선</h2>
-        <label class="setting-row" for="point-horizontal">수평<select id="point-horizontal"><option value="none">없음</option><option value="dashed">점선</option><option value="solid">실선</option></select></label>
-        <label class="setting-row" for="point-vertical">수직<select id="point-vertical"><option value="none">없음</option><option value="dashed">점선</option><option value="solid">실선</option></select></label>
-        <label class="setting-row" for="point-guide-extent">범위<select id="point-guide-extent"><option value="axes">축까지</option><option value="full">영역 전체</option></select></label>
       </section>
     </aside>
   </main>
   <dialog id="quadrant-dialog" class="quadrant-dialog" aria-labelledby="quadrant-title">
-    <h2 id="quadrant-title">작업 영역</h2>
+    <div class="json-heading"><h2 id="quadrant-title">작업 영역</h2><button id="close-workspace" class="icon-button" aria-label="작업 영역 닫기">${icon('close')}</button></div>
+    <h3>배치</h3>
+    <div id="layout-choices" class="layout-choices"></div>
+    <details id="custom-layout"><summary>직접 배치</summary><div id="custom-layout-grid" class="custom-layout-grid" role="group" aria-label="최대 3행 3열 배치"></div></details>
+    <h3>사분면</h3>
     <div class="quadrant-choices">
       <button data-quadrants="first" aria-pressed="true"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="32" y="6" width="26" height="26" rx="4" class="quadrant-fill"/><path d="M6 32h52M32 6v52"/></svg><span>1사분면</span></button>
       <button data-quadrants="upper" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="6" width="52" height="26" rx="4" class="quadrant-fill"/><path d="M6 32h52M32 6v52"/></svg><span>1·2사분면</span></button>
       <button data-quadrants="all" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="6" width="52" height="52" rx="4" class="quadrant-fill"/><path d="M6 32h52M32 6v52"/></svg><span>전체 사분면</span></button>
     </div>
+    <label class="apply-quadrants"><input id="apply-all-quadrants" type="checkbox" checked />모든 그래프에 적용</label>
+    <div class="workspace-dialog-footer"><p>배치를 줄여도 기존 그래프는 보관됩니다.</p><button id="apply-workspace" class="export-button primary-button">시작</button></div>
   </dialog>
   <dialog id="json-dialog" class="json-dialog" aria-labelledby="json-title">
     <div class="json-heading"><h2 id="json-title">JSON</h2><button id="close-json" class="icon-button" aria-label="JSON 닫기">${icon('close')}</button></div>
@@ -111,11 +154,14 @@ app.innerHTML = `
 
 const store = createStore();
 mountHistory(app, store);
-mountGraph(app.querySelector('#graph'), store);
+mountWorkspace(app, store);
 mountLineTool(app, store);
 mountCurveTool(app, store);
 mountObjectList(app, store);
 mountPointTool(app, store);
+mountDashedTool(app, store);
+mountHandTool(app, store);
+mountDuplicateTool(app, store);
 mountExport(app, store);
 mountAxes(app, store);
 app.querySelector('#grid-toggle').addEventListener('click', () => store.update({ showGrid: !store.getState().showGrid }));

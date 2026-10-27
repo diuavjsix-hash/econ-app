@@ -95,6 +95,8 @@ test('toggling snap changes only the tool preference, and snapped coordinates re
   const store = createStore();
   const id = store.addPoint({ x: 4.1, y: 4.1 });
   const original = store.getState().points[0];
+  assert.equal(store.getState().pointSnap, true);
+  store.update({ pointSnap: false });
   assert.equal(store.getState().pointSnap, false);
   store.update({ pointSnap: true });
   assert.equal(store.getState().pointSnap, true);
@@ -107,22 +109,15 @@ test('toggling snap changes only the tool preference, and snapped coordinates re
   assert.equal(store.getState().selectedId, id);
   close(store.getState().points[0].anchor, { x: 4, y: 4 });
   const exported = serializeDocument(store.getState());
-  assert.equal(exported.schemaVersion, 3);
+  assert.equal(exported.schemaVersion, 6);
   assert.equal('pointSnap' in exported, false);
   close(exported.points[0].anchor, { x: 4, y: 4 });
 });
 
-test('other points guide snapping while the dragged point excludes its own guides', () => {
-  const guided = {
-    lines: [], curves: [],
-    points: [{ id: 'point-1', anchor: { x: 6, y: 4.3 }, guides: { horizontal: 'dashed', vertical: 'solid', extent: 'axes' } }],
-  };
-  const raw = { x: 3, y: 4.4 };
-  const snapped = snapPoint(raw, buildSnapTargets(guided, bounds), 56);
-  assert.equal(snapped.kind, 'shape');
-  close(snapped.point, { x: 3, y: 4.3 });
-  assert.equal(snapPoint(raw, buildSnapTargets(guided, bounds, 'point-1'), 56), null);
-  const intersection = snapPoint({ x: 6.1, y: 4.4 }, buildSnapTargets(guided, bounds), 56);
-  assert.equal(intersection.kind, 'intersection');
-  close(intersection.point, guided.points[0].anchor);
+test('finite dashed strokes participate in snapping without extending and exclude their own segment', () => {
+  const measured = { lines: [], curves: [], points: [], dashedLines: [{id:'dashed-1',anchor:{x:2,y:4.3},end:{x:6,y:4.3}}] };
+  const snapped = snapPoint({x:3,y:4.4},buildSnapTargets(measured,bounds),56);
+  assert.equal(snapped.kind,'shape'); close(snapped.point,{x:3,y:4.3});
+  assert.equal(snapPoint({x:8,y:4.3},buildSnapTargets(measured,bounds),56),null);
+  assert.equal(snapPoint({x:3,y:4.4},buildSnapTargets(measured,bounds,'dashed-1'),56),null);
 });
