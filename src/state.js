@@ -1,3 +1,4 @@
+import { DEFAULT_AXIS_GAP, MIN_AXIS_GAP, MAX_AXIS_GAP } from './graph/display.js';
 import { prepareDuplicate, DUPLICATABLE } from './duplicate.js';
 import { validPoint, rulerMetrics } from './graph/ruler.js';
 import { LAYOUTS, normalizeSlots } from './layouts.js';
@@ -13,12 +14,12 @@ export function createStore() {
   const state = {
     lines: [], curves: [], points: [], dashedLines: [], rulers: [], groups: [], objectOrder: [],
     selectedId: null, handSelected: true, duplicatePanel: false, activeTool: 'point', mouseSelected: false, rulerSelected: false, dashedSelected: false, dashedMode: 'free', dashedSnap: true, pointSnap: true, pointCoordinates: false, showGrid: true,
-    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' },
+    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
   let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1, nextDashedId = 1;
   const listeners = new Set();
-  const documentKeys = ['lines', 'curves', 'points', 'dashedLines', 'rulers', 'groups', 'objectOrder', 'quadrantMode', 'axisNames', 'showGrid'];
-  const emptyDocument = () => ({ lines: [], curves: [], points: [], dashedLines: [], rulers: [], groups: [], objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, showGrid: true });
+  const documentKeys = ['lines', 'curves', 'points', 'dashedLines', 'rulers', 'groups', 'objectOrder', 'quadrantMode', 'axisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
+  const emptyDocument = () => ({ lines: [], curves: [], points: [], dashedLines: [], rulers: [], groups: [], objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
   let layout = { preset: 'single', slots: structuredClone(LAYOUTS.single.slots) };
@@ -146,6 +147,8 @@ export function createStore() {
       return true;
     },
     update(patch) {
+      if (typeof patch.axisGapEnabled === 'boolean') state.axisGapEnabled = patch.axisGapEnabled;
+      if (Number.isFinite(patch.axisGap)) state.axisGap = Math.max(MIN_AXIS_GAP, Math.min(MAX_AXIS_GAP, patch.axisGap));
       if (typeof patch.showGrid === 'boolean') state.showGrid = patch.showGrid;
       if (typeof patch.pointSnap === 'boolean') state.pointSnap = patch.pointSnap;
       if (typeof patch.pointCoordinates === 'boolean') state.pointCoordinates = patch.pointCoordinates;

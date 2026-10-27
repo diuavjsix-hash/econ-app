@@ -1,3 +1,4 @@
+import { DEFAULT_AXIS_GAP } from './graph/display.js';
 import { directionOf, interceptOf } from './graph/math.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
 import { curveControlPoints, curveTangentRays } from './graph/curve.js';
@@ -18,7 +19,7 @@ function serializeDiagram(state) {
     rulers: state.rulers.map(({ id, name, color, parentId, anchor, end, style, showMeasurement }) => ({
       id, type: 'ruler', name, color, parentId, anchor: { ...anchor }, end: { ...end }, style, showMeasurement,
     })),
-    coordinateSystem: { origin, quadrants: [...QUADRANT_MODES[state.quadrantMode].quadrants], xPositive: state.flipX ? 'left' : 'right', yPositive: state.flipY ? 'down' : 'up', axesVisible: true, axisNames: { ...state.axisNames } },
+    coordinateSystem: { origin, quadrants: [...QUADRANT_MODES[state.quadrantMode].quadrants], xPositive: state.flipX ? 'left' : 'right', yPositive: state.flipY ? 'down' : 'up', axesVisible: true, axisNames: { ...state.axisNames }, lineAxisGap: { enabled: Boolean(state.axisGapEnabled), distance: state.axisGap ?? DEFAULT_AXIS_GAP } },
     showGrid: state.showGrid,
     lines: state.lines.map((line) => {
       const direction = directionOf(line.slope);

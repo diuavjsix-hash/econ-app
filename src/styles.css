@@ -325,6 +325,13 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 .point-snap-setting input:checked + .switch-track { background:var(--accent); }
 .point-snap-setting input:checked + .switch-track::after { transform:translateX(12px); }
 .point-snap-setting input:focus-visible + .switch-track { outline:2px solid #a8afff; outline-offset:3px; }
+.axis-settings .axis-gap-toggle { margin:18px 0 0; color:#7b8499; cursor:pointer; }
+.axis-settings .axis-gap-toggle input { width:30px; padding:0; border:0; }
+.axis-gap-settings { margin-top:14px; }
+.axis-gap-settings .slope-heading { margin-bottom:10px; }
+.axis-gap-settings .slope-heading label { margin:0; }
+.axis-settings .axis-gap-settings input[type=range] { width:100%; padding:0; border:0; background:linear-gradient(to right, var(--accent) var(--progress), #eceef5 var(--progress)); }
+.axis-gap-settings output { color:#7b8499; font-size:11px; font-variant-numeric:tabular-nums; }
 .snap-preview { fill:none; stroke:#6068e8; stroke-width:1.5; pointer-events:none; }
 .snap-preview circle { stroke-dasharray:3 2; }
 .snap-preview text { fill:#6068e8; stroke:white; stroke-width:3px; paint-order:stroke; font:11px Inter,'Noto Sans KR',sans-serif; }

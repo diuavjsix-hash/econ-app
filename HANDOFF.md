@@ -4,7 +4,7 @@
 
 ## 먼저 확인할 사항
 
-사용자는 경제 모형을 그리는 웹 앱을 만들고 있으며, 최종적으로 GitHub Pages에서 볼 수 있는 형태를 원합니다. **2026-10-07 현재 구현의 문서 정리·커밋·푸시를 명시적으로 요청했습니다.** 앱·문서·테스트·실행 스크립트를 저장소에서 함께 관리합니다. 배포는 별도로 요청하지 않았습니다.
+사용자는 경제 모형을 그리는 웹 앱을 만들고 있으며, 최종적으로 GitHub Pages에서 볼 수 있는 형태를 원합니다. **2026-10-27 현재 구현의 문서화·커밋·GitHub 푸시를 명시적으로 요청했습니다.** 앱·문서·테스트·실행 스크립트를 저장소에서 함께 관리합니다. 배포는 별도로 요청하지 않았습니다.
 
 | 항목 | 현재 상태 |
 | --- | --- |
@@ -12,11 +12,23 @@
 | 원본 작업 폴더 | `C:\Users\htt06\OneDrive\바탕 화면\econ-app` |
 | 기준 브랜치 | `main`; 최신 커밋은 `git log -1 --oneline`으로 확인 |
 | Git 상태 확인 | `git status --short --branch`로 로컬 변경과 원격 동기화 확인 |
-| 실행 환경 | Codex 번들 Node.js 24.19.0; 일반 PowerShell의 PATH에는 node가 없었음. 프로젝트 요구 버전은 Node.js 20 이상 |
+| 실행 환경 | Codex 번들 Node.js 24.22.1; 일반 PowerShell의 PATH에는 node가 없었음. 프로젝트 요구 버전은 Node.js 20 이상 |
 | 로컬 주소 | `http://127.0.0.1:5173/` |
 | 저장 방식 | 메모리 상태; 새로고침하면 그림이 초기화됨 |
 
 다른 환경에서는 저장소의 최신 `main`을 가져와 Node.js 20 이상으로 실행합니다. 의존성 설치는 필요 없습니다. `dist/`는 빌드로 다시 생성하며 Git에서 제외합니다. `.local/`의 검증 화면·실행 로그·서버 PID 기록도 제외합니다. `.local/server.json`을 다른 환경에 복사하지 말고 서버를 새로 시작하십시오.
+
+## 2026-10-27 · 저장소 반영과 원격 축 간격 기능 통합
+
+사용자의 최신 요청은 현재 구현의 문서화·커밋·푸시입니다. 로컬 구현과 문서를 함께 커밋하며 배포는 요청받지 않았습니다. 커밋 ID와 원격 동기화는 `git log -1 --oneline`, `git status --short --branch`로 확인합니다. 아래 기능 변경 기록의 “커밋·푸시하지 않음”은 구현 당시의 이력입니다.
+
+- 원격 main에 먼저 올라온 aa93de8의 **축에서 선 띄우기** 기능을 보존해 여러 그래프·대면 축 반전·점선·복제와 통합했습니다. 간격은 그래프별로 독립 저장하며 기본 OFF, 거리 0.75, 조절 범위 0.25~2 좌표 단위입니다. 직선·곡선의 축 주변 표시와 hit 영역만 잘라 원본 좌표·기울기를 유지합니다. 숨긴 부분에는 스냅하지 않으며 축·점·점선은 자르지 않습니다.
+- lineDisplayRegions와 displayedLineSegments/displayedCurveSegments/lineEditingGeometry를 렌더·스냅·손잡이에 연결했습니다. 여러 SVG의 clipPath ID는 고유하며 반전된 그래프에서도 rect의 좌표를 min, 폭·높이를 절댓값으로 계산합니다. axisGapEnabled/axisGap는 그래프 문서·undo/redo·JSON coordinateSystem.lineAxisGap에 포함합니다. 점 보조선 제거와 자 비활성화는 유지합니다.
+- 통합 후 검증: Windows 서버 3개를 포함한 전체 **87개 테스트 통과**(실패·건너뜀 없음), 정적 빌드 성공. 새 통합 회귀는 그래프별 축 간격의 배치·기록·JSON 보존과 반전 투영의 유효한 클리핑 크기를 검증합니다. 브라우저에서는 좌우 대면 그래프의 직선·곡선에 축 간격 적용, 다른 그래프의 기본 OFF 독립성, 간격 슬라이더 한 단계 undo, 원본 anchor 유지, JSON 6의 그래프별 lineAxisGap, clipPath ID 고유성·양수 폭/높이와 콘솔 error 없음을 확인했습니다.
+- 현재 기능: 최대 3×3 배치, 개별 축·사분면·축 반전·축 간격, 기본 손 선택, 좌클릭 점 생성, 점·점선 각각 기본 보정 ON, 독립 점선, 직선 기울기 1/2·1·2배 복제와 하위 계층 복제, 최근 100단계 기록, JSON schemaVersion 6.
+- 문서: README는 사용법과 실행, docs/architecture.md는 상태·좌표·도구·기록, docs/json-format.md는 그래프별 좌표계·점선·복제 출력, 이 문서는 인계와 검증·제한을 기록합니다. 빌드 산출물 dist/와 .local/의 로그·검증 화면·서버 기록은 Git에서 제외합니다.
+- 원격의 별도 데스크톱 체크아웃(`C:\Users\htt06\Desktop\codex_project\econ-app`)에서는 server.cmd/start-server.cmd/stop-server.cmd의 기기 전용 수정본을 업로드하지 말라는 지시가 있었습니다. 해당 체크아웃의 skip-worktree는 그 기기 로컬 설정입니다. 현재 작업 폴더는 위 표의 OneDrive 경로이며, 이번 작업에서도 이 세 실행 파일은 변경·커밋하지 않습니다. 다른 환경의 실행 파일을 덮어쓰거나 저장소에서 삭제하지 마십시오.
+- 알려진 제한: 새로고침 시 메모리 초기화, JSON 불러오기·자동 저장 없음, 그래프 사이 변수 연동/연결선 없음, 같은 위치의 복제본 겹침 가능, 점/곡선에 영구 부착하지 않음. 실제 모바일 터치 입력은 검증하지 않았으며 세부 브라우저 검증 범위는 아래 변경 기록을 참고합니다.
 
 ## 2026-10-27 · 좌클릭 점 생성·손 탭·경제 그래프 복제
 
@@ -104,7 +116,7 @@ Windows에서는 **`server.cmd` 더블클릭 → `1` 시작 / `2` 종료 / `3` �
 node scripts/dev-server.mjs
 ```
 
-일반 PowerShell에서 `node`가 인식되지 않으면 [README의 전체 실행 경로](README.md)를 사용합니다. Codex 내부에서 명령을 찾을 수 있다는 사실이 사용자의 일반 PowerShell에서도 찾을 수 있다는 뜻은 아닙니다. 현재 실행 파일은 `C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`이며 `--version`으로 v24.19.0을 확인했습니다. 아래 테스트·빌드 명령에도 `node` 대신 `& "전체 실행 경로"`를 사용할 수 있습니다.
+일반 PowerShell에서 `node`가 인식되지 않으면 [README의 전체 실행 경로](README.md)를 사용합니다. Codex 내부에서 명령을 찾을 수 있다는 사실이 사용자의 일반 PowerShell에서도 찾을 수 있다는 뜻은 아닙니다. 현재 실행 파일은 `C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`이며 `--version`으로 v24.22.1을 확인했습니다. 아래 테스트·빌드 명령에도 `node` 대신 `& "전체 실행 경로"`를 사용할 수 있습니다.
 
 이미 서버가 실행 중이면 기존 `http://127.0.0.1:5173/`를 사용합니다. 서버는 파일을 매 요청마다 읽지만 HMR은 없으므로 소스 변경 후 브라우저를 새로고침해야 합니다. `EADDRINUSE`는 포트가 사용 중이라는 뜻입니다. 다른 포트가 필요하면 PowerShell에서 아래처럼 실행합니다.
 

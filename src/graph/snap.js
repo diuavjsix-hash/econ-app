@@ -1,5 +1,4 @@
-import { clipLine } from './math.js';
-import { clipCurveWithExtensions } from './curve.js';
+import { displayedLineSegments, displayedCurveSegments } from './display.js';
 import { clipSegment } from './ruler.js';
 
 export const SNAP_RADIUS = 10;
@@ -113,11 +112,10 @@ function intersections(a, b) {
 export function buildSnapTargets(state, bounds, excludeObjectId = null) {
   const shapes = [];
   for (const line of state.lines) {
-    const points = clipLine(line, bounds);
-    if (points) shapes.push(straightPiece(line.id, ...points));
+    shapes.push(...displayedLineSegments(line, bounds, state).map(points => straightPiece(line.id, ...points)));
   }
   for (const curve of state.curves) {
-    shapes.push(...clipCurveWithExtensions(curve, bounds).map((points) => piece(curve.id, points)));
+    shapes.push(...displayedCurveSegments(curve, bounds, state).map((points) => piece(curve.id, points)));
   }
   for (const ruler of state.dashedLines ?? []) {
     if (ruler.id === excludeObjectId) continue;

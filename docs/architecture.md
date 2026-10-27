@@ -25,6 +25,7 @@
 | `src/tools/ruler.js` | 비활성화된 자 UI 구현; 현재 main에서 mount하지 않음 |
 | `src/graph/point.js` | 좌표 표시용 반올림 |
 | `src/graph/snap.js` | 보이는 도형의 최근접점·교점 계산과 화면 거리 기준 점 보정 |
+| `src/graph/display.js` | 축 주변 수학 좌표 띠를 제외한 직선·곡선 표시 구간과 편집 기준점 |
 | `src/graph/viewport.js` | 사분면별 원점, 배율, 표시 영역 계산 |
 | `src/graph/canvas.js` | SVG 축·격자·도형·손잡이 렌더, 실시간 점선 포인터·좌표, 포인터·키보드 조작 |
 | `src/tools/line.js` | 직선 추가, 기울기 슬라이더·직접 입력·프리셋 |
@@ -32,13 +33,14 @@
 | `src/tools/point.js` | 점 탭·좌클릭 생성·마우스 조정·좌표 표시 |
 | `src/tools/objects.js` | 도형·폴더 트리, 이름 편집·삭제·분류 이동·접기 |
 | `src/quadrants.js` | 배치·사분면의 초안 선택과 일괄 적용, 첫 시작과 이후 변경 창 |
-| `src/axes.js` | 수평·수직축 이름 입력 |
+| `src/axes.js` | 수평·수직축 이름과 축 간격 입력 |
 | `src/export.js` | `serializeDocument`와 JSON 모달·복사·다운로드 |
 | `src/styles.css` | 미니멀한 외관, SVG 조작 스타일, 반응형 배치 |
 | `scripts/dev-server.mjs` | localhost 정적 파일 서버; 앱 자산만 제공 |
 | `server.cmd`, `start-server.cmd`, `stop-server.cmd` | Windows 더블클릭 실행 파일; 작업 폴더와 무관하게 PowerShell 제어 스크립트 호출 |
 | `scripts/server.ps1` | Node 실행 파일 탐색, 서버 시작·종료·상태 확인과 메뉴 |
 | `scripts/build.mjs` | 앱 파일을 `dist/`로 복사; 번들링·압축 없음 |
+| `tests/display.test.js` | 축 간격·정확한 형상·스냅·손잡이·기록·그래프별 설정·반전 클리핑 테스트 8개 |
 | `tests/graph.test.js` | 직선·상태·좌표·축 이름·JSON 회귀 테스트 13개 |
 | `tests/curve.test.js` | 곡선 계산·단조성·혼합 상태·JSON·경계 클리핑·연장 표시 회귀 테스트 8개 |
 | `tests/objects.test.js` | 점·좌표 표시·보조선 제거·사용자 이름·계층·삭제·JSON 회귀 테스트 7개 |
@@ -68,14 +70,14 @@
   pointCoordinates: false,
   showGrid: true,
   quadrantMode: 'first',
-  axisNames: { x: 'x', y: 'y' },
+  axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: 0.75,
   activeDiagramId: 'diagram-1', flipX: false, flipY: false,
   layout: { preset: 'single', slots: [{ row: 0, column: 0, flipX: false, flipY: false }] },
   diagrams: [/* id, name, flipX, flipY 및 그래프별 문서 필드 */]
 }
 ```
 
-`diagrams`가 그래프별 문서를 보관하고, 최상위 `lines`, `curves`, `points`, `dashedLines`, `rulers`, `groups`, `objectOrder`, `quadrantMode`, `axisNames`, `showGrid`는 활성 그래프의 편집용 투영입니다. `syncDiagram`으로 변경을 반영하고 `loadDiagram`으로 전환합니다. `configureLayout`은 필요한 그래프를 추가하며 배치를 줄여도 나머지 그래프를 보관합니다. 표시되는 그래프는 `diagrams`의 앞 N개와 `layout.slots`의 위치를 대응시킵니다. `diagram-N` ID 카운터도 되돌리지 않습니다.
+`diagrams`가 그래프별 문서를 보관하고, 최상위 `lines`, `curves`, `points`, `dashedLines`, `rulers`, `groups`, `objectOrder`, `quadrantMode`, `axisNames`, `showGrid`, `axisGapEnabled`, `axisGap`는 활성 그래프의 편집용 투영입니다. `syncDiagram`으로 변경을 반영하고 `loadDiagram`으로 전환합니다. `configureLayout`은 필요한 그래프를 추가하며 배치를 줄여도 나머지 그래프를 보관합니다. 표시되는 그래프는 `diagrams`의 앞 N개와 `layout.slots`의 위치를 대응시킵니다. `diagram-N` ID 카운터도 되돌리지 않습니다.
 
 `workspace.js`는 그래프마다 `diagramState`로 분리한 store 구독을 전달합니다. SVG의 pointerdown·keydown capture 단계에서 먼저 그래프를 선택하므로 빈 평면·도형·좌클릭 생성도 올바른 그래프에 적용합니다. 비활성 그래프에는 선택 손잡이와 마우스 커서를 표시하지 않습니다. 각 SVG의 clipPath ID는 고유합니다. 숨긴 그래프는 mount를 해제하고 다시 표시할 때 재생성합니다. 도구·계층·스냅은 활성 그래프 문서만 읽습니다. 마우스 옵션은 작업 전체에서 공유합니다.
 
@@ -103,6 +105,12 @@
 - 곡선 기본 중심 기울기는 우하향 −0.75, 우상향 +0.75입니다. `bend` 범위는 0~0.35로, 전체 구간에서 각각 하강·상승을 유지합니다. 단순 도식 표현이며 경제 모형 추정값은 아닙니다.
 - 곡선 생성 위치는 현재 플롯 중심입니다. 반폭은 내부 좌표 폭의 38%와 높이의 36% 중 작은 값으로 정합니다. 곡선 추가는 우하향·우상향을 번갈아 선택하고 기본 휘어짐은 0.25입니다.
 
+## 축에서 선 띄우기
+
+axisGapEnabled는 기본 false, axisGap는 기본 0.75이며 0.25~2 내부 좌표로 제한합니다. 그래프별 문서 필드여서 전환·배치 변경·undo/redo에서 보존합니다. display.js는 x=0/y=0 주변 띠를 제외한 영역을 구하고 직선·곡선의 실제 형상만 클리핑합니다. 수직선·접선 연장·기울기·anchor는 변하지 않습니다. 축·점·독립 점선에는 적용하지 않습니다.
+
+렌더와 스냅이 동일한 표시 구간을 사용하므로 숨긴 부분에는 스냅하지 않습니다. 드래그 기준점은 lineEditingGeometry로 보이는 선분 위에 두며 곡선 손잡이는 isLinePointVisible로 검사합니다. canvas별 line-display-clip ID를 고유하게 만들고 영역의 양 끝을 투영한 min 좌표와 절대 폭·높이를 사용해 좌우·상하 반전에서도 클리핑을 유지합니다. JSON의 coordinateSystem.lineAxisGap에 enabled/distance를 기록합니다.
+
 ## 직접 조작
 
 `canvas.js`는 시각적인 선과 별도로 넓은 투명 hit 영역을 렌더합니다. 선택한 도형은 마지막에 그려 앞에 보이도록 합니다. 선택한 직선에는 기울기 조절점 2개와 이동점, 곡선에는 휘어짐 조절점 1개와 이동점이 나타납니다.
@@ -117,7 +125,7 @@
 
 호버 이동은 비대화형 `.mouse-cursor-layer`만 갱신하고 도형·편집 손잡이·포커스를 재생성하지 않습니다. 좌표는 소수 둘째 자리까지 표시하고 가장자리에서는 위치를 바꿔 잘림을 막습니다. 마지막 포인터 위치는 canvas 내 임시 상태이며 문서·JSON에 저장하지 않습니다. 점 자체의 좌표 표시 옵션은 별개입니다.
 
-계산은 수학 좌표로 수행합니다. 이차 곡선의 최근접점은 거리 미분의 삼차식에서 구하고, 직선·곡선·곡선끼리의 교점은 실제 방정식의 근으로 구합니다. 접점도 포함하며 같은 곡선의 구간 연결은 교점으로 취급하지 않습니다. 보이는 도형·자·영역·제외할 객체이 바뀔 때만 대상과 교점을 다시 계산해 캐시합니다. `pointSnap`과 보정 표시 자체는 JSON에 출력하지 않고 보정된 점 좌표만 출력합니다.
+계산은 수학 좌표로 수행합니다. 이차 곡선의 최근접점은 거리 미분의 삼차식에서 구하고, 직선·곡선·곡선끼리의 교점은 실제 방정식의 근으로 구합니다. 접점도 포함하며 같은 곡선의 구간 연결은 교점으로 취급하지 않습니다. 보이는 도형·점선·영역·제외할 객체가 바뀔 때만 대상과 교점을 다시 계산해 캐시합니다. `pointSnap`과 보정 표시 자체는 JSON에 출력하지 않고 보정된 점 좌표만 출력합니다.
 
 목록은 생성 순서와 `parentId`로 중첩된 트리를 만듭니다. HTML 드래그 앤 드롭은 항목 안으로 이동하고, 드래그 중 최상위 영역으로 꺼낼 수 있습니다. 접기 버튼과 상위 항목 선택 목록도 제공합니다. 모바일·키보드 사용자는 상위 항목 선택 목록으로 같은 분류 동작을 수행합니다. DOM 이름은 textContent로 렌더하고 드래그 대상은 순환 검사를 통과해야 합니다.
 

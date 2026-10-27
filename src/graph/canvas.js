@@ -1,8 +1,9 @@
+import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions, isLinePointVisible, lineEditingGeometry } from './display.js';
 import { drawDashedLine } from './dashed-view.js';
 import { constrainRuler, translateRuler } from './ruler.js';
-import { angleFromSlope, clipLine, slopeFromAngle } from './math.js';
-import { createViewport, visibleAnchor, toScreen as projectPoint, toWorld } from './viewport.js';
-import { bendFromPoint, clipCurveWithExtensions, curvePoint } from './curve.js';
+import { angleFromSlope, slopeFromAngle } from './math.js';
+import { createViewport, toScreen as projectPoint, toWorld } from './viewport.js';
+import { bendFromPoint, curvePoint } from './curve.js';
 import { pointCoordinatesLabel } from './point.js';
 import { buildSnapTargets, snapPoint } from './snap.js';
 import { objectsOf } from '../objects.js';
@@ -17,7 +18,8 @@ function element(tag, attributes, text) {
 }
 
 export function mountGraph(container, store) {
-  const clipId = `plot-clip-${nextCanvasId++}`;
+  const canvasId = nextCanvasId++;
+  const clipId = `plot-clip-${canvasId}`, lineClipId = `line-display-clip-${canvasId}`;
   const svg = element('svg', { 'aria-label': '그래프 편집 화면', class: 'graph-svg' });
   container.append(svg);
   let currentState = store.getState();
@@ -34,7 +36,7 @@ export function mountGraph(container, store) {
     const snapping = currentState.dashedSelected || drag?.object.type === 'dashed' ? currentState.dashedSnap : currentState.pointSnap;
     if (!snapping || event.altKey || point.x < bounds.xMin || point.x > bounds.xMax || point.y < bounds.yMin || point.y > bounds.yMax) return point;
     const signature = JSON.stringify([
-      bounds,
+      bounds, currentState.axisGapEnabled, currentState.axisGap,
       currentState.lines.map(({ id, anchor, slope }) => [id, anchor, slope]),
       currentState.curves.map(({ id, anchor, slope, span, bend }) => [id, anchor, slope, span, bend]),
       currentState.dashedLines.filter(r => r.id !== drag?.object.id).map(({ id, anchor, end }) => [id, anchor, end]),
@@ -132,6 +134,12 @@ export function mountGraph(container, store) {
     const clip = element('clipPath', { id: clipId });
     clip.append(element('rect', { x: plot.left, y: plot.top, width: plot.right - plot.left, height: plot.bottom - plot.top }));
     defs.append(clip);
+    const lineClip = element('clipPath', { id: lineClipId });
+    for (const region of lineDisplayRegions(bounds, currentState)) {
+      const a = toScreen({ x: region.xMin, y: region.yMin }), b = toScreen({ x: region.xMax, y: region.yMax });
+      lineClip.append(element('rect', { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) }));
+    }
+    defs.append(lineClip);
     svg.append(defs);
     // Clip geometry rather than painted strokes so the full thickness reaches each axis.
     // Only the wider interaction targets remain restricted to the mathematical domain.
@@ -140,7 +148,7 @@ export function mountGraph(container, store) {
     const ordered = [...currentState.lines, ...currentState.curves].sort((a, b) => Number(a.id === currentState.selectedId) - Number(b.id === currentState.selectedId));
     for (const line of ordered) {
       if (line.type === 'curve') {
-        const segments = clipCurveWithExtensions(line, bounds);
+        const segments = displayedCurveSegments(line, bounds, currentState);
         if (!segments.length) continue;
         let previousEnd = null;
         const d = segments.map((points) => {
@@ -152,20 +160,22 @@ export function mountGraph(container, store) {
         const selected = line.id === currentState.selectedId;
         const group = element('g', { class: 'graph-curve', style: `--line-color:${line.color}` });
         group.append(element('path', { d, class: `plotted-line${selected ? ' is-selected' : ''}`, fill: 'none', 'aria-hidden': 'true' }));
-        const hit = element('path', { d, fill: 'none', class: 'line-hit', 'clip-path': `url(#${clipId})`, 'data-id': line.id, 'data-action': 'move', tabindex: 0, role: 'button', 'aria-label': `${line.name} 이동`, 'aria-pressed': selected });
+        const hit = element('path', { d, fill: 'none', class: 'line-hit', 'clip-path': `url(#${lineClipId})`, 'data-id': line.id, 'data-action': 'move', tabindex: 0, role: 'button', 'aria-label': `${line.name} 이동`, 'aria-pressed': selected });
         hit.append(element('title', {}, `${line.name} · 드래그하여 이동`));
         group.append(hit);
         shapes.append(group);
         continue;
       }
-      const points = clipLine(line, bounds);
-      if (!points) continue;
-      const [a, b] = points.map(toScreen);
+      const segments = displayedLineSegments(line, bounds, currentState);
+      if (!segments.length) continue;
+      const d = segments.map(points => {
+        const [a, b] = points.map(toScreen);
+        return `M${a.x} ${a.y}L${b.x} ${b.y}`;
+      }).join(' ');
       const selected = line.id === currentState.selectedId;
       const group = element('g', { class: 'graph-line', style: `--line-color:${line.color}` });
-      const coordinates = { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
-      group.append(element('line', { ...coordinates, class: `plotted-line${selected ? ' is-selected' : ''}`, 'aria-hidden': 'true' }));
-      const hit = element('line', { ...coordinates, class: 'line-hit', 'clip-path': `url(#${clipId})`, 'data-id': line.id, 'data-action': 'move', tabindex: 0, role: 'button', 'aria-label': `${line.name} 이동`, 'aria-pressed': selected });
+      group.append(element('path', { d, fill: 'none', class: `plotted-line${selected ? ' is-selected' : ''}`, 'aria-hidden': 'true' }));
+      const hit = element('path', { d, fill: 'none', class: 'line-hit', 'clip-path': `url(#${lineClipId})`, 'data-id': line.id, 'data-action': 'move', tabindex: 0, role: 'button', 'aria-label': `${line.name} 이동`, 'aria-pressed': selected });
       hit.append(element('title', {}, `${line.name} · 드래그하여 이동`));
       group.append(hit);
       shapes.append(group);
@@ -223,15 +233,16 @@ export function mountGraph(container, store) {
       const center = element('circle', { cx: anchor.x, cy: anchor.y, r: 5, class: 'move-handle', 'data-id': selected.id, 'data-action': 'move' });
       center.append(element('title', {}, '드래그하여 이동'));
       // A handle on an axis stays whole; an offscreen handle stays hidden.
-      for (const [node, point] of [[handle, bendPoint], [center, anchor]]) {
-        if (point.x >= plot.left && point.x <= plot.right && point.y >= plot.top && point.y <= plot.bottom) handles.append(node);
+      for (const [node, point] of [[handle, curvePoint(selected, 0.6)], [center, selected.anchor]]) {
+        if (isLinePointVisible(point, bounds, currentState)) handles.append(node);
       }
       svg.append(handles);
       return;
     }
-    const points = clipLine(selected, bounds);
-    if (!points) return;
-    const anchor = toScreen(visibleAnchor(selected, points, bounds));
+    const editing = lineEditingGeometry(selected, displayedLineSegments(selected, bounds, currentState));
+    if (!editing) return;
+    const { points } = editing;
+    const anchor = toScreen(editing.anchor);
     const handles = element('g', { class: 'line-handles', style: `--line-color:${selected.color}` });
     for (const [index, endpoint] of points.entries()) {
       const edge = toScreen(endpoint);
@@ -311,9 +322,9 @@ export function mountGraph(container, store) {
     if (!object) return;
     let anchor = object.anchor;
     if (object.type === 'line') {
-      const points = clipLine(object, viewport.bounds);
-      if (!points) return;
-      anchor = visibleAnchor(object, points, viewport.bounds);
+      const editing = lineEditingGeometry(object, displayedLineSegments(object, viewport.bounds, currentState));
+      if (!editing) return;
+      anchor = editing.anchor;
     }
     drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), object: { ...structuredClone(object), anchor } };
     store.beginHistory();
