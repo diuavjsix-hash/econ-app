@@ -444,3 +444,17 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 .copy-children input { accent-color:var(--accent); }
 .copy-action { width:100%; margin-top:12px; }
 .copy-action:disabled { cursor:default; opacity:.4; }
+/* Sum operands stay selectable in compact side panels. */
+#sum-options { padding: 10px 4px 14px; }
+.sum-sources { display: grid; gap: 8px; max-height: 180px; overflow: auto; margin: 12px 0; }
+.sum-sources label { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+.sum-sources span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sum-sources input, #sum-nonnegative { accent-color: #6068e8; }
+.graph-sum .line-hit { cursor: pointer; }
+#sketch-options, #sketch-settings { padding: 10px 4px 14px; }
+.sketch-shapes { display:flex; gap:8px; margin:8px 0 14px; }
+.sketch-shapes button { flex:1; padding:5px; border:1px solid var(--border); border-radius:6px; background:white; font-size:22px; cursor:pointer; }
+.sketch-shapes button:disabled { opacity:.4; cursor:default; }
+.sketch-guide { stroke:var(--line-color); stroke-width:1; stroke-dasharray:3 4; opacity:.4; pointer-events:none; }
+.sketch-draft { pointer-events:none; opacity:.65; }
+.sketch-step-label { fill:#6b7288; font-size:12px; }

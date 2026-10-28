@@ -102,7 +102,7 @@ export function mountObjectList(root, store) {
         swatch.style.setProperty('--object-color', object.color);
         if (object.type === 'group' || descendants.length) {
           swatch.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h7l2 2h9v11H3zM3 7V4h7l2 3"/></svg>';
-        } else swatch.textContent = object.type === 'point' ? '●' : object.type === 'curve' ? '⌒' : object.type === 'ruler' ? '↔' : object.type === 'dashed' ? '┄' : '―';
+        } else swatch.textContent = object.type === 'sketch' ? '∿' : object.type === 'sum' ? 'Σ' : object.type === 'point' ? '●' : object.type === 'curve' ? '⌒' : object.type === 'ruler' ? '↔' : object.type === 'dashed' ? '┄' : '―';
         const name = document.createElement('span');
         name.className = 'object-label';
         name.textContent = label(object);

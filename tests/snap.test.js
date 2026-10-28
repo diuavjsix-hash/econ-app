@@ -109,7 +109,7 @@ test('toggling snap changes only the tool preference, and snapped coordinates re
   assert.equal(store.getState().selectedId, id);
   close(store.getState().points[0].anchor, { x: 4, y: 4 });
   const exported = serializeDocument(store.getState());
-  assert.equal(exported.schemaVersion, 6);
+  assert.equal(exported.schemaVersion, 8);
   assert.equal('pointSnap' in exported, false);
   close(exported.points[0].anchor, { x: 4, y: 4 });
 });

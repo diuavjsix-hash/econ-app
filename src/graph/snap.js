@@ -1,5 +1,7 @@
 import { displayedLineSegments, displayedCurveSegments } from './display.js';
 import { clipSegment } from './ruler.js';
+import { displayedSumSegments } from './sum.js';
+import { displayedSketchSegments } from './sketch.js';
 
 export const SNAP_RADIUS = 10;
 export const INTERSECTION_RADIUS = 16;
@@ -121,6 +123,14 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
     if (ruler.id === excludeObjectId) continue;
     const segment = clipSegment(ruler.anchor, ruler.end, bounds);
     if (segment) shapes.push(straightPiece(ruler.id, ...segment));
+  }
+  for (const sum of state.sums ?? []) {
+    if (sum.id === excludeObjectId) continue;
+    shapes.push(...displayedSumSegments(sum, state, bounds).map(points => straightPiece(sum.id, ...points)));
+  }
+  for (const sketch of state.sketches ?? []) {
+    if (sketch.id===excludeObjectId) continue;
+    shapes.push(...displayedSketchSegments(sketch,bounds,state).map(points=>straightPiece(sketch.id,...points)));
   }
 
   if (bounds.yMin <= 0 && bounds.yMax >= 0) shapes.push(straightPiece('axis-x', { x: bounds.xMin, y: 0 }, { x: bounds.xMax, y: 0 }));

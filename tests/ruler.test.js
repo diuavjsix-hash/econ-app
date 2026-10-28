@@ -80,7 +80,7 @@ test('JSON exports both endpoints and styles per diagram, without point guides o
   const store=createStore(); store.addPoint({x:1,y:2});
   const id=store.addRuler({x:1,y:2},{x:4,y:6});
   const document=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(document.schemaVersion,6); assert.equal(document.rulers[0].id,id);
+  assert.equal(document.schemaVersion,8); assert.equal(document.rulers[0].id,id);
   assert.deepEqual(document.rulers[0].end,{x:4,y:6});
   assert.equal(document.rulers[0].showMeasurement,true); assert.equal('guides' in document.points[0],false);
   assert.deepEqual(document.rulers,document.diagrams[0].rulers);

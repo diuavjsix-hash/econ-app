@@ -1,12 +1,15 @@
 import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions, isLinePointVisible, lineEditingGeometry } from './display.js';
 import { drawDashedLine } from './dashed-view.js';
 import { constrainRuler, translateRuler } from './ruler.js';
-import { angleFromSlope, slopeFromAngle } from './math.js';
+import { angleFromSlope, slopeFromAngle, directionOf } from './math.js';
 import { createViewport, toScreen as projectPoint, toWorld } from './viewport.js';
 import { bendFromPoint, curvePoint } from './curve.js';
 import { pointCoordinatesLabel } from './point.js';
 import { buildSnapTargets, snapPoint } from './snap.js';
 import { objectsOf } from '../objects.js';
+import { displayedSumSegments } from './sum.js';
+import { projectOnLine, unitVector, validSketch, distance, sketchHandlePoints } from './sketch.js';
+import { drawSketch } from './sketch-view.js';
 
 let nextCanvasId = 1;
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -26,6 +29,8 @@ export function mountGraph(container, store) {
   let viewport;
   let drag = null;
   let draft = null;
+  let sketchDraft = [];
+  let sketchHover = null;
   let snapTarget = null;
   let pointer = null;
   let snapCache = { signature: '', targets: null };
@@ -39,6 +44,8 @@ export function mountGraph(container, store) {
       bounds, currentState.axisGapEnabled, currentState.axisGap,
       currentState.lines.map(({ id, anchor, slope }) => [id, anchor, slope]),
       currentState.curves.map(({ id, anchor, slope, span, bend }) => [id, anchor, slope, span, bend]),
+      currentState.sums,
+      currentState.sketches,
       currentState.dashedLines.filter(r => r.id !== drag?.object.id).map(({ id, anchor, end }) => [id, anchor, end]),
       drag?.object.id ?? null,
     ]);
@@ -181,6 +188,26 @@ export function mountGraph(container, store) {
       shapes.append(group);
     }
 
+    for (const sketch of currentState.sketches) shapes.append(drawSketch(sketch,viewport,currentState,{selected:sketch.id===currentState.selectedId,clipId:lineClipId}));
+    svg.append(element('g',{class:'sketch-draft-layer','pointer-events':'none'}));
+    updateSketchDraft();
+    for (const sum of currentState.sums) {
+      const segments = displayedSumSegments(sum, currentState, bounds);
+      if (!segments.length) continue;
+      let previousEnd = null;
+      const d = segments.map(([a, b]) => {
+        const start = toScreen(a), end = toScreen(b);
+        const connected = previousEnd && Math.hypot(start.x - previousEnd.x, start.y - previousEnd.y) < 1e-6;
+        previousEnd = end;
+        return `${connected ? '' : `M${start.x} ${start.y}`}L${end.x} ${end.y}`;
+      }).join(' ');
+      const selected = sum.id === currentState.selectedId;
+      const group = element('g', { class: 'graph-sum', style: `--line-color:${sum.color}` });
+      group.append(element('path', { d, fill: 'none', class: `plotted-line${selected ? ' is-selected' : ''}`, 'aria-hidden': 'true' }));
+      const hit = element('path', { d, fill: 'none', class: 'line-hit', 'clip-path': `url(#${lineClipId})`, 'data-id': sum.id, 'data-action': 'select', tabindex: 0, role: 'button', 'aria-label': `${sum.name} 선택`, 'aria-pressed': selected });
+      hit.append(element('title', {}, `${sum.name} · 원본을 수정하면 자동 갱신`));
+      group.append(hit); shapes.append(group);
+    }
     for (const ruler of currentState.dashedLines) svg.append(drawDashedLine(ruler, viewport, { selected: ruler.id === currentState.selectedId, editable: currentState.handSelected, clipId }));
     svg.append(element('g', { class: 'dashed-draft-layer', 'pointer-events': 'none' }));
     updateDraft();
@@ -223,7 +250,10 @@ export function mountGraph(container, store) {
     svg.append(element('g', { class: 'mouse-cursor-layer', 'pointer-events': 'none' }));
     updateMouseCursor(drag?.object.type === 'point' ? currentState.points.find((point) => point.id === drag.object.id)?.anchor : undefined);
     const selected = objectsOf(currentState).find((object) => object.id === currentState.selectedId);
-    if (!currentState.handSelected || !selected || selected.type === 'ruler' || selected.type === 'point' || selected.type === 'group' || selected.type === 'dashed') return;
+    if (currentState.handSelected && selected?.type==='sketch') {
+      svg.append(drawSketch(selected,viewport,currentState,{selected:true,editable:true,clipId:lineClipId,handlesOnly:true}));return;
+    }
+    if (!currentState.handSelected || !selected || ['ruler', 'point', 'group', 'dashed', 'sum', 'sketch'].includes(selected.type)) return;
     if (selected.type === 'curve') {
       const handles = element('g', { class: 'curve-handles', style: `--line-color:${selected.color}` });
       const bendPoint = toScreen(curvePoint(selected, 0.6));
@@ -258,6 +288,38 @@ export function mountGraph(container, store) {
     svg.append(handles);
   }
 
+  function tangentTarget(point, event) {
+    if (event.altKey) return null;
+    const direct=event.target?.closest?.('[data-id]')?.dataset.id;
+    return currentState.lines.map(line=>({line,...projectOnLine(point,line)}))
+      .filter(candidate=>(currentState.pointSnap || candidate.line.id===direct) && distance(candidate.point,point)*viewport.unit<=10 && isLinePointVisible(candidate.point,viewport.bounds,currentState))
+      .sort((a,b)=>distance(a.point,point)-distance(b.point,point))[0] ?? null;
+  }
+  function updateSketchDraft() {
+    const layer=svg.querySelector('.sketch-draft-layer');
+    if (!layer) return;
+    layer.replaceChildren();
+    if (currentState.sketchSelected) {
+      const status=document.querySelector('#sketch-step');
+      if (status) status.textContent=['시작점을 찍으세요.','끝점을 찍으세요.','지나는 점을 찍으세요. 직선 위에서는 접합니다.'][sketchDraft.length];
+    }
+    const points=[...sketchDraft];
+    if (sketchHover && sketchDraft.length===2) {
+      const {point, target}=sketchHover;
+      const tangent=target ? directionOf(target.line.slope) : currentState.sketchMode==='horizontal' ? {x:1,y:0} : currentState.sketchMode==='vertical' ? {x:0,y:1} : unitVector({x:points[1].x-points[0].x,y:points[1].y-points[0].y});
+      if (target && tangent.x*(points[1].x-points[0].x)+tangent.y*(points[1].y-points[0].y)<0) {tangent.x*=-1;tangent.y*=-1;}
+      const curve={start:points[0],end:points[1],anchor:target?.point??point,tangent,leftReach:0.5,rightReach:0.5};
+      if (validSketch(curve)) layer.append(drawSketch(curve,viewport,currentState,{preview:true}));
+    } else if (sketchHover && sketchDraft.length===1) {
+      const a=projectPoint(sketchDraft[0],viewport),b=projectPoint(sketchHover.point,viewport);
+      layer.append(element('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,class:'sketch-guide',stroke:'#4c8e9a'}));
+    }
+    points.forEach((point,index)=>{
+      const p=projectPoint(point,viewport);
+      layer.append(element('circle',{cx:p.x,cy:p.y,r:5,fill:'#4c8e9a'}));
+      layer.append(element('text',{x:p.x+9,y:p.y-9,class:'sketch-step-label'},index===0?'시작':'끝'));
+    });
+  }
   function updateDraft() {
     const layer = svg.querySelector('.dashed-draft-layer');
     if (!layer) return;
@@ -279,6 +341,22 @@ export function mountGraph(container, store) {
     updateDraft();
   }
 
+  function editSketch(curve, action, point, event, start) {
+    if (action==='move') {
+      store.updateSelected({anchor:{x:curve.anchor.x+point.x-start.x,y:curve.anchor.y+point.y-start.y},translate:true});return;
+    }
+    const key=action.replace('sketch-','');
+    if (key==='start' || key==='end') store.updateSelected({[key]:snappedPosition(point,event)});
+    else if (key==='middle') store.updateSelected({anchor:snappedPosition(point,event)});
+    else if (key==='tangent') {
+      if (distance(point,curve.anchor)>1e-6) store.updateSelected({tangent:{x:point.x-curve.anchor.x,y:point.y-curve.anchor.y}});
+    } else if (key==='leftReach' || key==='rightReach') {
+      const endpoint=key==='leftReach'?curve.start:curve.end, sign=key==='leftReach'?-1:1;
+      const direction=unitVector(curve.tangent);
+      const length=sign*((point.x-curve.anchor.x)*direction.x+(point.y-curve.anchor.y)*direction.y);
+      store.updateSelected({[key]:length/distance(endpoint,curve.anchor)});
+    }
+  }
   function worldPoint(event) {
     const bounds = svg.getBoundingClientRect();
     const x = (event.clientX - bounds.left) * viewport.width / bounds.width;
@@ -297,6 +375,20 @@ export function mountGraph(container, store) {
       return;
     }
     if (event.button !== 0) return;
+    if (currentState.sketchSelected) {
+      event.preventDefault();
+      const raw=worldPoint(event),{bounds}=viewport;
+      if (raw.x<bounds.xMin || raw.x>bounds.xMax || raw.y<bounds.yMin || raw.y>bounds.yMax) return;
+      const point=snappedPosition(raw,event);
+      if (sketchDraft.length<2) {
+        if (sketchDraft.length && distance(sketchDraft[0],point)<1e-6) return;
+        sketchDraft.push(point); sketchHover=null; updateSketchDraft(); return;
+      }
+      const target=tangentTarget(raw,event);
+      const id=store.addSketch(sketchDraft[0],sketchDraft[1],target?.point??point,{lineId:target?.line.id});
+      if (id) {sketchDraft=[];sketchHover=null;updateSketchDraft();}
+      return;
+    }
     if (currentState.duplicatePanel) {
       event.preventDefault();
       store.selectObject(event.target.closest('[data-id]')?.dataset.id ?? null);
@@ -320,6 +412,8 @@ export function mountGraph(container, store) {
     }
     const object = objectsOf(currentState).find((item) => item.id === target.dataset.id);
     if (!object) return;
+    if (object.type === 'sum') { event.preventDefault(); store.selectObject(object.id); return; }
+    if (object.binding && ['point','line'].includes(object.type) && target.dataset.action==='move') {event.preventDefault();store.selectObject(object.id);return;}
     let anchor = object.anchor;
     if (object.type === 'line') {
       const editing = lineEditingGeometry(object, displayedLineSegments(object, viewport.bounds, currentState));
@@ -336,6 +430,11 @@ export function mountGraph(container, store) {
   });
   svg.addEventListener('pointermove', (event) => {
     pointer = event;
+    if (currentState.sketchSelected) {
+      const raw=worldPoint(event);
+      sketchHover={point:snappedPosition(raw,event),target:sketchDraft.length===2?tangentTarget(raw,event):null};
+      updateSketchDraft();return;
+    }
     if (draft && currentState.dashedSelected) {
       draft.end = segmentPosition(event, draft.anchor); updateDraft(); updateMouseCursor(draft.end); return;
     }
@@ -345,6 +444,10 @@ export function mountGraph(container, store) {
     }
     if (event.pointerId !== drag.pointerId) return;
     const point = worldPoint(event);
+    if (drag.object.type==='sketch') {
+      editSketch(drag.object,drag.action,point,event,drag.start);
+      return;
+    }
     if (drag.object.type === 'dashed') {
       if (drag.action === 'move') store.updateSelected(translateRuler(drag.object, { x: point.x - drag.start.x, y: point.y - drag.start.y }, viewport.bounds));
       else {
@@ -409,7 +512,19 @@ export function mountGraph(container, store) {
     const label = target.getAttribute('aria-label');
     store.selectObject(id);
     const line = objectsOf(currentState).find((item) => item.id === id);
+    if (!line || line.type === 'sum') {
+      svg.querySelector(`[data-id="${id}"]`)?.focus();
+      return;
+    }
     const step = event.shiftKey ? 1 : 0.1;
+    if (line.type==='sketch') {
+      if (event.key.startsWith('Arrow')) {
+        const points=sketchHandlePoints(line),key=action.replace('sketch-','');
+        const origin=points[key]??line.anchor;
+        editSketch(line,action,{x:origin.x+(event.key==='ArrowRight'?step:event.key==='ArrowLeft'?-step:0)*viewport.xDirection,y:origin.y+(event.key==='ArrowUp'?step:event.key==='ArrowDown'?-step:0)*viewport.yDirection},{...event,altKey:true},origin);
+      }
+      [...svg.querySelectorAll('[data-id]')].find(node=>node.dataset.id===id && node.dataset.action===action)?.focus();return;
+    }
     if (event.key.startsWith('Arrow')) {
       if (line.type === 'dashed') {
         const delta = { x: (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0) * viewport.xDirection, y: (event.key === 'ArrowUp' ? step : event.key === 'ArrowDown' ? -step : 0) * viewport.yDirection };
@@ -434,6 +549,7 @@ export function mountGraph(container, store) {
   const observer = new ResizeObserver(render);
   observer.observe(container);
   const unsubscribe = store.subscribe((state) => {
+    if ((!state.sketchSelected || state.historyRevision!==currentState.historyRevision) && sketchDraft.length) {sketchDraft=[];sketchHover=null;}
     if (draft && (!state.dashedSelected || state.historyRevision !== currentState.historyRevision)) {
       const id = draft.pointerId; draft = null;
       if (id != null && svg.hasPointerCapture(id)) svg.releasePointerCapture(id);

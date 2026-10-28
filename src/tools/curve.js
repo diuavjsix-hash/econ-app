@@ -5,10 +5,11 @@ export function mountCurveTool(root, store) {
   const settings = root.querySelector('#curve-settings');
   const slider = root.querySelector('#bend-slider');
   const presets = root.querySelectorAll('[data-curve-variant]');
-  root.querySelector('#curve-tool').addEventListener('click', () => {
+  for (const button of root.querySelectorAll('[data-add-curve]')) button.addEventListener('click', () => {
     const graph = root.querySelector('.diagram-card.is-active .graph-container');
     const { bounds } = createViewport(graph.clientWidth, graph.clientHeight, store.getState().quadrantMode);
     store.addCurve({
+      variant:button.dataset.addCurve,
       anchor: { x: (bounds.xMin + bounds.xMax) / 2, y: (bounds.yMin + bounds.yMax) / 2 },
       span: Math.min((bounds.xMax - bounds.xMin) * 0.38, (bounds.yMax - bounds.yMin) * 0.36),
     });

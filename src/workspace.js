@@ -3,7 +3,7 @@ import { QUADRANT_MODES } from './graph/viewport.js';
 
 export function diagramState(state, id) {
   const diagram = state.diagrams.find(d => d.id === id);
-  return { ...state, ...diagram, selectedId: state.activeDiagramId === id ? state.selectedId : null, handSelected: state.activeDiagramId === id && state.handSelected, duplicatePanel: state.activeDiagramId === id && state.duplicatePanel, dashedSelected: state.activeDiagramId === id && state.dashedSelected, mouseSelected: state.activeDiagramId === id && state.mouseSelected };
+  return { ...state, ...diagram, selectedId: state.activeDiagramId === id ? state.selectedId : null, sketchSelected:state.activeDiagramId===id && state.sketchSelected, handSelected: state.activeDiagramId === id && state.handSelected, duplicatePanel: state.activeDiagramId === id && state.duplicatePanel, dashedSelected: state.activeDiagramId === id && state.dashedSelected, mouseSelected: state.activeDiagramId === id && state.mouseSelected };
 }
 
 export function mountWorkspace(root, store) {
@@ -42,7 +42,7 @@ export function mountWorkspace(root, store) {
         const scoped = {
           getState: () => diagramState(store.getState(), diagram.id),
           subscribe: listener => store.subscribe(snapshot => listener(diagramState(snapshot, diagram.id))),
-          ...Object.fromEntries(['beginHistory', 'endHistory', 'addPoint', 'addDashedLine', 'selectObject', 'updateSelected'].map(method => [method, (...args) => store[method](...args)])),
+          ...Object.fromEntries(['beginHistory', 'endHistory', 'addPoint', 'addSketch', 'addDashedLine', 'selectObject', 'updateSelected'].map(method => [method, (...args) => store[method](...args)])),
         };
         card = { element, button, dispose: mountGraph(graph, scoped) };
         cards.set(diagram.id, card);

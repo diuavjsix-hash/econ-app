@@ -128,7 +128,7 @@ test('workspace JSON records real directions, origins, per-diagram geometry and 
   const second=store.getState().diagrams[1].id; store.selectDiagram(second); store.addCurve();
   store.updateDiagram({flipY:true});
   const doc=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(doc.schemaVersion,6);
+  assert.equal(doc.schemaVersion,8);
   assert.equal(doc.diagrams[0].coordinateSystem.origin,'bottom-right');
   assert.equal(doc.diagrams[0].coordinateSystem.xPositive,'left');
   assert.equal(doc.diagrams[1].coordinateSystem.origin,'top-left');

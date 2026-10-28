@@ -1,0 +1,111 @@
+/* Task-oriented editor layout; geometry and document styles live in styles.css. */
+:root { color:#374151; --border:#e6e9ef; }
+.app-header { gap:20px; padding:0 24px; }
+.history-actions { margin-left:20px; }
+.document-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.app-layout { grid-template-columns:minmax(0,1fr) 300px; }
+.workspace { flex-direction:column; gap:0; padding:18px 22px 22px; }
+.editor-toolbar { display:flex; align-items:center; gap:5px; flex-wrap:wrap; min-height:44px; }
+.editor-toolbar .tool-button { width:auto; max-width:none; margin:0!important; gap:5px; padding:7px 10px; border:1px solid transparent; border-radius:7px; background:transparent; color:#616b7b; min-height:36px; }
+.editor-toolbar .tool-button:hover { background:#e9edf4; border-color:transparent; }
+.editor-toolbar .tool-button[aria-pressed=true] { color:var(--accent); border-color:#d5daf8; background:#e9ecff; }
+.editor-toolbar .tool-icon { width:18px; height:18px; }
+.editor-toolbar .tool-icon .icon { width:17px; height:17px; }
+.editor-toolbar .tool-button strong { font-size:12px; font-weight:500; white-space:nowrap; }
+.editor-toolbar .add-icon { display:none; }
+.editor-toolbar #line-tool .add-icon { display:block; width:11px; height:11px; margin-left:0; }
+.curve-tool-group { display:flex; align-items:center; position:relative; }
+.curve-menu { position:relative; }
+.curve-menu summary { list-style:none; display:grid; place-items:center; width:24px; height:32px; color:#778294; cursor:pointer; border-radius:5px; }
+.curve-menu summary::-webkit-details-marker { display:none; }
+.curve-menu summary:hover,.curve-menu[open] summary { background:#e9edf4; }
+.curve-menu-content { position:absolute; top:38px; left:-75px; z-index:10; width:182px; padding:6px; border:1px solid var(--border); border-radius:9px; background:white; box-shadow:0 8px 30px #1e293b1a; }
+.curve-menu-content button { display:block; width:100%; padding:10px; text-align:left; background:white; color:#515e70; border-radius:5px; font-size:12px; }
+.curve-menu-content button:hover { background:#f1f3f9; }
+.toolbar-separator { height:20px; border-left:1px solid #dce1ea; margin:0 5px; }
+.editor-toolbar .sum-command { background:transparent; border-color:transparent; gap:5px; padding:7px 9px; }
+.sum-command strong { font-size:12px; font-weight:500; }
+.sum-command[aria-pressed=true] { background:#e9ecff; color:var(--accent); border-color:#d5daf8; }
+.toolbar-end { margin-left:auto; }
+.editor-toolbar .grid-toggle { position:static; float:none; margin:0; top:auto; right:auto; width:32px; height:32px; border-color:transparent; background:transparent; }
+.editor-toolbar .grid-toggle[aria-pressed=true] { color:var(--accent); background:#eef0fb; }
+.editor-status { display:flex; align-items:center; gap:9px; padding:5px 1px 12px; min-height:32px; font-size:11px; color:#778294; white-space:nowrap; min-width:0; }
+#editor-mode { font-weight:600; color:#657188; flex-shrink:0; }
+#editor-status-detail { overflow:hidden; text-overflow:ellipsis; }
+.canvas-card { flex:1; min-height:0; border-radius:12px; }
+.tools-panel { display:flex; flex-direction:column; padding:0; overflow:hidden; }
+.inspector { flex:1; min-height:140px; overflow:auto; padding:18px 18px 22px; scrollbar-width:thin; }
+.inspector-heading { display:flex; align-items:center; justify-content:space-between; min-height:30px; gap:8px; margin-bottom:12px; }
+.tools-panel .inspector-heading h2 { margin:0; color:#475366; font-size:13px; font-weight:600; }
+.inspector-empty { margin:10px 0; color:#8490a0; font-size:12px; line-height:1.7; }
+#finish-tool { width:28px; height:28px; }
+.inspector .object-settings { border:0; margin:0; padding:0; }
+.name-heading { justify-content:initial; gap:5px; }
+.name-heading > label { margin-right:auto; }
+.compact-action { padding:4px 6px; gap:4px; font-size:11px; }
+.compact-action strong { font-weight:500; font-size:11px; }
+.compact-action .tool-icon { width:16px; height:16px; }
+.compact-action .icon { width:13px; height:13px; }
+.compact-action:disabled { opacity:.4; cursor:default; }
+.editor-details { padding:10px 0; margin-top:8px; border-top:1px solid #edf0f5; }
+.editor-details summary { color:#6b7789; font-size:12px; cursor:pointer; width:fit-content; }
+.editor-details[open] summary { margin-bottom:12px; }
+.inspector #line-settings,.inspector #curve-settings,.inspector #sketch-settings,.inspector #point-settings { margin:16px 0 0; padding:16px 0 0; border-top:1px solid var(--border); }
+.inspector #sketch-options,.inspector #mouse-settings,.inspector #dashed-options,.inspector #sum-options,.inspector #duplicate-options { padding:0; margin:0; border:0; }
+.inspector .equation-row { margin-bottom:18px; }
+.inspector .equation-value { font-size:20px; }
+.inspector .slope-heading { margin-bottom:12px; }
+.inspector .slope-presets { gap:6px; margin-top:18px; }
+.inspector .slope-presets button { padding:10px 4px; gap:6px; }
+.inspector .curve-presets { margin-bottom:18px; }
+.inspector .copy-action { margin-top:10px; }
+.inspector .sketch-shapes { margin:0 0 12px; }
+.inspector .copy-factors { grid-template-columns:1fr; }
+.inspector .copy-factors button { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:9px; text-align:left; }
+.inspector .copy-factors strong,.inspector .copy-factors span { margin:0; }
+.inspector .mouse-hint { line-height:1.7; color:#8490a0; }
+#binding-settings { padding:8px 0; }
+#binding-settings .copy-action { margin-top:5px; }
+.tools-panel .object-section { flex:none; display:flex; flex-direction:column; max-height:34%; margin:0; padding:12px 15px 16px; border-top:1px solid var(--border); }
+.object-heading h2 { color:#667386; font-size:12px; }
+#object-count { margin-left:4px; color:#9aa4b4; font-size:11px; }
+.object-section .object-list { max-height:22vh; min-height:0; margin:5px 0 0; }
+.object-section .object-item { padding:6px 4px; color:#667386; }
+.object-section .object-row.is-selected { background:#eef0f8; }
+#objects-empty { font-size:11px; margin:7px 0; }
+.graph-settings-dialog { width:min(420px,calc(100vw - 28px)); max-height:85dvh; overflow:auto; }
+.graph-settings-dialog .axis-settings { margin:0 0 18px; padding-bottom:18px; }
+.graph-settings-dialog .axis-settings h2 { font-size:12px; color:#7c8797; font-weight:500; }
+.graph-settings-dialog .axis-settings label { font-size:12px; color:#667386; }
+.graph-settings-dialog .axis-settings input[type=text] { width:58%; }
+.graph-settings-dialog .axis-settings select { width:58%; max-width:58%; }
+.graph-dialog-footer { display:flex; justify-content:space-between; gap:10px; padding-top:4px; }
+.danger-action:hover { color:#b25f66; background:#fff5f5; border-color:#eed5d7; }
+.danger-action:disabled { opacity:.4; cursor:default; }
+@media(min-width:1500px) { .app-layout { grid-template-columns:minmax(0,1fr) 310px; } .workspace { padding:22px 28px 28px; } }
+@media(max-width:1000px) and (min-width:761px) { .app-layout { grid-template-columns:minmax(0,1fr) 270px; } .workspace { padding:14px; } .editor-toolbar { gap:2px; } .editor-toolbar .tool-button { padding:7px; } }
+@media(max-width:760px) {
+  .app-header { gap:8px; height:60px; padding:0 12px; }
+  .brand { font-size:15px; gap:7px; }
+  .brand > span:last-child { display:none; }
+  .history-actions { margin:0 0 0 4px; gap:0; }
+  .document-actions { gap:5px; }
+  .document-actions .export-button { padding:7px 9px; }
+  #graph-settings-action span { display:none; }
+  .app-layout { display:block; height:auto; min-height:calc(100dvh - 60px); }
+  .workspace { padding:12px; }
+  .editor-toolbar { flex-wrap:wrap; gap:2px; }
+  .editor-toolbar .tool-button { padding:7px 8px; gap:4px; }
+  .editor-toolbar .tool-button strong { font-size:11px; }
+  .curve-menu summary { width:18px; }
+  .toolbar-separator { margin:0 2px; }
+  .editor-toolbar .sum-command { padding:7px 5px; }
+  .sum-command strong { font-size:11px; }
+  .toolbar-end { margin-left:auto; }
+  .editor-status { font-size:10px; padding-bottom:9px; }
+  .canvas-card { flex:none; height:55dvh; min-height:320px; }
+  .tools-panel { display:flex; border-left:0; border-top:1px solid var(--border); }
+  .inspector { flex:none; overflow:visible; min-height:0; padding:16px 20px 20px; }
+  .tools-panel .object-section { max-height:none; padding:14px 20px 20px; }
+  .object-section .object-list { max-height:220px; }
+}

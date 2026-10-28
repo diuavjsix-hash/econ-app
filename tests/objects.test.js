@@ -136,7 +136,7 @@ test('deleting a parent lifts its children and keeps their own descendants and u
   assert.notEqual(newPoint, point);
 });
 
-test('JSON version 6 exports point labels and mixed parent links in creation order', () => {
+test('JSON version 8 exports point labels and mixed parent links in creation order', () => {
   const store = createStore();
   const line = store.addLine();
   store.updateSelected({ name: '수요 <test>' });
@@ -148,7 +148,7 @@ test('JSON version 6 exports point labels and mixed parent links in creation ord
   store.moveObject(curve, line);
   store.moveObject(point, line);
   const exported = JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(exported.schemaVersion, 6);
+  assert.equal(exported.schemaVersion, 8);
   assert.deepEqual(exported.objectOrder, [line, curve, point, folder]);
   assert.equal(exported.lines[0].parentId, folder);
   assert.equal(exported.curves[0].parentId, line);

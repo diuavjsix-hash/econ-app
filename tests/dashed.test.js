@@ -26,7 +26,7 @@ test('dashed strokes store two exact endpoints with no ruler styling or measurem
   assert.equal(line.type,'dashed'); assert.equal(line.id,id);
   assert.equal(line.anchor.x,1.234567); assert.equal('style' in line,false); assert.equal('showMeasurement' in line,false);
   const doc=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(doc.schemaVersion,6); assert.deepEqual(doc.dashedLines,doc.diagrams[0].dashedLines);
+  assert.equal(doc.schemaVersion,8); assert.deepEqual(doc.dashedLines,doc.diagrams[0].dashedLines);
   assert.equal(doc.rulers.length,0); assert.equal(doc.dashedLines[0].name,'投影');
   doc.dashedLines[0].anchor.x=100; assert.equal(store.getState().dashedLines[0].anchor.x,1.234567);
 });

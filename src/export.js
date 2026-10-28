@@ -2,16 +2,22 @@ import { DEFAULT_AXIS_GAP } from './graph/display.js';
 import { directionOf, interceptOf } from './graph/math.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
 import { curveControlPoints, curveTangentRays } from './graph/curve.js';
+import { sketchControls } from './graph/sketch.js';
 
 function serializeDiagram(state) {
   const baseOrigin = QUADRANT_MODES[state.quadrantMode].origin;
   const origin = baseOrigin === 'center' ? 'center' : `${state.flipY ? 'top' : 'bottom'}-${baseOrigin.endsWith('center') ? 'center' : state.flipX ? 'right' : 'left'}`;
   return {
     objectOrder: [...state.objectOrder],
+    sketches:(state.sketches??[]).map(({collapsed,...curve})=>({...structuredClone(curve),geometry:{type:'piecewise-quadratic-bezier',controlPoints:structuredClone(sketchControls(curve))}})),
+    sums: (state.sums ?? []).map(({ id, name, color, parentId, direction, nonnegative, sourceIds }) => ({
+      id, type: 'sum', name, color, parentId, direction, nonnegative, sourceIds: [...sourceIds],
+    })),
     groups: state.groups.map(({ id, name, parentId }) => ({ id, type: 'group', name, parentId })),
     points: state.points.map((point) => ({
       id: point.id, type: 'point', name: point.name, color: point.color, parentId: point.parentId,
       anchor: { ...point.anchor }, showCoordinates: Boolean(point.showCoordinates),
+      ...(point.binding ? {binding:{...point.binding}}:{}),
     })),
     dashedLines: state.dashedLines.map(({ id, name, color, parentId, anchor, end }) => ({
       id, type: 'dashed', name, color, parentId, anchor: { ...anchor }, end: { ...end },
@@ -26,6 +32,7 @@ function serializeDiagram(state) {
       return {
         id: line.id, type: 'line', name: line.name, color: line.color, parentId: line.parentId,
         slope: line.slope, intercept: interceptOf(line), anchor: { ...line.anchor },
+        ...(line.binding ? {binding:{...line.binding}}:{}),
         vertical: line.slope === null,
         xIntercept: line.slope === null ? line.anchor.x : null,
         // a*x + b*y + c = 0 also covers vertical lines without Infinity in JSON.
@@ -45,7 +52,7 @@ function serializeDiagram(state) {
 
 export function serializeDocument(state) {
   return {
-    schemaVersion: 6,
+    schemaVersion: 8,
     // Retain the active diagram's fields for consumers of the earlier format.
     ...serializeDiagram(state),
     activeDiagramId: state.activeDiagramId,

@@ -2,24 +2,29 @@ import { DEFAULT_AXIS_GAP, MIN_AXIS_GAP, MAX_AXIS_GAP } from './graph/display.js
 import { prepareDuplicate, DUPLICATABLE } from './duplicate.js';
 import { validPoint, rulerMetrics } from './graph/ruler.js';
 import { LAYOUTS, normalizeSlots } from './layouts.js';
-import { normalizeSlope } from './graph/math.js';
+import { normalizeSlope, directionOf } from './graph/math.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
 import { CURVE_PRESETS, MAX_BEND } from './graph/curve.js';
 import { canReparent, objectsOf } from './objects.js';
+import { sumError } from './graph/sum.js';
+import { validSketch, unitVector, projectOnLine, translatedSketch } from './graph/sketch.js';
+import { resolveRelations, canAttach, dependencyId } from './relations.js';
 
 const COLORS = ['#6068e8', '#e69451', '#43a999', '#cf7299', '#849353', '#699bd1'];
 
 /** Internal mathematical coordinates; hierarchy only organizes objects. */
 export function createStore() {
   const state = {
-    lines: [], curves: [], points: [], dashedLines: [], rulers: [], groups: [], objectOrder: [],
-    selectedId: null, handSelected: true, duplicatePanel: false, activeTool: 'point', mouseSelected: false, rulerSelected: false, dashedSelected: false, dashedMode: 'free', dashedSnap: true, pointSnap: true, pointCoordinates: false, showGrid: true,
+    lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], rulers: [], groups: [], objectOrder: [],
+    selectedId: null, handSelected: true, duplicatePanel: false, sumPanel: false, sketchSelected: false, sketchMode: 'auto', activeTool: 'point', mouseSelected: false, rulerSelected: false, dashedSelected: false, dashedMode: 'free', dashedSnap: true, pointSnap: true, pointCoordinates: false, showGrid: true,
     quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
   let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1, nextDashedId = 1;
+  let nextSumId = 1;
+  let nextSketchId = 1;
   const listeners = new Set();
-  const documentKeys = ['lines', 'curves', 'points', 'dashedLines', 'rulers', 'groups', 'objectOrder', 'quadrantMode', 'axisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
-  const emptyDocument = () => ({ lines: [], curves: [], points: [], dashedLines: [], rulers: [], groups: [], objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
+  const documentKeys = ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'rulers', 'groups', 'objectOrder', 'quadrantMode', 'axisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
+  const emptyDocument = () => ({ lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], rulers: [], groups: [], objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
   let layout = { preset: 'single', slots: structuredClone(LAYOUTS.single.slots) };
@@ -35,7 +40,7 @@ export function createStore() {
     return {
       document: structuredClone({ layout, diagrams: diagrams.map(diagram => ({
         ...diagram,
-        ...Object.fromEntries(['lines', 'curves', 'points', 'dashedLines', 'rulers', 'groups'].map(key => [key, diagram[key].map(({ collapsed, ...object }) => object)])),
+        ...Object.fromEntries(['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'rulers', 'groups'].map(key => [key, diagram[key].map(({ collapsed, ...object }) => object)])),
       })) }),
       activeDiagramId, selectedId: state.selectedId,
     };
@@ -55,6 +60,7 @@ export function createStore() {
     };
   };
   const emit = () => {
+    resolveRelations(state);
     const next = documentState();
     if (!restoring && different(baseline, next)) {
       if (!transaction) remember(baseline);
@@ -88,7 +94,7 @@ export function createStore() {
     state[collection].push(object);
     state.objectOrder.push(object.id);
     state.selectedId = object.id;
-    if (object.type === 'line' || object.type === 'curve') { state.mouseSelected = false; state.rulerSelected = false; state.dashedSelected = false; state.handSelected = true; state.duplicatePanel = false; }
+    if (['line', 'curve', 'sketch', 'sum'].includes(object.type)) { state.mouseSelected = false; state.rulerSelected = false; state.dashedSelected = false; state.handSelected = true; state.duplicatePanel = false; state.sketchSelected = false; state.sumPanel=false; }
     emit();
     return object.id;
   };
@@ -96,6 +102,7 @@ export function createStore() {
     getState: snapshot,
     selectDiagram(id) {
       if (id === activeDiagramId || !diagrams.slice(0, layout.slots.length).some(d => d.id === id)) return;
+      if (state.sumPanel || state.duplicatePanel) {state.sumPanel=false;state.duplicatePanel=false;state.handSelected=true;}
       endHistory(); syncDiagram(); activeDiagramId = id; loadDiagram(); historyRevision++; emit();
     },
     configureLayout(preset, customSlots, quadrantMode, { allQuadrants = true, preserveDirections = false } = {}) {
@@ -140,13 +147,15 @@ export function createStore() {
     clearAll() {
       endHistory();
       if (!state.objectOrder.length) return false;
-      for (const key of ['lines', 'curves', 'points', 'dashedLines', 'rulers', 'groups', 'objectOrder']) state[key] = [];
+      for (const key of ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'rulers', 'groups', 'objectOrder']) state[key] = [];
       state.selectedId = null;
       historyRevision++;
       emit();
       return true;
     },
     update(patch) {
+      if (patch.handSelected || patch.mouseSelected || patch.dashedSelected || patch.duplicatePanel || patch.sketchSelected) state.sumPanel=false;
+      if (['auto','horizontal','vertical'].includes(patch.sketchMode)) state.sketchMode=patch.sketchMode;
       if (typeof patch.axisGapEnabled === 'boolean') state.axisGapEnabled = patch.axisGapEnabled;
       if (Number.isFinite(patch.axisGap)) state.axisGap = Math.max(MIN_AXIS_GAP, Math.min(MAX_AXIS_GAP, patch.axisGap));
       if (typeof patch.showGrid === 'boolean') state.showGrid = patch.showGrid;
@@ -155,26 +164,34 @@ export function createStore() {
       if (typeof patch.mouseSelected === 'boolean') {
         state.mouseSelected = patch.mouseSelected;
         // Switching to the point tool ends the previous line/curve selection.
-        if (patch.mouseSelected) { state.rulerSelected = false; state.dashedSelected = false; state.handSelected = false; state.duplicatePanel = false; }
-        if (patch.mouseSelected && [...state.lines, ...state.curves, ...state.dashedLines, ...state.rulers].some(object => object.id === state.selectedId)) state.selectedId = null;
+        if (patch.mouseSelected) { state.rulerSelected = false; state.dashedSelected = false; state.handSelected = false; state.duplicatePanel = false; state.sketchSelected = false; }
+        if (patch.mouseSelected && [...state.lines, ...state.curves, ...state.sketches, ...state.sums, ...state.dashedLines, ...state.rulers].some(object => object.id === state.selectedId)) state.selectedId = null;
       }
       // The ruler tool is intentionally disabled until its behavior is redesigned.
       state.rulerSelected = false;
       if (typeof patch.dashedSelected === 'boolean') {
         state.dashedSelected = patch.dashedSelected;
         if (patch.dashedSelected) {
-          state.mouseSelected = false; state.handSelected = false; state.duplicatePanel = false;
+          state.mouseSelected = false; state.handSelected = false; state.duplicatePanel = false; state.sketchSelected = false;
           if (!state.dashedLines.some(line => line.id === state.selectedId)) state.selectedId = null;
         }
       }
       if (typeof patch.duplicatePanel === 'boolean') {
         state.duplicatePanel = patch.duplicatePanel;
-        if (patch.duplicatePanel) { state.mouseSelected = false; state.dashedSelected = false; state.handSelected = false; }
+        if (patch.duplicatePanel) { state.mouseSelected = false; state.dashedSelected = false; state.handSelected = false; state.sketchSelected = false; }
+      }
+      if (typeof patch.sketchSelected === 'boolean') {
+        state.sketchSelected=patch.sketchSelected;
+        if (patch.sketchSelected) { state.handSelected=false; state.mouseSelected=false; state.dashedSelected=false; state.duplicatePanel=false; state.selectedId=null; }
+      }
+      if (typeof patch.sumPanel==='boolean') {
+        state.sumPanel=patch.sumPanel;
+        if (patch.sumPanel) {state.handSelected=false;state.mouseSelected=false;state.dashedSelected=false;state.duplicatePanel=false;state.sketchSelected=false;}
       }
       if (patch.handSelected === true) {
-        state.handSelected = true; state.mouseSelected = false; state.dashedSelected = false; state.duplicatePanel = false;
+        state.handSelected = true; state.mouseSelected = false; state.dashedSelected = false; state.duplicatePanel = false; state.sketchSelected = false;
       }
-      if (!state.mouseSelected && !state.dashedSelected && !state.duplicatePanel) state.handSelected = true;
+      if (!state.mouseSelected && !state.dashedSelected && !state.duplicatePanel && !state.sketchSelected && !state.sumPanel) state.handSelected = true;
       if (typeof patch.dashedSnap === 'boolean') state.dashedSnap = patch.dashedSnap;
       if (['free', 'horizontal', 'vertical'].includes(patch.dashedMode)) state.dashedMode = patch.dashedMode;
       if (Object.hasOwn(QUADRANT_MODES, patch.quadrantMode)) state.quadrantMode = patch.quadrantMode;
@@ -194,7 +211,7 @@ export function createStore() {
     },
     addCurve(placement = {}) {
       const index = nextCurveId++;
-      const variant = index % 2 === 1 ? 'descending' : 'ascending';
+      const variant = Object.hasOwn(CURVE_PRESETS,placement.variant) ? placement.variant : index % 2 === 1 ? 'descending' : 'ascending';
       const preset = CURVE_PRESETS[variant];
       return add('curves', {
         id: `curve-${index}`, type: 'curve', name: `곡선 ${String(index).padStart(2, '0')}`,
@@ -203,6 +220,50 @@ export function createStore() {
         anchor: Number.isFinite(placement.anchor?.x) && Number.isFinite(placement.anchor?.y)
           ? { ...placement.anchor } : { x: state.quadrantMode === 'first' ? 4 : 0, y: state.quadrantMode === 'all' ? 0 : 4 },
       });
+    },
+    addSketch(start, end, anchor, { lineId=null, tangent=null, mode=state.sketchMode } = {}) {
+      if (![start,end,anchor].every(validPoint)) return null;
+      const target=state.lines.find(line=>line.id===lineId);
+      const projection=target ? projectOnLine(anchor,target) : null;
+      const curve={ start:{...start}, end:{...end}, anchor:projection?.point ?? {...anchor},
+        tangent:unitVector(tangent ?? (mode==='horizontal' ? {x:1,y:0} : mode==='vertical' ? {x:0,y:1} : {x:end.x-start.x,y:end.y-start.y})), leftReach:0.5, rightReach:0.5 };
+      if (!validSketch(curve)) return null;
+      const index=nextSketchId++;
+      return add('sketches',{...curve,id:`sketch-${index}`,type:'sketch',name:`자유 곡선 ${String(index).padStart(2,'0')}`,color:'#4c8e9a',
+        binding:target ? {kind:'tangent',sourceId:target.id,parameter:projection.parameter,direction:directionOf(target.slope)}:null });
+    },
+    attachSelectedToLine(lineId) {
+      const curve=state.sketches.find(curve=>curve.id===state.selectedId), line=state.lines.find(line=>line.id===lineId);
+      if (!curve || !line || !canAttach(state,curve.id,line.id)) return false;
+      const projection=projectOnLine(curve.anchor,line);
+      if (!validSketch({...curve,anchor:projection.point})) return false;
+      curve.binding={kind:'tangent',sourceId:line.id,parameter:projection.parameter,direction:directionOf(line.slope)}; emit(); return true;
+    },
+    detachSelected() {
+      const object=objectsOf(state).find(object=>object.id===state.selectedId);
+      if (!object?.binding) return false;
+      object.binding=null; emit(); return true;
+    },
+    markMinimum() {
+      const source=state.sketches.find(curve=>curve.id===state.selectedId);
+      if (!source) return null;
+      const index=nextPointId++;
+      return add('points',{id:`point-${index}`,type:'point',name:`최저점 ${index}`,color:'#59627a',anchor:{...source.anchor},showCoordinates:true,binding:{kind:'minimum',sourceId:source.id}});
+    },
+    lineThroughSelectedPoint({follow=true,slope=1}={}) {
+      const point=state.points.find(point=>point.id===state.selectedId);
+      if (!point) return null;
+      const index=nextId++;
+      return add('lines',{id:`line-${index}`,type:'line',name:`통과 직선 ${index}`,color:COLORS[(index-1)%COLORS.length],anchor:{...point.anchor},slope:normalizeSlope(slope),binding:follow ? {kind:'through-point',sourceId:point.id}:null});
+    },
+    addSum(sourceIds, { direction = 'vertical', nonnegative = true } = {}) {
+      if (!Array.isArray(sourceIds) || new Set(sourceIds).size !== sourceIds.length) return null;
+      const sources = sourceIds.map(id => [...state.lines, ...state.curves].find(source => source.id === id));
+      if (sumError(sources, direction)) return null;
+      endHistory();
+      const index = nextSumId++;
+      return add('sums', { id: `sum-${index}`, type: 'sum', name: `${direction === 'vertical' ? '수직합' : '수평합'} ${String(index).padStart(2, '0')}`,
+        direction, nonnegative: Boolean(nonnegative), sourceIds: [...sourceIds], color: ['#b67836', '#9b5eb5', '#257f96', '#ad5265'][(index - 1) % 4] });
     },
     addPoint(anchor) {
       if (!Number.isFinite(anchor?.x) || !Number.isFinite(anchor?.y)) return null;
@@ -236,7 +297,7 @@ export function createStore() {
     selectObject(id) {
       const object = objectsOf(state).find(item => item.id === id);
       if (id === null || object) {
-        if (object && !state.duplicatePanel) { state.handSelected = true; state.mouseSelected = false; state.dashedSelected = false; }
+        if (object && !state.duplicatePanel) { state.handSelected = true; state.mouseSelected = false; state.dashedSelected = false; state.sketchSelected=false; state.sumPanel=false; }
         state.selectedId = id;
         emit();
       }
@@ -271,10 +332,10 @@ export function createStore() {
         names.add(object.name);
       }
       const ids = new Map();
-      const collections = { line: 'lines', curve: 'curves', point: 'points', dashed: 'dashedLines', group: 'groups' };
+      const collections = { line: 'lines', curve: 'curves', sketch: 'sketches', point: 'points', dashed: 'dashedLines', group: 'groups' };
       for (const object of copies) {
         const previous = object.id;
-        object.id = object.type === 'line' ? `line-${nextId++}` : object.type === 'curve' ? `curve-${nextCurveId++}` : object.type === 'point' ? `point-${nextPointId++}` : object.type === 'dashed' ? `dashed-${nextDashedId++}` : `group-${nextGroupId++}`;
+        object.id = object.type === 'line' ? `line-${nextId++}` : object.type === 'curve' ? `curve-${nextCurveId++}` : object.type === 'sketch' ? `sketch-${nextSketchId++}` : object.type === 'point' ? `point-${nextPointId++}` : object.type === 'dashed' ? `dashed-${nextDashedId++}` : `group-${nextGroupId++}`;
         ids.set(previous, object.id);
       }
       for (const object of copies) {
@@ -290,6 +351,24 @@ export function createStore() {
       const object = objectsOf(state).find((item) => item.id === state.selectedId);
       if (!object) return;
       if (typeof patch.name === 'string') object.name = patch.name.slice(0, 80);
+      if (object.type==='sketch') {
+        const next=structuredClone(object);
+        if (validPoint(patch.anchor)) {
+          const desired=object.binding && patch.translate ? projectOnLine(patch.anchor,state.lines.find(line=>line.id===object.binding.sourceId)).point : patch.anchor;
+          if (patch.translate) Object.assign(next,translatedSketch(object,{x:desired.x-object.anchor.x,y:desired.y-object.anchor.y}));
+          else next.anchor={...patch.anchor};
+        }
+        for (const key of ['start','end']) if (validPoint(patch[key])) next[key]={...patch[key]};
+        if (validPoint(patch.tangent) && !object.binding) next.tangent=unitVector(patch.tangent);
+        for (const key of ['leftReach','rightReach']) if (Number.isFinite(patch[key])) next[key]=Math.max(0.05,Math.min(2,patch[key]));
+        if (next.binding && validPoint(patch.anchor)) {
+          const line=state.lines.find(line=>line.id===next.binding.sourceId);
+          const projection=projectOnLine(next.anchor,line);
+          next.anchor=projection.point; next.binding.parameter=projection.parameter;next.binding.direction=directionOf(line.slope);
+        }
+        if (validSketch(next)) Object.assign(object,next);
+      }
+      if (object.type === 'sum' && typeof patch.nonnegative === 'boolean') object.nonnegative = patch.nonnegative;
       if (object.type === 'curve') {
         if (Object.hasOwn(CURVE_PRESETS, patch.variant)) {
           object.variant = patch.variant;
@@ -309,7 +388,7 @@ export function createStore() {
         if (object.type === 'ruler' && ['solid', 'dashed'].includes(patch.style)) object.style = patch.style;
         if (object.type === 'ruler' && typeof patch.showMeasurement === 'boolean') object.showMeasurement = patch.showMeasurement;
       }
-      if (!['group', 'ruler', 'dashed'].includes(object.type) && Number.isFinite(patch.anchor?.x) && Number.isFinite(patch.anchor?.y)) {
+      if (!['group', 'ruler', 'dashed', 'sum', 'sketch'].includes(object.type) && Number.isFinite(patch.anchor?.x) && Number.isFinite(patch.anchor?.y)) {
         object.anchor = { x: patch.anchor.x === 0 ? 0 : patch.anchor.x, y: patch.anchor.y === 0 ? 0 : patch.anchor.y };
       }
       emit();
@@ -331,11 +410,19 @@ export function createStore() {
     removeSelected() {
       const removed = objectsOf(state).find((item) => item.id === state.selectedId);
       if (!removed) return;
-      // Retain children when their parent is deleted.
-      for (const object of objectsOf(state)) if (object.parentId === removed.id) object.parentId = removed.parentId;
-      for (const collection of ['lines', 'curves', 'points', 'dashedLines', 'rulers', 'groups']) state[collection] = state[collection].filter((item) => item.id !== removed.id);
-      state.objectOrder = state.objectOrder.filter((id) => id !== removed.id);
-      state.selectedId = removed.parentId ?? state.objectOrder.at(-1) ?? null;
+      const deleted = new Set([removed.id, ...state.sums.filter(sum => sum.sourceIds.includes(removed.id)).map(sum => sum.id)]);
+      // Freeze the current geometry when its relation source is deleted.
+      for (const object of objectsOf(state)) if (deleted.has(dependencyId(object))) object.binding=null;
+      // Retain children of both the deleted source and its dependent sums.
+      const byId = new Map(objectsOf(state).map(object => [object.id, object]));
+      const survivingParent = id => {
+        while (deleted.has(id)) id = byId.get(id)?.parentId ?? null;
+        return id;
+      };
+      for (const object of byId.values()) object.parentId = survivingParent(object.parentId);
+      for (const collection of ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'rulers', 'groups']) state[collection] = state[collection].filter((item) => !deleted.has(item.id));
+      state.objectOrder = state.objectOrder.filter((id) => !deleted.has(id));
+      state.selectedId = survivingParent(removed.parentId) ?? state.objectOrder.at(-1) ?? null;
       emit();
     },
     subscribe(listener) {
