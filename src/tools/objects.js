@@ -1,4 +1,4 @@
-import { canReparent, OBJECT_LABELS, objectsOf } from '../objects.js';
+import { canReparent, OBJECT_LABELS, objectsOf, selectedIdsOf } from '../objects.js';
 
 export function mountObjectList(root, store) {
   const list = root.querySelector('#object-list');
@@ -24,7 +24,7 @@ export function mountObjectList(root, store) {
     const row = event.target.closest('[data-object-id]');
     if (!row) return;
     if (event.target.closest('[data-action="fold"]')) store.toggleCollapsed(row.dataset.objectId);
-    else store.selectObject(row.dataset.objectId);
+    else store.selectObject(row.dataset.objectId,{toggle:event.ctrlKey||event.metaKey});
   });
   list.addEventListener('dragstart', (event) => {
     const row = event.target.closest('[data-object-id]');
@@ -102,7 +102,7 @@ export function mountObjectList(root, store) {
         swatch.style.setProperty('--object-color', object.color);
         if (object.type === 'group' || descendants.length) {
           swatch.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h7l2 2h9v11H3zM3 7V4h7l2 3"/></svg>';
-        } else swatch.textContent = object.type === 'sketch' ? '∿' : object.type === 'sum' ? 'Σ' : object.type === 'point' ? '●' : object.type === 'curve' ? '⌒' : object.type === 'ruler' ? '↔' : object.type === 'dashed' ? '┄' : '―';
+        } else swatch.textContent = object.type === 'fill' ? '▰' : object.type === 'sketch' ? '∿' : object.type === 'sum' ? 'Σ' : object.type === 'point' ? '●' : object.type === 'curve' ? '⌒' : object.type === 'ruler' ? '↔' : object.type === 'dashed' ? '┄' : '―';
         const name = document.createElement('span');
         name.className = 'object-label';
         name.textContent = label(object);
@@ -127,7 +127,7 @@ export function mountObjectList(root, store) {
       if (focusId && focusAction) list.querySelector(`[data-object-id="${focusId}"] [data-action="${focusAction}"]`)?.focus();
     }
     for (const row of list.querySelectorAll('[data-object-id]')) {
-      const active = row.dataset.objectId === state.selectedId;
+      const active = selectedIdsOf(state).includes(row.dataset.objectId);
       row.classList.toggle('is-selected', active);
       row.parentElement.setAttribute('aria-selected', String(active));
       row.querySelector('.object-item').setAttribute('aria-pressed', String(active));

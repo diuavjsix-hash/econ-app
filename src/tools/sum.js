@@ -1,4 +1,5 @@
 import { sumError, sumSources } from '../graph/sum.js';
+import { isIndifference } from '../graph/indifference.js';
 
 export function mountSumTool(root, store) {
   const button = root.querySelector('#sum-tool'), panel = root.querySelector('#sum-options');
@@ -39,7 +40,7 @@ export function mountSumTool(root, store) {
       root.querySelector('#sum-selected-status').textContent = sumError(operands, sum.direction) ?? '원본을 수정하면 자동 갱신됩니다.';
     }
     if (diagramId !== state.activeDiagramId) { diagramId = state.activeDiagramId; selected.clear(); signature = ''; }
-    const objects = [...state.lines, ...state.curves];
+    const objects = [...state.lines, ...state.curves].filter(object=>!isIndifference(object));
     selected = new Set([...selected].filter(id => objects.some(object => object.id === id)));
     const next = JSON.stringify(objects.map(({ id, name }) => [id, name]));
     if (next !== signature) {

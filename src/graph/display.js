@@ -1,5 +1,6 @@
 import { clipLine } from './math.js';
 import { clipCurveWithExtensions } from './curve.js';
+import { isIndifference, clipIndifference } from './indifference.js';
 
 export const DEFAULT_AXIS_GAP = 0.75;
 export const MIN_AXIS_GAP = 0.25;
@@ -25,7 +26,7 @@ export function displayedLineSegments(line, bounds, state) {
 }
 
 export function displayedCurveSegments(curve, bounds, state) {
-  return lineDisplayRegions(bounds, state).flatMap((region) => clipCurveWithExtensions(curve, region))
+  return lineDisplayRegions(bounds, state).flatMap((region) => isIndifference(curve) ? clipIndifference(curve,region) : clipCurveWithExtensions(curve, region))
     .sort((a, b) => a[0].x - b[0].x);
 }
 

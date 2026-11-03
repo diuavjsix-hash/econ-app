@@ -19,14 +19,13 @@ test('hand, point, dashed and duplicate tabs are exclusive and preserve drawing 
   store.update({duplicatePanel:true}); store.update({duplicatePanel:false}); assert.equal(store.getState().handSelected,true);
 });
 
-test('slope factors preserve sign and vertical intercept, or rotate about the original anchor', () => {
+test('slope factors rotate about the original anchor without preserving the vertical intercept', () => {
   for (const slope of [-3,-1,0,0.4,2]) for (const factor of [0.5,1,2]) {
     const line={id:'a',type:'line',name:'D',slope,anchor:{x:4,y:7}};
     const copy=prepareDuplicate(line,{slopeFactor:factor}).object;
     assert.equal(copy.slope,slope*factor);
-    assert.ok(Math.abs(interceptOf(copy)-interceptOf(line))<1e-10);
-    const rotated=prepareDuplicate(line,{slopeFactor:factor,pivot:'anchor'}).object;
-    assert.deepEqual(rotated.anchor,line.anchor);
+    assert.deepEqual(copy.anchor,line.anchor);
+    if (slope!==0 && factor!==1) assert.notEqual(interceptOf(copy),interceptOf(line));
     assert.equal(line.slope,slope); assert.deepEqual(line.anchor,{x:4,y:7});
   }
   const vertical={type:'line',name:'LRAS',slope:null,anchor:{x:4,y:2}};
@@ -37,7 +36,7 @@ test('slope factors preserve sign and vertical intercept, or rotate about the or
 test('invalid or overflowing copies leave the complete document and ID sequence unchanged', () => {
   const store=createStore(); store.addLine(); store.updateSelected({slope:Number.MAX_VALUE});
   const before=serializeDocument(store.getState());
-  for (const options of [{slopeFactor:2},{slopeFactor:3},{placement:'unknown'},{pivot:'unknown'}]) {
+  for (const options of [{slopeFactor:2},{slopeFactor:3}]) {
     assert.equal(store.duplicateSelected(options),null); assert.deepEqual(serializeDocument(store.getState()),before);
   }
   assert.equal(store.addLine(),'line-2');
@@ -50,10 +49,11 @@ test('curve, point and dashed copies preserve their geometry and settings with d
   const dashed=store.addDashedLine({x:1,y:4},{x:5,y:4});
   for (const id of [curve,point,dashed]) {
     store.selectObject(id); const source=objectsOf(store.getState()).find(o=>o.id===id);
-    const copyId=store.duplicateSelected({slopeFactor:2,placement:'right'});
+    const copyId=store.duplicateSelected({slopeFactor:2});
     const copy=objectsOf(store.getState()).find(o=>o.id===copyId);
-    assert.equal(copy.name,`${source.name}′`); assert.equal(copy.anchor.x,source.anchor.x+1); assert.equal(copy.anchor.y,source.anchor.y);
-    if (source.end) assert.deepEqual(copy.end,{x:source.end.x+1,y:source.end.y});
+    const offset=source.type==='curve'?{x:0.6,y:0.8}:source.type==='dashed'?{x:0,y:1}:{x:1,y:0};
+    assert.equal(copy.name,`${source.name}′`); assert.ok(Math.abs(copy.anchor.x-source.anchor.x-offset.x)<1e-10); assert.ok(Math.abs(copy.anchor.y-source.anchor.y-offset.y)<1e-10);
+    if (source.end) assert.deepEqual(copy.end,{x:source.end.x+offset.x,y:source.end.y+offset.y});
     if (source.type==='curve') { assert.equal(copy.slope,source.slope); assert.equal(copy.bend,0.12); }
     if (source.type==='point') assert.equal(copy.showCoordinates,true);
     store.updateSelected({anchor:{x:9,y:9}});
@@ -64,12 +64,12 @@ test('curve, point and dashed copies preserve their geometry and settings with d
 test('folder copies remap nested parents even when children precede their parents in creation order', () => {
   const store=createStore(); const line=store.addLine(), point=store.addPoint({x:2,y:3}), folder=store.addGroup();
   store.moveObject(point,line); store.moveObject(line,folder); store.selectObject(folder);
-  const copyFolder=store.duplicateSelected({placement:'up'});
+  const copyFolder=store.duplicateSelected();
   const state=store.getState(), copied=objectsOf(state).filter(o=>o.name.endsWith('′'));
   assert.equal(copied.length,3); assert.equal(new Set(state.objectOrder).size,state.objectOrder.length);
   const copiedLine=copied.find(o=>o.type==='line'), copiedPoint=copied.find(o=>o.type==='point');
   assert.equal(copiedLine.parentId,copyFolder); assert.equal(copiedPoint.parentId,copiedLine.id);
-  assert.equal(copiedPoint.anchor.y,4); assert.equal(state.points.find(o=>o.id===point).anchor.y,3);
+  assert.equal(copiedPoint.anchor.y,copiedLine.anchor.y); assert.equal(state.points.find(o=>o.id===point).anchor.y,3);
   assert.equal(state.lines.find(o=>o.id===line).parentId,folder);
 });
 
@@ -95,7 +95,7 @@ test('copies stay within their active diagram and serialize as normal editable o
   store.update({duplicatePanel:true}); const copy=store.duplicateSelected({slopeFactor:2});
   const doc=serializeDocument(store.getState());
   assert.equal(doc.lines.length,2); assert.equal(doc.diagrams[1].lines.length,0);
-  assert.equal(doc.lines.find(o=>o.id===copy).intercept,10); assert.equal(doc.lines.find(o=>o.id===copy).slope,-2);
+  assert.ok(Math.abs(doc.lines.find(o=>o.id===copy).intercept-(14+Math.sqrt(5)))<1e-10); assert.equal(doc.lines.find(o=>o.id===copy).slope,-2);
   assert.equal(doc.coordinateSystem.xPositive,'left'); assert.equal('duplicatePanel' in doc,false);
   store.selectObject('line-1'); store.duplicateSelected({slopeFactor:2});
   assert.equal(new Set(store.getState().lines.map(line=>line.name)).size,3);
@@ -107,4 +107,40 @@ test('copy names remain bounded and ruler data is excluded while other parent li
   const copy=store.duplicateSelected(); const object=store.getState().lines.find(o=>o.id===copy);
   assert.equal(object.name.length,80); assert.equal(object.name.at(-1),'′'); assert.equal(object.parentId,group);
   store.addRuler({x:1,y:2},{x:3,y:4}); assert.equal(store.duplicateSelected(),null);
+});
+
+test('default nearby copies visibly separate horizontal, vertical and oblique lines',()=>{
+  for (const slope of [0,null,-1,1,1e12]) {
+    const store=createStore();const id=store.addLine();store.updateSelected({slope});
+    const source=store.getState().lines[0],copyId=store.duplicateSelected();
+    const copy=store.getState().lines.find(line=>line.id===copyId),dx=copy.anchor.x-source.anchor.x,dy=copy.anchor.y-source.anchor.y;
+    assert.equal(copy.slope,slope);assert.ok(Math.abs(Math.hypot(dx,dy)-1)<1e-8);
+    if (slope===0) {assert.equal(dx,0);assert.equal(dy,1);}
+    if (slope===null) {assert.equal(dx,1);assert.equal(dy,0);}
+    assert.deepEqual(store.getState().lines.find(line=>line.id===id),source);
+  }
+});
+
+test('repeated nearby copies of the same source occupy different positions and undo once',()=>{
+  const store=createStore(),id=store.addLine();store.updateSelected({slope:0});
+  const original=serializeDocument(store.getState());
+  store.duplicateSelected();store.selectObject(id);const beforeSecond=serializeDocument(store.getState());
+  const second=store.duplicateSelected();assert.equal(new Set(store.getState().lines.map(line=>line.anchor.y)).size,3);
+  assert.equal(store.getState().lines.find(line=>line.id===second).anchor.y,5);
+  store.undo();assert.deepEqual(serializeDocument(store.getState()),beforeSecond);
+  store.undo();assert.deepEqual(serializeDocument(store.getState()),original);
+});
+
+test('nearby copies translate every child together and detach bindings without changing shapes',()=>{
+  const store=createStore(),line=store.addLine();store.updateSelected({slope:1});
+  const point=store.addPoint({x:2,y:3});store.moveObject(point,line);
+  store.selectObject(line);const copyId=store.duplicateSelected();
+  const state=store.getState(),original=state.lines.find(o=>o.id===line),copy=state.lines.find(o=>o.id===copyId);
+  const copiedPoint=state.points.find(o=>o.id!==point);
+  assert.equal(copiedPoint.parentId,copyId);
+  assert.ok(Math.abs((copiedPoint.anchor.x-2)-(copy.anchor.x-original.anchor.x))<1e-10);
+  assert.ok(Math.abs((copiedPoint.anchor.y-3)-(copy.anchor.y-original.anchor.y))<1e-10);
+  const dash=store.addDashedLine({x:1,y:2},{x:6,y:2});store.duplicateSelected();
+  const dashed=store.getState().dashedLines.find(o=>o.id!==dash);
+  assert.deepEqual(dashed.anchor,{x:1,y:3});assert.deepEqual(dashed.end,{x:6,y:3});
 });

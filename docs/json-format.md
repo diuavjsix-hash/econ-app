@@ -1,28 +1,31 @@
-# JSON 출력 형식 · schemaVersion 8
+# JSON 출력 형식 · schemaVersion 10
 
 구현 기준은 `src/export.js`의 `serializeDocument(state)`입니다. 현재는 내보내기만 지원하며 JSON 불러오기 API와 UI는 없습니다. 화면에서 가려진 도형도 모두 내보냅니다.
+
+구역 칠하기의 `fills` 컬렉션을 추가해 schemaVersion을 10으로 올렸습니다. 영역 선택의 `selectedIds`·단일 편집용 `selectedId`·드래그 사각형·선택 강조와 칠하기 도구/미리보기는 UI 상태이며 출력하지 않습니다.
 
 ## 최상위 필드
 
 | 필드 | 설명 |
 | --- | --- |
-| `schemaVersion` | 현재 8. sketches 배열과 곡선·점·직선의 binding 추가; 기존 도형 자료 보존 |
+| `schemaVersion` | 현재 10. 독립된 칠한 구역 fills 추가; 기존 도형 자료 보존 |
 | `activeDiagramId` | 최상위 도형·좌표계 필드가 가리키는 그래프 ID |
 | `layout` | `preset`과 `slots`: `{diagramId, row, column}` 배열. 행·열은 0부터 시작 |
 | `diagrams` | 숨겨진 그래프를 포함한 모든 그래프. 각각 `id`, `name`, 아래의 좌표계·도형 필드를 보유 |
 | `coordinateSystem` | 원점 배치·사분면·방향·축 표시·축 이름 |
 | `showGrid` | 격자 표시 여부 |
 | `lines` | 모든 직선 |
-| `curves` | 우상향·우하향 기본 곡선; 자유 곡선은 sketches에 별도 저장 |
+| `curves` | 기본 곡선과 family가 있는 무차별곡선; 자유 곡선은 sketches에 별도 저장 |
 | `sums` | 수직합·수평합의 방향·음수 처리·같은 그래프 원본 ID |
 | `sketches` | 세 점 자유 곡선의 시작·끝·가운데 점·접선·양쪽 휘어짐·접점 관계 |
 | `points` | 모든 점과 이름·좌표 표시 설정 |
 | `dashedLines` | 모든 점선의 두 끝점·이름·색상·계층 |
+| `fills` | 칠한 구역의 수학 좌표 다각형 rings·색·진하기·이동 기준점·계층 |
 | `rulers` | 비활성화된 이전 자 자료 보존용 배열 |
 | `groups` | 도형 없이 분류에 사용하는 폴더 |
 | `objectOrder` | 모든 종류를 섞은 생성 순서의 ID 배열 |
 
-기존 최상위 `coordinateSystem`, `showGrid`, `lines`, `curves`, `sketches`, `sums`, `points`, `dashedLines`, `rulers`, `groups`, `objectOrder`는 선택한 그래프의 사본입니다. 전체 문서는 `diagrams`와 `layout`으로 읽습니다. 배치를 줄여도 `diagrams`에서 삭제하지 않으며 `layout.slots`에 있는 그래프만 표시합니다. 다음 예시는 좌우 대면 배치입니다.
+최상위 `coordinateSystem`, `showGrid`, `lines`, `curves`, `sketches`, `sums`, `points`, `dashedLines`, `fills`, `rulers`, `groups`, `objectOrder`는 선택한 그래프의 사본입니다. 전체 문서는 `diagrams`와 `layout`으로 읽습니다. 배치를 줄여도 `diagrams`에서 삭제하지 않으며 `layout.slots`에 있는 그래프만 표시합니다. 다음 예시는 좌우 대면 배치입니다.
 
 ```json
 {"preset":"face2","slots":[{"diagramId":"diagram-1","row":0,"column":0},{"diagramId":"diagram-2","row":0,"column":1}]}
@@ -32,13 +35,35 @@
 
 객체 선택 상태(현재 그래프 ID 제외), 다음 ID 카운터, 화면 크기·배율, UI 입력 포커스, 마우스 선택(`mouseSelected`), 되돌리기·다시 실행 기록과 메타데이터(`canUndo`, `canRedo`, `historyRevision`)는 출력하지 않습니다. 복원 기능을 구현할 경우 사분면 조합에서 내부 `quadrantMode`를 결정하고 ID 카운터 충돌을 방지해야 합니다. 파일의 표시 메타데이터와 기하 데이터를 검증 없이 DOM에 삽입해서는 안 됩니다.
 
+점·접선·절편 자석은 드래그 중 임시 위치 보정입니다. 자석 후보·강조·포착 상태는 내보내지 않으며 새 binding도 생성하지 않습니다. 이동을 마친 도형의 수학 좌표만 저장하고 드래그 전용 자료를 추가하지 않습니다. 현재 형식은 구역 칠하기를 포함한 10입니다.
+
+## 칠한 구역 · 버전 10
+
+최상위와 각 diagrams에 `fills` 배열을 저장합니다. 각 도형은 아래와 같습니다.
+
+```json
+{"id":"fill-1","type":"fill","name":"구역 A","label":"A","color":"#6068e8","opacity":0.24,"parentId":null,"anchor":{"x":0,"y":0},"rings":[[{"x":0,"y":0},{"x":6,"y":0},{"x":0,"y":6}]]}
+```
+
+rings는 유한한 수학 좌표로 된 닫힌 다각형들의 배열이며 각 배열은 마지막 점을 첫 점에 암묵적으로 잇습니다. 내부 구멍은 추가 ring으로 저장하고 SVG evenodd 규칙을 사용합니다. anchor는 모든 ring을 함께 옮기는 기준점이며 opacity는 0.1~0.6, color는 6자리 hex입니다. 같은 그래프의 objectOrder·parentId·이름·기록을 공유합니다. 경계 선/곡선에 대한 sourceIds/binding은 저장하지 않으며 **칠한 당시 모양을 독립적으로 유지**합니다. 선을 옮기거나 삭제해도 칠한 구역은 그대로 남습니다. 곡선 경계는 수학 좌표의 다각형 근사이며 정확한 면적 데이터나 픽셀 마스크가 아닙니다. `fillSelected`·자동 색/다음 글자·새 진하기·면 캐시·hover·열린 곳 안내는 내보내지 않습니다. fills가 없는 과거 문서는 빈 배열에 해당하지만 불러오기 기능은 아직 제공하지 않습니다.
+
+선택적 `label`은 새 구역에 자동 부여하는 영어 대문자(A…Z→AA)이며 이름과 독립적입니다. 색과 글자를 생성 시 저장하므로 삭제/이동·이름 편집·undo/redo에서 유지됩니다. 다음 구역의 색/글자는 활성 그래프의 남은 구역에서 계산하되 선택한 결과만 실제 객체에 저장합니다. 글자의 내부 위치·폰트 크기는 화면에 맞춰 계산하며 출력하지 않습니다. label이 없는 이전 버전 10 도형은 표시 글자가 없는 구역으로 해석할 수 있습니다. 추가 필드는 기존 버전 10 도형 필드를 변경하지 않습니다.
+
 ## 축 간격
 
 각 coordinateSystem.lineAxisGap은 `{enabled, distance}`입니다. 기본은 enabled=false, distance=0.75이고 거리 범위는 0.25~2 내부 좌표 단위입니다. 이 필드는 직선·곡선의 축 주변 표시만 자르는 설정이며 anchor/slope/제어점은 원본을 유지합니다. 축·점·독립 점선은 자르지 않습니다. 이전 출력에 이 필드가 없으면 기본값을 사용합니다.
 
 ## 이름과 계층
 
-직선·기본/자유 곡선·합산·점·점선·이전 자·폴더에는 `parentId`가 있습니다. null은 최상위이며 다른 항목 ID면 그 아래에 들어갑니다. 계층은 같은 그래프 안에서만 연결하고 순환을 허용하지 않습니다. 같은 상위 항목의 자식은 `objectOrder` 순서로 정렬합니다. 분류는 좌표를 바꾸지 않으며 `name`은 방향과 독립적입니다. 목록 접기·그리기 모드·점 보정 토글은 UI 상태여서 출력하지 않습니다. 일반 스냅은 보정된 좌표만 출력합니다. 명시적인 따라가기는 별도의 binding으로 아래에 기록합니다.
+직선·기본/자유 곡선·합산·점·점선·칠한 구역·이전 자·폴더에는 `parentId`가 있습니다. null은 최상위이며 다른 항목 ID면 그 아래에 들어갑니다. 계층은 같은 그래프 안에서만 연결하고 순환을 허용하지 않습니다. 같은 상위 항목의 자식은 `objectOrder` 순서로 정렬합니다. 분류는 좌표를 바꾸지 않으며 `name`은 방향과 독립적입니다. 목록 접기·그리기 모드·점 보정 토글은 UI 상태여서 출력하지 않습니다. 일반 스냅은 보정된 좌표만 출력합니다. 명시적인 따라가기는 별도의 binding으로 아래에 기록합니다.
+
+## 무차별곡선 · 버전 9
+
+무차별곡선은 curves 배열의 type=curve 객체이며 family는 `cobb-douglas`, `substitutes`, `complements`, `quasilinear` 중 하나입니다. 기본 곡선 목록의 직각 쌍곡선도 같은 저장 형식을 공유하며 family는 `rectangular-hyperbola`입니다. 공통 id·name·color·parentId와 내부 좌표 anchor, shape를 저장합니다. 준선형에는 linearAxis(x/y)가 추가됩니다. geometry는 `{type:"indifference",domain:"nonnegative",movement:"이동 방식 표시"}`이며 기본 곡선의 variant/span/slope/bend·이차 제어점·접선 연장을 출력하지 않습니다. movement는 표시용이고 실제 기하는 family와 anchor/shape/linearAxis로 복원합니다.
+
+`rectangular-hyperbola`는 `shape:1`을 유지하고 `x*y=anchor.x*anchor.y`, x,y>0으로 복원합니다. 두 축이 점근선이며 anchor는 곡선 위의 기준점입니다. 크기 조절·몸체 이동·복제는 anchor를 원점 기준으로 확대/축소하고 `shape`를 바꾸지 않습니다. 음수 가지나 점근선 이동은 저장하지 않습니다. JSON 10의 기존 객체 형식을 확장한 family 값이며 별도 컬렉션은 없습니다.
+
+shape는 0.15~20이며 완전보완재의 기하는 shape 대신 꺾임 anchor의 비율을 사용합니다. 콥더글라스·완전보완재 anchor는 양수, 준선형의 비선형 축 anchor는 양수이고 선형 축 anchor는 음수도 가능합니다. 실제 표시 영역은 비음수 좌표입니다. 기하식과 이동·클리핑 명세는 [무차별곡선 설계](indifference-design.md)를 참고하십시오. 표시 근사·픽셀·자석 후보·효용/가격/소득 수치는 저장하지 않습니다.
 
 ## 자유 곡선과 따라가기 관계
 
@@ -71,7 +96,7 @@ point의 minimum 관계는 원본 자유 곡선의 유한 전체 구간 최저�
 {"id":"sum-1","type":"sum","name":"수평합 01","color":"#b67836","parentId":null,"direction":"horizontal","nonnegative":true,"sourceIds":["line-1","curve-1"]}
 ```
 
-direction은 vertical(같은 x에서 y를 더함) 또는 horizontal(같은 y에서 x를 더함)입니다. sourceIds는 같은 그래프의 서로 다른 직선·곡선 두 개 이상을 참조하며, 합을 다시 원본으로 참조할 수 없습니다. 원본은 같은 문서의 lines/curves에서 복원합니다. nonnegative=true는 독립 변수를 0 이상으로 제한하고 각각의 음수 기여분을 0으로 처리합니다. false는 음수까지 그대로 더합니다. 기울기·절편·anchor·제어점·화면 근사 선분은 합에 저장하지 않습니다. 표시 시 원본을 평가해 계산하므로 원본의 이후 변경을 반영합니다.
+direction은 vertical(같은 x에서 y를 더함) 또는 horizontal(같은 y에서 x를 더함)입니다. sourceIds는 같은 그래프의 서로 다른 직선·기본 곡선 두 개 이상(무차별곡선 제외)을 참조하며, 합을 다시 원본으로 참조할 수 없습니다. 원본은 같은 문서의 lines/curves에서 복원합니다. nonnegative=true는 독립 변수를 0 이상으로 제한하고 각각의 음수 기여분을 0으로 처리합니다. false는 음수까지 그대로 더합니다. 기울기·절편·anchor·제어점·화면 근사 선분은 합에 저장하지 않습니다. 표시 시 원본을 평가해 계산하므로 원본의 이후 변경을 반영합니다.
 
 원본 삭제 시 의존하는 합도 함께 삭제됩니다. 원본이 수직합에 사용할 수 없는 수직선 또는 수평합에 사용할 수 없는 수평선으로 변경된 경우 합의 참조를 유지하며 표시만 중단합니다. 상위 항목(parentId)과 계산 원본(sourceIds)은 별개의 관계입니다. 합 이름·분류·nonnegative 변경과 삭제는 일반 도형처럼 undo/redo 대상입니다. 6 이하 문서에는 sums가 없으므로 향후 불러오기 구현 시 빈 배열로 처리합니다.
 
@@ -151,19 +176,19 @@ schemaVersion 5에서 점 보조선 기능과 `guides` 필드를 제거했습니
 
 ## 복제와 UI 상태
 
-복제본은 원본과 같은 line/curve/sketch/point/dashed/group 타입의 독립 객체입니다. sum과 ruler는 복제 대상이 아닙니다. 새 ID와 이름을 사용하고 함께 복제한 계층의 parentId는 새 ID를 가리킵니다. 기울기 배율과 기준은 실제 slope/anchor에 반영하며 수직선 null을 유지합니다. 자유 곡선은 start/anchor/end를 함께 이동합니다. binding은 같은 계층을 함께 복제해도 모두 끊어 독립 사본으로 만듭니다.
+복제본은 원본과 같은 line/curve/sketch/point/dashed/group 타입의 독립 객체입니다. sum과 ruler는 복제 대상이 아닙니다. 새 ID와 이름을 사용하고 함께 복제한 계층의 parentId는 새 ID를 가리킵니다. 직선은 현재 기준점에서 기울기 배율을 적용한 뒤 자동으로 옆에 띄우며 결과를 실제 slope/anchor에 반영합니다. 기준·절편 유지·배치 선택은 없고 수직선 null을 유지합니다. 자유 곡선은 start/anchor/end를 함께 이동합니다. binding은 같은 계층을 함께 복제해도 모두 끊어 독립 사본으로 만듭니다.
 
-선택·점·점선·자유 곡선·복제·합산의 UI 플래그(handSelected/mouseSelected/dashedSelected/sketchSelected/duplicatePanel/sumPanel)와 생성/복제 옵션은 출력하지 않습니다. 현재 형식 버전은 **8**입니다. 6은 독립 점선, 7은 원본 참조 합산, 8은 자유 곡선·따라가기 관계를 추가한 버전입니다. JSON 불러오기는 현재 제공하지 않으므로 과거 버전의 자동 마이그레이션을 약속하는 형식은 아닙니다.
+선택·점·점선·자유 곡선·칠하기·복제·합산의 UI 플래그와 생성/복제 옵션은 출력하지 않습니다. 현재 형식 버전은 **10**입니다. 6은 독립 점선, 7은 원본 참조 합산, 8은 자유 곡선·따라가기 관계, 9는 무차별곡선, 10은 칠한 구역을 추가한 버전입니다. JSON 불러오기는 현재 제공하지 않으므로 과거 버전의 자동 마이그레이션을 약속하는 형식은 아닙니다.
 
 ## 예시
 
-[두 그래프의 전체 예시](examples/editor-v8.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 합산, 직선에 접한 자유 곡선, U자 곡선→최저점→통과 직선, 폴더와 독립 점선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다.
+[두 그래프의 전체 예시](examples/editor-v10.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, U자 곡선→최저점→통과 직선, 폴더와 독립 점선, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다.
 
-현재 직렬화 함수로 생성한 점과 점선 문서입니다. 축 간격 기본 설정도 함께 포함합니다.
+버전 9 당시 직렬화 함수로 생성한 점과 점선 문서입니다. 축 간격 기본 설정도 함께 포함합니다.
 
 ```json
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "objectOrder": [
     "point-1",
     "dashed-1"

@@ -102,11 +102,11 @@ test('deleting relation sources freezes surviving geometry and undo restores the
 
 test('sketches copy independently, preserve hierarchy and export full internal geometry and relations',()=>{
   const store=createStore(), source=addLine(store), id=store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2},{lineId:source});
-  const copy=store.duplicateSelected({placement:'right'}), state=store.getState();
+  const copy=store.duplicateSelected(), state=store.getState();
   assert.equal(copy,'sketch-2');assert.equal(state.sketches[1].binding,null);
   for(const key of ['start','anchor','end']) near(state.sketches[1][key].x,state.sketches[0][key].x+1);
   const group=store.addGroup();store.moveObject(id,group);
-  const exportedState=store.getState(), doc=serializeDocument(exportedState);assert.equal(doc.schemaVersion,8);assert.deepEqual(doc.sketches,doc.diagrams[0].sketches);
+  const exportedState=store.getState(), doc=serializeDocument(exportedState);assert.equal(doc.schemaVersion,10);assert.deepEqual(doc.sketches,doc.diagrams[0].sketches);
   assert.equal(doc.sketches[0].parentId,group);assert.equal(doc.sketches[0].binding.sourceId,source);
   assert.equal(doc.sketches[0].geometry.type,'piecewise-quadratic-bezier');assert.ok(!('collapsed' in doc.sketches[0]));
   doc.sketches[0].start.x=999;assert.equal(sketch(store).start.x,1);

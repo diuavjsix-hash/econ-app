@@ -87,14 +87,15 @@ test('editing anchors and curve handle visibility follow displayed sections', ()
   assert.equal(lineEditingGeometry(line, []), null);
 });
 
-test('hidden strokes and axis intersections do not attract snapping; points remain visible and axes remain available', () => {
+test('hidden strokes stay excluded while exact intercepts remain available across axis gaps', () => {
   const line = { id: 'line', slope: 0, anchor: { x: 3, y: 3 } };
   const state = { ...display, lines: [line], curves: [], points: [] };
   const targets = buildSnapTargets(state, bounds);
   assert.equal(snapPoint({ x: 0.35, y: 3 }, targets, 100), null);
-  assert.ok(targets.crossings.every(({ ids }) => !ids.includes('line')));
+  assert.ok(targets.crossings.some(({kind,point,ids})=>kind==='intercept' && ids.includes('line') && point.x===0 && point.y===3));
   assert.ok(targets.shapes.some(({ id }) => id === 'axis-x'));
-  assert.equal(snapPoint({ x: 0.02, y: 3 }, targets, 100).ids[0], 'axis-y');
+  assert.equal(snapPoint({ x: 0.02, y: 3 }, targets, 100).kind, 'intercept');
+  assert.ok(snapPoint({ x: 0.02, y: 3 }, targets, 100).ids.includes('axis-y'));
   assert.ok(snapPoint({ x: 3, y: 3.02 }, targets, 100).ids.includes('line'));
   state.points.push({ id: 'point', anchor: { x: 0.3, y: 3 }, guides: { horizontal: 'dashed', vertical: 'solid', extent: 'axes' } });
   const guided = buildSnapTargets(state, bounds);

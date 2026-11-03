@@ -3,12 +3,16 @@ import { directionOf, interceptOf } from './graph/math.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
 import { curveControlPoints, curveTangentRays } from './graph/curve.js';
 import { sketchControls } from './graph/sketch.js';
+import { isIndifference, indifferenceMovement } from './graph/indifference.js';
 
 function serializeDiagram(state) {
   const baseOrigin = QUADRANT_MODES[state.quadrantMode].origin;
   const origin = baseOrigin === 'center' ? 'center' : `${state.flipY ? 'top' : 'bottom'}-${baseOrigin.endsWith('center') ? 'center' : state.flipX ? 'right' : 'left'}`;
   return {
     objectOrder: [...state.objectOrder],
+    fills: (state.fills ?? []).map(({ id, name, label, color, opacity, parentId, anchor, rings }) => ({
+      id, type: 'fill', name, ...(label ? { label } : {}), color, opacity, parentId, anchor: { ...anchor }, rings: structuredClone(rings),
+    })),
     sketches:(state.sketches??[]).map(({collapsed,...curve})=>({...structuredClone(curve),geometry:{type:'piecewise-quadratic-bezier',controlPoints:structuredClone(sketchControls(curve))}})),
     sums: (state.sums ?? []).map(({ id, name, color, parentId, direction, nonnegative, sourceIds }) => ({
       id, type: 'sum', name, color, parentId, direction, nonnegative, sourceIds: [...sourceIds],
@@ -39,7 +43,12 @@ function serializeDiagram(state) {
         implicit: { a: -direction.y, b: direction.x, c: direction.y * line.anchor.x - direction.x * line.anchor.y },
       };
     }),
-    curves: state.curves.map((curve) => ({
+    curves: state.curves.map((curve) => isIndifference(curve) ? {
+      id:curve.id,type:'curve',name:curve.name,color:curve.color,parentId:curve.parentId,
+      family:curve.family,anchor:{...curve.anchor},shape:curve.shape,
+      ...(curve.family==='quasilinear'?{linearAxis:curve.linearAxis}:{}),
+      geometry:{type:'indifference',domain:'nonnegative',movement:indifferenceMovement(curve)},
+    } : ({
       id: curve.id, type: 'curve', name: curve.name, color: curve.color, variant: curve.variant, parentId: curve.parentId,
       anchor: { ...curve.anchor }, span: curve.span, slope: curve.slope, bend: curve.bend,
       geometry: {
@@ -52,7 +61,7 @@ function serializeDiagram(state) {
 
 export function serializeDocument(state) {
   return {
-    schemaVersion: 8,
+    schemaVersion: 10,
     // Retain the active diagram's fields for consumers of the earlier format.
     ...serializeDiagram(state),
     activeDiagramId: state.activeDiagramId,

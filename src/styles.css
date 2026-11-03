@@ -278,7 +278,7 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 
 
 /* Ascending and descending curves. */
-#curve-tool, #mouse-tool { margin-top:9px; }
+#mouse-tool { margin-top:9px; }
 #curve-settings { --selected-color:var(--accent); border-top:1px solid var(--border); margin-top:24px; padding-top:25px; }
 .curve-title { color:var(--selected-color); font-size:16px; font-weight:500; }
 .curve-presets { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:24px; }
@@ -288,7 +288,7 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 #delete-curve:hover { color:#c46677; background:#fff4f6; }
 .bend-handle { cursor:ns-resize; }
 #bend-value { color:var(--selected-color); }
-@media(max-width:760px) { #curve-tool { max-width:300px; } #curve-settings { margin-top:20px; padding-top:20px; } }
+@media(max-width:760px) { #curve-settings { margin-top:20px; padding-top:20px; } }
 
 /* Points, labels and nested object organization. */
 .object-section { margin-top:24px; }
@@ -332,11 +332,6 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 .axis-gap-settings .slope-heading label { margin:0; }
 .axis-settings .axis-gap-settings input[type=range] { width:100%; padding:0; border:0; background:linear-gradient(to right, var(--accent) var(--progress), #eceef5 var(--progress)); }
 .axis-gap-settings output { color:#7b8499; font-size:11px; font-variant-numeric:tabular-nums; }
-.snap-preview { fill:none; stroke:#6068e8; stroke-width:1.5; pointer-events:none; }
-.snap-preview circle { stroke-dasharray:3 2; }
-.snap-preview text { fill:#6068e8; stroke:white; stroke-width:3px; paint-order:stroke; font:11px Inter,'Noto Sans KR',sans-serif; }
-.graph-svg.is-mouse-adjusting, .graph-svg.is-mouse-adjusting * { cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%236068e8' stroke-width='1.5' stroke-dasharray='3 2'/%3E%3C/svg%3E") 12 12, crosshair; }
-.graph-svg.has-mouse-cursor, .graph-svg.has-mouse-cursor * { cursor:none!important; }
 .mouse-chevron { margin-left:auto; font-size:16px; }
 #mouse-tool[aria-expanded=false] .mouse-chevron { transform:rotate(-90deg); }
 .mouse-hint { margin:8px 3px 0; color:#949bae; font-size:10px; line-height:1.6; }
@@ -426,9 +421,7 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 
 /* Selection and economically useful copies share existing graph objects. */
 #hand-tool { margin-bottom:9px; }
-#hand-tool[aria-pressed=true], #duplicate-tool[aria-pressed=true] { background:#e9ecff; border-color:#aeb7f4; }
-#duplicate-tool { margin-top:9px; }
-#duplicate-tool[aria-expanded=false] .mouse-chevron { transform:rotate(-90deg); }
+#hand-tool[aria-pressed=true] { background:#e9ecff; border-color:#aeb7f4; }
 .copy-target-label { display:block; margin:14px 0 10px; font-size:11px; color:#7b8499; }
 .copy-target-label select { display:block; width:100%; padding:8px; margin-top:8px; border:1px solid var(--border); border-radius:7px; background:#fafbfc; color:#59627a; font:12px Inter,'Noto Sans KR',sans-serif; }
 .copy-caption { margin:14px 0 8px; font-size:11px; color:#7b8499; font-weight:500; }
@@ -438,8 +431,6 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 .copy-factors span { font-size:10px; }
 .copy-factors button[aria-pressed=true] { color:var(--accent); border-color:#bcc5fa; background:#f7f8ff; }
 .copy-preview { font-size:11px; color:#7b8499; line-height:1.7; overflow-wrap:anywhere; }
-.copy-details { margin:12px 0; font-size:11px; color:#8b93a6; }
-.copy-details summary { cursor:pointer; }
 .copy-children { display:flex; align-items:center; gap:5px; margin:12px 0; }
 .copy-children input { accent-color:var(--accent); }
 .copy-action { width:100%; margin-top:12px; }

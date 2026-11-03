@@ -1,5 +1,5 @@
 import { DEFAULT_AXIS_GAP, MIN_AXIS_GAP, MAX_AXIS_GAP } from './graph/display.js';
-import { prepareDuplicate, DUPLICATABLE } from './duplicate.js';
+import { prepareDuplicate, DUPLICATABLE, placeCopiesNearby } from './duplicate.js';
 import { validPoint, rulerMetrics } from './graph/ruler.js';
 import { LAYOUTS, normalizeSlots } from './layouts.js';
 import { normalizeSlope, directionOf } from './graph/math.js';
@@ -9,22 +9,33 @@ import { canReparent, objectsOf } from './objects.js';
 import { sumError } from './graph/sum.js';
 import { validSketch, unitVector, projectOnLine, translatedSketch } from './graph/sketch.js';
 import { resolveRelations, canAttach, dependencyId } from './relations.js';
+import { INDIFFERENCE_FAMILIES, isIndifference, moveIndifference, radialIndifference } from './graph/indifference.js';
+import { validFill, fillKey } from './graph/fill.js';
+import { nextFillColor, nextFillLabel } from './graph/fill-style.js';
 
 const COLORS = ['#6068e8', '#e69451', '#43a999', '#cf7299', '#849353', '#699bd1'];
 
 /** Internal mathematical coordinates; hierarchy only organizes objects. */
 export function createStore() {
   const state = {
-    lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], rulers: [], groups: [], objectOrder: [],
+    selectedIds: [],
+    lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], fills: [], rulers: [], groups: [], objectOrder: [],
+    fillSelected: false, fillColor: '#6068e8', fillAutoColor: true, fillOpacity: 0.24,
     selectedId: null, handSelected: true, duplicatePanel: false, sumPanel: false, sketchSelected: false, sketchMode: 'auto', activeTool: 'point', mouseSelected: false, rulerSelected: false, dashedSelected: false, dashedMode: 'free', dashedSnap: true, pointSnap: true, pointCoordinates: false, showGrid: true,
     quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
   let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1, nextDashedId = 1;
   let nextSumId = 1;
   let nextSketchId = 1;
+  let nextFillId = 1;
   const listeners = new Set();
-  const documentKeys = ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'rulers', 'groups', 'objectOrder', 'quadrantMode', 'axisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
-  const emptyDocument = () => ({ lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], rulers: [], groups: [], objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
+  const setSelection = ids => {
+    const requested=new Set(ids);
+    state.selectedIds=objectsOf(state).filter(object=>requested.has(object.id)).map(object=>object.id);
+    state.selectedId=state.selectedIds.length===1?state.selectedIds[0]:null;
+  };
+  const documentKeys = ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups', 'objectOrder', 'quadrantMode', 'axisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
+  const emptyDocument = () => ({ lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], fills: [], rulers: [], groups: [], objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
   let layout = { preset: 'single', slots: structuredClone(LAYOUTS.single.slots) };
@@ -33,16 +44,16 @@ export function createStore() {
   const loadDiagram = () => {
     const diagram = diagrams.find(d => d.id === activeDiagramId);
     for (const key of documentKeys) state[key] = diagram[key];
-    state.selectedId = null;
+    setSelection([]);
   };
   const documentState = () => {
     syncDiagram();
     return {
       document: structuredClone({ layout, diagrams: diagrams.map(diagram => ({
         ...diagram,
-        ...Object.fromEntries(['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'rulers', 'groups'].map(key => [key, diagram[key].map(({ collapsed, ...object }) => object)])),
+        ...Object.fromEntries(['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups'].map(key => [key, diagram[key].map(({ collapsed, ...object }) => object)])),
       })) }),
-      activeDiagramId, selectedId: state.selectedId,
+      activeDiagramId, selectedId: state.selectedId, selectedIds: [...state.selectedIds],
     };
   };
   const different = (a, b) => JSON.stringify(a.document) !== JSON.stringify(b.document);
@@ -55,6 +66,7 @@ export function createStore() {
     const active = diagrams.find(d => d.id === activeDiagramId);
     return {
       ...structuredClone(state), diagrams: structuredClone(diagrams), layout: structuredClone(layout),
+      fillColor: state.fillAutoColor ? nextFillColor(state.fills) : state.fillColor, fillNextLabel: nextFillLabel(state.fills),
       activeDiagramId, flipX: active.flipX, flipY: active.flipY,
       canUndo: past.length > 0 || Boolean(pendingChange()), canRedo: future.length > 0 && !pendingChange(), historyRevision,
     };
@@ -82,7 +94,7 @@ export function createStore() {
     activeDiagramId = entry.activeDiagramId;
     for (const diagram of diagrams) for (const object of objectsOf(diagram)) object.collapsed = folds.get(object.id) ?? false;
     loadDiagram();
-    state.selectedId = entry.selectedId;
+    setSelection(entry.selectedIds ?? (entry.selectedId?[entry.selectedId]:[]));
     historyRevision++;
     restoring = true;
     emit();
@@ -93,8 +105,8 @@ export function createStore() {
     object.collapsed = false;
     state[collection].push(object);
     state.objectOrder.push(object.id);
-    state.selectedId = object.id;
-    if (['line', 'curve', 'sketch', 'sum'].includes(object.type)) { state.mouseSelected = false; state.rulerSelected = false; state.dashedSelected = false; state.handSelected = true; state.duplicatePanel = false; state.sketchSelected = false; state.sumPanel=false; }
+    setSelection([object.id]);
+    if (['line', 'curve', 'sketch', 'sum'].includes(object.type)) { state.fillSelected = false; state.mouseSelected = false; state.rulerSelected = false; state.dashedSelected = false; state.handSelected = true; state.duplicatePanel = false; state.sketchSelected = false; state.sumPanel=false; }
     emit();
     return object.id;
   };
@@ -147,13 +159,25 @@ export function createStore() {
     clearAll() {
       endHistory();
       if (!state.objectOrder.length) return false;
-      for (const key of ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'rulers', 'groups', 'objectOrder']) state[key] = [];
-      state.selectedId = null;
+      for (const key of ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups', 'objectOrder']) state[key] = [];
+      setSelection([]);
       historyRevision++;
       emit();
       return true;
     },
     update(patch) {
+      if (patch.handSelected || patch.mouseSelected || patch.dashedSelected || patch.duplicatePanel || patch.sketchSelected || patch.sumPanel) state.fillSelected = false;
+      if (typeof patch.fillSelected === 'boolean') {
+        state.fillSelected = patch.fillSelected;
+        if (patch.fillSelected) {
+          state.fillAutoColor = true;
+          state.handSelected=false; state.mouseSelected=false; state.dashedSelected=false; state.duplicatePanel=false; state.sketchSelected=false; state.sumPanel=false;
+          setSelection([]);
+        }
+      }
+      if (typeof patch.fillColor === 'string' && /^#[0-9a-f]{6}$/i.test(patch.fillColor)) { state.fillColor = patch.fillColor; state.fillAutoColor = false; }
+      if (Number.isFinite(patch.fillOpacity)) state.fillOpacity = Math.max(0.1, Math.min(0.6, patch.fillOpacity));
+      if (state.selectedIds.length>1 && (patch.mouseSelected || patch.dashedSelected || patch.sketchSelected || patch.duplicatePanel || patch.sumPanel)) setSelection([]);
       if (patch.handSelected || patch.mouseSelected || patch.dashedSelected || patch.duplicatePanel || patch.sketchSelected) state.sumPanel=false;
       if (['auto','horizontal','vertical'].includes(patch.sketchMode)) state.sketchMode=patch.sketchMode;
       if (typeof patch.axisGapEnabled === 'boolean') state.axisGapEnabled = patch.axisGapEnabled;
@@ -165,7 +189,7 @@ export function createStore() {
         state.mouseSelected = patch.mouseSelected;
         // Switching to the point tool ends the previous line/curve selection.
         if (patch.mouseSelected) { state.rulerSelected = false; state.dashedSelected = false; state.handSelected = false; state.duplicatePanel = false; state.sketchSelected = false; }
-        if (patch.mouseSelected && [...state.lines, ...state.curves, ...state.sketches, ...state.sums, ...state.dashedLines, ...state.rulers].some(object => object.id === state.selectedId)) state.selectedId = null;
+        if (patch.mouseSelected && [...state.lines, ...state.curves, ...state.sketches, ...state.sums, ...state.dashedLines, ...state.rulers].some(object => object.id === state.selectedId)) setSelection([]);
       }
       // The ruler tool is intentionally disabled until its behavior is redesigned.
       state.rulerSelected = false;
@@ -173,7 +197,7 @@ export function createStore() {
         state.dashedSelected = patch.dashedSelected;
         if (patch.dashedSelected) {
           state.mouseSelected = false; state.handSelected = false; state.duplicatePanel = false; state.sketchSelected = false;
-          if (!state.dashedLines.some(line => line.id === state.selectedId)) state.selectedId = null;
+          if (!state.dashedLines.some(line => line.id === state.selectedId)) setSelection([]);
         }
       }
       if (typeof patch.duplicatePanel === 'boolean') {
@@ -182,7 +206,7 @@ export function createStore() {
       }
       if (typeof patch.sketchSelected === 'boolean') {
         state.sketchSelected=patch.sketchSelected;
-        if (patch.sketchSelected) { state.handSelected=false; state.mouseSelected=false; state.dashedSelected=false; state.duplicatePanel=false; state.selectedId=null; }
+        if (patch.sketchSelected) { state.handSelected=false; state.mouseSelected=false; state.dashedSelected=false; state.duplicatePanel=false; setSelection([]); }
       }
       if (typeof patch.sumPanel==='boolean') {
         state.sumPanel=patch.sumPanel;
@@ -191,7 +215,7 @@ export function createStore() {
       if (patch.handSelected === true) {
         state.handSelected = true; state.mouseSelected = false; state.dashedSelected = false; state.duplicatePanel = false; state.sketchSelected = false;
       }
-      if (!state.mouseSelected && !state.dashedSelected && !state.duplicatePanel && !state.sketchSelected && !state.sumPanel) state.handSelected = true;
+      if (!state.mouseSelected && !state.dashedSelected && !state.duplicatePanel && !state.sketchSelected && !state.sumPanel && !state.fillSelected) state.handSelected = true;
       if (typeof patch.dashedSnap === 'boolean') state.dashedSnap = patch.dashedSnap;
       if (['free', 'horizontal', 'vertical'].includes(patch.dashedMode)) state.dashedMode = patch.dashedMode;
       if (Object.hasOwn(QUADRANT_MODES, patch.quadrantMode)) state.quadrantMode = patch.quadrantMode;
@@ -220,6 +244,13 @@ export function createStore() {
         anchor: Number.isFinite(placement.anchor?.x) && Number.isFinite(placement.anchor?.y)
           ? { ...placement.anchor } : { x: state.quadrantMode === 'first' ? 4 : 0, y: state.quadrantMode === 'all' ? 0 : 4 },
       });
+    },
+    addIndifference(family, placement={}) {
+      if (!Object.hasOwn(INDIFFERENCE_FAMILIES,family)) return null;
+      const index=nextCurveId++,preset=INDIFFERENCE_FAMILIES[family];
+      const anchor=validPoint(placement.anchor)?{x:Math.max(0.1,placement.anchor.x),y:Math.max(0.1,placement.anchor.y)}:{x:3,y:3};
+      return add('curves',{id:`curve-${index}`,type:'curve',family,name:`${preset.label} ${String(index).padStart(2,'0')}`,
+        color:preset.color,anchor,shape:family==='quasilinear'?Math.max(0.2,Math.min(20,anchor.x*0.7)):1,linearAxis:'y'});
     },
     addSketch(start, end, anchor, { lineId=null, tangent=null, mode=state.sketchMode } = {}) {
       if (![start,end,anchor].every(validPoint)) return null;
@@ -294,11 +325,33 @@ export function createStore() {
       const index = nextGroupId++;
       return add('groups', { id: `group-${index}`, type: 'group', name: `폴더 ${String(index).padStart(2, '0')}`, color: '#949aab' });
     },
-    selectObject(id) {
+    addFill(region) {
+      if (!validFill(region)) return null;
+      const key = fillKey(region), existing = state.fills.find(fill => fillKey(fill) === key);
+      if (existing) {
+        if (!state.fillAutoColor) existing.color = state.fillColor;
+        existing.opacity = state.fillOpacity;
+        state.fillAutoColor = true;
+        setSelection([existing.id]); emit(); return existing.id;
+      }
+      const index = nextFillId++;
+      const color = state.fillAutoColor ? nextFillColor(state.fills) : state.fillColor, label = nextFillLabel(state.fills);
+      state.fillAutoColor = true;
+      return add('fills', { id: `fill-${index}`, type: 'fill', name: `구역 ${label}`, label,
+        color, opacity: state.fillOpacity, rings: structuredClone(region.rings), anchor: { ...region.rings[0][0] } });
+    },
+    selectObjects(ids) {
+      if (!Array.isArray(ids)) return false;
+      setSelection(ids);
+      if (state.selectedIds.length && !state.duplicatePanel) {state.fillSelected=false;state.handSelected=true;state.mouseSelected=false;state.dashedSelected=false;state.sketchSelected=false;state.sumPanel=false;}
+      emit();
+      return true;
+    },
+    selectObject(id,{toggle=false}={}) {
       const object = objectsOf(state).find(item => item.id === id);
       if (id === null || object) {
-        if (object && !state.duplicatePanel) { state.handSelected = true; state.mouseSelected = false; state.dashedSelected = false; state.sketchSelected=false; state.sumPanel=false; }
-        state.selectedId = id;
+        if (object && !state.duplicatePanel) { state.fillSelected=false; state.handSelected = true; state.mouseSelected = false; state.dashedSelected = false; state.sketchSelected=false; state.sumPanel=false; }
+        setSelection(id===null?[]:toggle?(state.selectedIds.includes(id)?state.selectedIds.filter(selected=>selected!==id):[...state.selectedIds,id]):[id]);
         emit();
       }
     },
@@ -315,11 +368,13 @@ export function createStore() {
           for (const object of originals) if (!selected.has(object.id) && selected.has(object.parentId) && DUPLICATABLE.includes(object.type)) { selected.add(object.id); changed = true; }
         }
       }
-      const copies = originals.filter(object => selected.has(object.id)).map(object => {
+      let copies = originals.filter(object => selected.has(object.id)).map(object => {
         if (object.id === source.id) return prepared.object;
-        return prepareDuplicate(object, { placement: options.placement ?? 'same' }).object;
+        return prepareDuplicate(object).object;
       });
       if (copies.some(object => !object)) return null;
+      copies=placeCopiesNearby(copies,originals,source.id);
+      if (!copies) return null;
       endHistory();
       const names = new Set(originals.map(object => object.name));
       for (const object of copies) {
@@ -342,7 +397,7 @@ export function createStore() {
         object.parentId = ids.get(object.parentId) ?? object.parentId;
         state[collections[object.type]].push(object); state.objectOrder.push(object.id);
       }
-      state.selectedId = ids.get(source.id);
+      setSelection([ids.get(source.id)]);
       historyRevision++;
       emit();
       return state.selectedId;
@@ -351,6 +406,15 @@ export function createStore() {
       const object = objectsOf(state).find((item) => item.id === state.selectedId);
       if (!object) return;
       if (typeof patch.name === 'string') object.name = patch.name.slice(0, 80);
+      if (object.type === 'fill') {
+        if (typeof patch.color === 'string' && /^#[0-9a-f]{6}$/i.test(patch.color)) object.color = patch.color;
+        if (Number.isFinite(patch.opacity)) object.opacity = Math.max(0.1, Math.min(0.6, patch.opacity));
+        if (validPoint(patch.anchor)) {
+          const dx = patch.anchor.x - object.anchor.x, dy = patch.anchor.y - object.anchor.y;
+          const moved = object.rings.map(ring => ring.map(point => ({ x: point.x + dx, y: point.y + dy })));
+          if (validFill({ rings: moved })) { object.rings = moved; object.anchor = { ...patch.anchor }; }
+        }
+      }
       if (object.type==='sketch') {
         const next=structuredClone(object);
         if (validPoint(patch.anchor)) {
@@ -369,7 +433,17 @@ export function createStore() {
         if (validSketch(next)) Object.assign(object,next);
       }
       if (object.type === 'sum' && typeof patch.nonnegative === 'boolean') object.nonnegative = patch.nonnegative;
-      if (object.type === 'curve') {
+      if (isIndifference(object)) {
+        if (validPoint(patch.anchor)) {
+          const next=patch.reshape && object.family==='complements' ? patch.anchor : moveIndifference(object,object.anchor,patch.anchor);
+          if (validPoint(next) && (!radialIndifference(object) || (next.x>=0.02 && next.y>=0.02))) object.anchor={...next};
+        }
+        if (Number.isFinite(patch.shape) && object.family!=='rectangular-hyperbola') object.shape=Math.max(0.15,Math.min(20,patch.shape));
+        if (object.family==='quasilinear' && ['x','y'].includes(patch.linearAxis) && patch.linearAxis!==object.linearAxis) {
+          // Reflect the complete geometry, including a possibly negative linear-axis level.
+          object.anchor={x:object.anchor.y,y:object.anchor.x};object.linearAxis=patch.linearAxis;
+        }
+      } else if (object.type === 'curve') {
         if (Object.hasOwn(CURVE_PRESETS, patch.variant)) {
           object.variant = patch.variant;
           object.slope = CURVE_PRESETS[patch.variant].slope;
@@ -388,7 +462,7 @@ export function createStore() {
         if (object.type === 'ruler' && ['solid', 'dashed'].includes(patch.style)) object.style = patch.style;
         if (object.type === 'ruler' && typeof patch.showMeasurement === 'boolean') object.showMeasurement = patch.showMeasurement;
       }
-      if (!['group', 'ruler', 'dashed', 'sum', 'sketch'].includes(object.type) && Number.isFinite(patch.anchor?.x) && Number.isFinite(patch.anchor?.y)) {
+      if (!isIndifference(object) && !['group', 'ruler', 'dashed', 'sum', 'sketch', 'fill'].includes(object.type) && Number.isFinite(patch.anchor?.x) && Number.isFinite(patch.anchor?.y)) {
         object.anchor = { x: patch.anchor.x === 0 ? 0 : patch.anchor.x, y: patch.anchor.y === 0 ? 0 : patch.anchor.y };
       }
       emit();
@@ -408,9 +482,10 @@ export function createStore() {
       emit();
     },
     removeSelected() {
-      const removed = objectsOf(state).find((item) => item.id === state.selectedId);
-      if (!removed) return;
-      const deleted = new Set([removed.id, ...state.sums.filter(sum => sum.sourceIds.includes(removed.id)).map(sum => sum.id)]);
+      const selected=new Set(state.selectedIds),removed=objectsOf(state).filter(object=>selected.has(object.id));
+      if (!removed.length) return false;
+      endHistory();
+      const deleted = new Set([...selected, ...state.sums.filter(sum => sum.sourceIds.some(id=>selected.has(id))).map(sum => sum.id)]);
       // Freeze the current geometry when its relation source is deleted.
       for (const object of objectsOf(state)) if (deleted.has(dependencyId(object))) object.binding=null;
       // Retain children of both the deleted source and its dependent sums.
@@ -420,10 +495,13 @@ export function createStore() {
         return id;
       };
       for (const object of byId.values()) object.parentId = survivingParent(object.parentId);
-      for (const collection of ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'rulers', 'groups']) state[collection] = state[collection].filter((item) => !deleted.has(item.id));
+      for (const collection of ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups']) state[collection] = state[collection].filter((item) => !deleted.has(item.id));
       state.objectOrder = state.objectOrder.filter((id) => !deleted.has(id));
-      state.selectedId = survivingParent(removed.parentId) ?? state.objectOrder.at(-1) ?? null;
+      const next=removed.length===1?(survivingParent(removed[0].parentId) ?? state.objectOrder.at(-1) ?? null):null;
+      setSelection(next?[next]:[]);
+      historyRevision++;
       emit();
+      return true;
     },
     subscribe(listener) {
       listeners.add(listener);

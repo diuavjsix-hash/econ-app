@@ -1,10 +1,12 @@
-import { displayedLineSegments, displayedCurveSegments } from './display.js';
+import { displayedLineSegments, displayedCurveSegments, isLinePointVisible } from './display.js';
 import { clipSegment } from './ruler.js';
 import { displayedSumSegments } from './sum.js';
-import { displayedSketchSegments } from './sketch.js';
+import { displayedSketchSegments, sketchControls } from './sketch.js';
+import { isIndifference, indifferenceLineIntersections } from './indifference.js';
+import { SNAP_CAPTURE_PX, SNAP_RELEASE_PX, chooseSnapCandidate } from './snap-policy.js';
 
-export const SNAP_RADIUS = 10;
-export const INTERSECTION_RADIUS = 16;
+export const SNAP_RADIUS = SNAP_CAPTURE_PX;
+export const INTERSECTION_RADIUS = SNAP_CAPTURE_PX;
 const EPS = 1e-9;
 const dot = (a, b) => a.x * b.x + a.y * b.y;
 const cross = (a, b) => a.x * b.y - a.y * b.x;
@@ -79,6 +81,47 @@ function nearest(shape, point) {
   return best;
 }
 
+function quadraticRoots(coefficients) {
+  const scale=Math.max(...coefficients.map(Math.abs));
+  if (!Number.isFinite(scale) || !scale) return []; // Coincident pieces have no unique contact.
+  const [c,b,a]=coefficients.map(value=>value/scale);
+  let parameters=[];
+  if (!a) { if (b) parameters=[-c/b]; }
+  else {
+    const discriminant=b*b-4*a*c,tolerance=32*Number.EPSILON*(b*b+Math.abs(4*a*c));
+    // A double root is especially sensitive to rounding after translating a line.
+    // Keep a single exact critical point rather than two nearby false crossings.
+    if (Math.abs(discriminant)<=tolerance) parameters=[-b/(2*a)];
+    else if (discriminant>0) {
+      const q=-0.5*(b+(b<0?-1:1)*Math.sqrt(discriminant));
+      parameters=q?[q/a,c/q]:[0];
+    }
+  }
+  return parameters.filter(inside).map(clamp);
+}
+
+/** Exact finite quadratic helpers shared by point placement and moving-shape magnets. */
+export function nearestQuadraticPoint(points,point) {
+  return nearest(piece('quadratic',points),point);
+}
+export function quadraticCoordinatePoints(points,coordinate,value) {
+  const shape=piece('quadratic',points),coefficients=[shape.a[coordinate]-value,shape.v[coordinate],shape.q[coordinate]];
+  if (coefficients.every(coefficient=>coefficient===0)) return null; // Every parameter has this coordinate.
+  return quadraticRoots(coefficients).map(t=>at(shape,t));
+}
+
+function quadraticLineCrossings(curve, line) {
+  const lengthSquared = dot(line.v,line.v);
+  if (!lengthSquared) return [];
+  const coefficients=[cross(sub(curve.a,line.a),line.v),cross(curve.v,line.v),cross(curve.q,line.v)];
+  return quadraticRoots(coefficients)
+    .map(t => {
+      const point=at(curve,t),derivative={x:curve.v.x+2*t*curve.q.x,y:curve.v.y+2*t*curve.q.y};
+      const scale=Math.hypot(derivative.x,derivative.y)*Math.sqrt(lengthSquared);
+      return {point,kind:scale>0 && Math.abs(cross(derivative,line.v))<=1e-9*scale?'tangent':'intersection'};
+    }).filter(({point}) => inside(dot(sub(point,line.a),line.v)/lengthSquared));
+}
+
 function intersections(a, b) {
   if (a.linear && b.linear) {
     const denominator = cross(a.v, b.v);
@@ -90,10 +133,7 @@ function intersections(a, b) {
   }
   if (a.linear) [a, b] = [b, a];
   if (b.linear) {
-    const lengthSquared = dot(b.v, b.v);
-    if (!lengthSquared) return [];
-    return roots([cross(sub(a.a, b.a), b.v), cross(a.v, b.v), cross(a.q, b.v)])
-      .map((t) => at(a, t)).filter((point) => inside(dot(sub(point, b.a), b.v) / lengthSquared));
+    return quadraticLineCrossings(a,b).map(({point})=>point);
   }
   // Rendered curve pieces have linear x and quadratic y, so curve/curve roots are quadratic.
   const dxA = a.v.x, dxB = b.v.x;
@@ -108,6 +148,45 @@ function intersections(a, b) {
   ];
   return roots(coefficients, clamp((low - a.a.x) / dxA), clamp((high - a.a.x) / dxA))
     .filter((u) => inside(v0 + v1 * u)).map((u) => at(a, u));
+}
+
+/** Exact axis crossings stay available even when an axis-gap band hides the stroke. */
+export function buildInterceptTargets(state,bounds,excludeObjectId=null) {
+  const axes=[];
+  if (bounds.yMin<=0 && bounds.yMax>=0) axes.push({axis:'x',shape:straightPiece('axis-x',{x:bounds.xMin,y:0},{x:bounds.xMax,y:0})});
+  if (bounds.xMin<=0 && bounds.xMax>=0) axes.push({axis:'y',shape:straightPiece('axis-y',{x:0,y:bounds.yMin},{x:0,y:bounds.yMax})});
+  const targets=[],rawState={...state,axisGapEnabled:false};
+  const add=(point,axis,id=null)=>{
+    const normalized={x:axis==='y'||Math.abs(point.x)<1e-10?0:point.x,y:axis==='x'||Math.abs(point.y)<1e-10?0:point.y};
+    if (!Number.isFinite(normalized.x) || !Number.isFinite(normalized.y)) return;
+    if (normalized.x<bounds.xMin-EPS || normalized.x>bounds.xMax+EPS || normalized.y<bounds.yMin-EPS || normalized.y>bounds.yMax+EPS) return;
+    const origin=normalized.x===0 && normalized.y===0;
+    if (targets.some(target=>target.sourceId===id && distance(normalized,target.point)<1e-7)) return;
+    targets.push({point:normalized,axis:origin?'origin':axis,sourceId:id,kind:'intercept',label:origin?'원점':`${axis}절편`,ids:id?[id,`axis-${axis}`]:['axis-x','axis-y']});
+  };
+  if (axes.length===2) add({x:0,y:0},'origin');
+  const sourcePieces=[];
+  for (const line of state.lines) if (line.id!==excludeObjectId && displayedLineSegments(line,bounds,state).length) {
+    sourcePieces.push(...displayedLineSegments(line,bounds,rawState).map(points=>straightPiece(line.id,...points)));
+  }
+  for (const curve of state.curves) if (curve.id!==excludeObjectId && displayedCurveSegments(curve,bounds,state).length) {
+    if (isIndifference(curve)) {
+      for (const {axis} of axes) {
+        const line=axis==='x'?{anchor:{x:0,y:0},slope:0}:{anchor:{x:0,y:0},slope:null};
+        for (const {point} of indifferenceLineIntersections(curve,line,bounds)) add(point,axis,curve.id);
+      }
+      continue;
+    }
+    sourcePieces.push(...displayedCurveSegments(curve,bounds,rawState).map(points=>piece(curve.id,points)));
+  }
+  for (const sketch of state.sketches??[]) if (sketch.id!==excludeObjectId && displayedSketchSegments(sketch,bounds,state).length) {
+    sourcePieces.push(...sketchControls(sketch).map(points=>piece(sketch.id,points)));
+  }
+  for (const sum of state.sums??[]) if (sum.id!==excludeObjectId && displayedSumSegments(sum,state,bounds).length) {
+    sourcePieces.push(...displayedSumSegments(sum,rawState,bounds).map(points=>straightPiece(sum.id,...points)));
+  }
+  for (const source of sourcePieces) for (const {axis,shape} of axes) for (const point of intersections(source,shape)) add(point,axis,source.id);
+  return targets;
 }
 
 /** Use exactly the visible straight, quadratic and tangent geometry; no stored pixels. */
@@ -135,35 +214,75 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
 
   if (bounds.yMin <= 0 && bounds.yMax >= 0) shapes.push(straightPiece('axis-x', { x: bounds.xMin, y: 0 }, { x: bounds.xMax, y: 0 }));
   if (bounds.xMin <= 0 && bounds.xMax >= 0) shapes.push(straightPiece('axis-y', { x: 0, y: bounds.yMin }, { x: 0, y: bounds.yMax }));
-  const crossings = [];
-  for (let i = 0; i < shapes.length; i++) {
-    for (let j = i + 1; j < shapes.length; j++) {
-      if (shapes[i].id === shapes[j].id) continue;
-      for (const point of intersections(shapes[i], shapes[j])) {
-        if (!crossings.some((item) => distance(point, item.point) < 1e-7)) crossings.push({ point, ids: [shapes[i].id, shapes[j].id] });
+  const intercepts=buildInterceptTargets(state,bounds,excludeObjectId);
+  const crossings = [...intercepts];
+  // A kink is a deliberate point target, not only the nearest point on either arm.
+  // Register it before computed intersections so coincident crossings keep its identity.
+  for (const curve of state.curves) if (curve.id!==excludeObjectId && curve.family==='complements'
+    && isLinePointVisible(curve.anchor,bounds,state)) {
+    crossings.push({ point:{...curve.anchor}, ids:[curve.id], sourceId:curve.id, kind:'kink', label:'꺾임 맞춤' });
+  }
+  const exactSketches = new Map((state.sketches ?? []).filter(sketch=>sketch.id!==excludeObjectId)
+    .map(sketch=>[sketch.id,sketchControls(sketch).map(points=>piece(sketch.id,points))]));
+  const addCrossing = (point,ids,kind='intersection') => {
+    if (!crossings.some(item=>distance(point,item.point)<1e-7)) crossings.push({point,ids,kind});
+  };
+  const exactIndifferences=new Set(state.curves.filter(isIndifference).map(c=>c.id));
+  const exactLines=new Set(state.lines.map(line=>line.id));
+  for (const curve of state.curves.filter(isIndifference)) {
+    if (curve.id===excludeObjectId) continue;
+    for (const line of state.lines) for (const {point,kind} of indifferenceLineIntersections(curve,line,bounds)) {
+      if (isLinePointVisible(point,bounds,state)) addCrossing(point,[curve.id,line.id],kind);
+    }
+  }
+  // A tangent between mesh vertices never crosses the display chords. Solve against
+  // the original quadratic instead, then apply the same visible-domain clipping.
+  for (const [id,pieces] of exactSketches) {
+    for (const line of shapes.filter(shape=>shape.linear && !exactSketches.has(shape.id))) {
+      for (const curve of pieces) for (const {point,kind} of quadraticLineCrossings(curve,line)) {
+        if (isLinePointVisible(point,bounds,state)) addCrossing(point,[id,line.id],kind);
       }
     }
   }
-  return { shapes, crossings };
-}
-
-/** Intersections get a larger capture radius and take priority over the nearest stroke. */
-export function snapPoint(point, targets, unit) {
-  let crossing = null, bestDistance = INTERSECTION_RADIUS;
-  for (const candidate of targets.crossings) {
-    const pixels = distance(point, candidate.point) * unit;
-    if (pixels <= bestDistance) { crossing = candidate; bestDistance = pixels; }
-  }
-  if (crossing) return { point: { ...crossing.point }, kind: 'intersection', ids: [...crossing.ids] };
-  let snapped = null;
-  bestDistance = SNAP_RADIUS;
-  for (const shape of targets.shapes) {
-    const candidate = nearest(shape, point);
-    const pixels = distance(point, candidate) * unit;
-    if (pixels <= bestDistance) {
-      snapped = { point: candidate, kind: 'shape', ids: [shape.id] };
-      bestDistance = pixels;
+  for (let i = 0; i < shapes.length; i++) {
+    for (let j = i + 1; j < shapes.length; j++) {
+      if (shapes[i].id === shapes[j].id) continue;
+      if ((exactIndifferences.has(shapes[i].id) && exactLines.has(shapes[j].id)) || (exactIndifferences.has(shapes[j].id) && exactLines.has(shapes[i].id))) continue;
+      const aSketch=exactSketches.has(shapes[i].id),bSketch=exactSketches.has(shapes[j].id);
+      if ((aSketch && !bSketch && shapes[j].linear) || (bSketch && !aSketch && shapes[i].linear)) continue;
+      for (const point of intersections(shapes[i], shapes[j])) {
+        addCrossing(point,[shapes[i].id,shapes[j].id]);
+      }
     }
   }
-  return snapped;
+  return { shapes, crossings, intercepts };
+}
+
+/** Candidates on the allowed movement axis, before magnet priority/hysteresis. */
+export function guidedSnapCandidates(point, targets, unit, axis = null, radius = SNAP_RELEASE_PX) {
+  const locked = axis === 'x' ? 'y' : 'x', candidates = [];
+  const add = (candidate, key, priority) => {
+    if (axis && Math.abs(candidate.point[locked] - point[locked]) > EPS) return;
+    const aligned = axis ? { ...candidate.point, [locked]: point[locked] } : candidate.point;
+    const pixels = distance(point, aligned) * unit;
+    if (pixels <= radius) candidates.push({ ...candidate, point: aligned, key, priority, distance: pixels });
+  };
+  for (const crossing of targets.crossings) add(crossing,
+    `crossing:${crossing.ids.join(',')}:${crossing.point.x}:${crossing.point.y}`, 1);
+  for (const shape of targets.shapes) {
+    let points;
+    if (!axis) points = [nearest(shape, point)];
+    else {
+      const coefficients = [shape.a[locked] - point[locked], shape.v[locked], shape.q[locked]];
+      points = coefficients.every(value => Math.abs(value) <= 1e-12)
+        ? [nearest(shape, point)] : quadraticRoots(coefficients).map(t => at(shape, t));
+    }
+    for (const target of points) add({ point: target, kind: 'shape', ids: [shape.id] }, `shape:${shape.id}`, 2);
+  }
+  return candidates;
+}
+
+/** Crossings retain priority; all pointer magnets share capture/release and axis constraints. */
+export function snapPoint(point, targets, unit, { previous=null, axis=null }={}) {
+  return chooseSnapCandidate(guidedSnapCandidates(point,targets,unit,axis),previous);
 }
