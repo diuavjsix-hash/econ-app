@@ -171,6 +171,6 @@ node scripts/browser-test.mjs
 
 ## GitHub Pages
 
-`node scripts/build.mjs`로 만든 `dist/`는 정적 웹 파일입니다. 앱 경로는 GitHub Pages의 `/econ-app/` 하위 경로를 고려한 상대 경로입니다. 저장소 루트 자체도 정적 사이트로 제공할 수 있습니다. 자동 배포는 설정하지 않았으며 실제 배포 검증은 아직 하지 않았습니다.
+`node scripts/build.mjs`로 만든 `dist/`는 정적 웹 파일입니다. 앱 경로는 GitHub Pages의 `/econ-app/` 하위 경로를 고려한 상대 경로입니다. 저장소 루트 자체도 정적 사이트로 제공할 수 있습니다. 프로젝트의 `Check` 워크플로에는 배포 단계가 없습니다. 다만 기존 저장소의 별도 Pages 설정으로 `main` 푸시 시 GitHub 관리형 `pages build and deployment`가 자동 실행되는 것을 2026-11-04에 확인했습니다. 이번 작업에서 배포 명령이나 Pages 설정 변경은 하지 않았으며, 배포 실행 상태와 실제 사이트 검증은 로컬 빌드/CI와 구분합니다.
 
 작업은 메모리에 보관하므로 새로고침하면 초기화됩니다. JSON으로 결과를 저장할 수 있으며, JSON 불러오기와 자동 저장은 아직 지원하지 않습니다.

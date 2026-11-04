@@ -4,7 +4,7 @@
 
 ## 최신 요청과 반영 범위
 
-최신 사용자 요청은 **현재 작업을 꼼꼼히 문서화하고 커밋·푸시**하는 것입니다. 이번 반영에는 PPC·에지워드 상자, 공통 클래스/상속과 조작·UI 기반, 곡선끼리 접점 자석, 접점의 점/점선 누락 수정, 공통화 재점검·회귀 검사·CI 구성을 함께 포함합니다. 배포는 별도 요청 전까지 하지 않습니다.
+최신 사용자 요청은 **현재 작업을 꼼꼼히 문서화하고 커밋·푸시**하는 것입니다. 이번 반영에는 PPC·에지워드 상자, 공통 클래스/상속과 조작·UI 기반, 곡선끼리 접점 자석, 접점의 점/점선 누락 수정, 공통화 재점검·회귀 검사·CI 구성을 함께 포함합니다. 직접 배포 명령과 Pages 설정 변경은 별도 요청 전까지 하지 않습니다. 기존 저장소의 푸시 연동 Pages 자동 실행은 아래에 따로 기록합니다.
 
 - 의존성 없는 JavaScript ES module 앱입니다. 수식 입력이나 자동 경제 계산보다 노트처럼 자유롭게 그리는 것이 제품 목표입니다.
 - 컴퓨터 전용 `server.cmd`, `start-server.cmd`, `stop-server.cmd`의 로컬 내용·Git 플래그는 유지하고 이번 커밋·푸시에서 제외합니다. 파일을 저장소에서 삭제하지 않습니다.
@@ -69,6 +69,8 @@
 `node scripts/check.mjs`, `node scripts/test.mjs`, `node scripts/build.mjs`, `node scripts/browser-test.mjs`로 재현합니다. 상세 사례·이전 실제 조작과 합성 검사의 구분은 [검증 문서](docs/testing.md)를 따릅니다. 문서화 단계에서 재실행한 로컬 자료는 `.local/commit-foundation-node-result.txt`, `.local/commit-foundation-browser-result.json`에 있습니다.
 
 `.github/workflows/check.yml`은 push/PR/수동 실행에서 같은 검사를 수행하며 배포 단계가 없습니다. 로컬 통과와 원격 Actions 결과를 구분하고 원격 실행 상태는 해당 커밋의 Actions에서 확인합니다.
+
+앱/기반 변경 커밋 `2328d3f`는 origin/main에 반영됐고 [원격 Check](https://github.com/diuavjsix-hash/econ-app/actions/runs/41757848785)가 성공했습니다. 별도 배포 명령/설정 변경은 하지 않았으나 기존 저장소 Pages 설정으로 main 푸시가 GitHub 관리형 `pages build and deployment`도 자동 시작했습니다. 이 자동 동작과 실제 사이트 검증은 별개입니다. 현재 최종 커밋은 위 Git 명령으로 확인합니다.
 
 ## 알려진 제한
 

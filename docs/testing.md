@@ -8,6 +8,8 @@
 
 CI는 동일 명령을 push/PR/수동 실행에 연결합니다. 로컬 통과를 원격 CI 통과로 표현하지 않으며 해당 커밋의 Actions 결과에서 별도로 확인합니다. 배포 단계는 없습니다.
 
+앱/기반 변경 커밋 `2328d3f`의 [원격 Check 실행](https://github.com/diuavjsix-hash/econ-app/actions/runs/41757848785)은 **success**로 완료됐습니다. 따라서 아래 개발 당시의 ‘원격 CI 미검증’은 해당 시점의 기록입니다. 기존 저장소 설정의 [GitHub 관리형 Pages 실행](https://github.com/diuavjsix-hash/econ-app/actions/runs/41757845921)도 푸시로 자동 시작했으며, 이는 이번 Check 워크플로의 배포 단계나 별도 배포 명령으로 실행한 것이 아닙니다. 실제 게시 사이트의 UI/동작은 이번에 검증하지 않았습니다.
+
 문서화 정리에서 위 로컬 검사를 다시 실행해 같은 결과를 확인했습니다. 문서 **14개**의 로컬 링크 **86개**, JSON 블록 **6개**, 전체 예시의 그래프 2개/객체 15개와 실제 serializer 재생성 일치도 확인했습니다. 현재 인계는 요약으로 재구성하고 이전 인계는 이력에 보존했습니다. 최종 로컬 결과는 `.local/commit-foundation-node-result.txt`, `.local/commit-foundation-browser-result.json`입니다.
 
 ## 2026-11-04 · 공통화 재점검과 보수
@@ -265,7 +267,7 @@ Windows 서버 테스트는 .local/server-test-* 안에 임시 서버를 만들�
 
 Windows 서버 검사만 실행하려면 `node --test tests/server.test.js` 또는 `npm run test:server`를 사용합니다. `node --test` 전체 실행은 서버 검사도 포함하므로 기본 앱 검사 명령과 결과 개수가 다릅니다.
 
-빌드는 index.html, src/, public/을 dist/로 복사합니다. 새 editor.css도 포함합니다. 이전 dist 파일을 자동 삭제하지 않으므로 원본에서 파일을 제거한 작업이라면 잔여 파일을 별도로 확인합니다. 이번 변경에는 배포 동작이 없습니다.
+빌드는 index.html, src/, public/을 dist/로 복사합니다. 새 editor.css도 포함합니다. 이전 dist 파일을 자동 삭제하지 않으므로 원본에서 파일을 제거한 작업이라면 잔여 파일을 별도로 확인합니다. Check 검사에는 배포 단계가 없으며 저장소의 별도 Pages 자동 실행은 위 현재 반영 기록과 구분합니다.
 
 ## 실제 브라우저에서 확인한 범위
 
