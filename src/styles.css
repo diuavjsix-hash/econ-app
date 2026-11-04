@@ -244,7 +244,7 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 .quadrant-dialog { width:min(550px,calc(100vw - 32px)); padding:28px; border:1px solid var(--border); border-radius:18px; color:#303241; box-shadow:0 24px 80px #25294026; }
 .quadrant-dialog::backdrop { background:#22283b30; backdrop-filter:blur(6px); }
 .quadrant-dialog h2 { font-size:16px; font-weight:500; margin:0 0 24px; }
-.quadrant-choices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.quadrant-choices { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
 .quadrant-choices button { display:flex; flex-direction:column; align-items:center; gap:18px; padding:24px 8px 20px; border:1px solid var(--border); border-radius:12px; background:#fff; color:#798298; font-size:12px; white-space:nowrap; }
 .quadrant-choices button:hover { border-color:#b9c2f9; background:#fafaff; color:var(--accent); }
 .quadrant-choices button[aria-pressed=true] { border-color:#c9cff8; background:#f7f8ff; color:var(--accent); }
@@ -370,6 +370,14 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 .layout-preview-cell svg { width:100%; height:100%; max-width:28px; max-height:28px; fill:none; stroke:currentColor; stroke-width:1.3; }
 .quadrant-choices button { padding:12px 6px; gap:6px; }
 .quadrant-choices svg { width:38px; height:38px; }
+.box-size-fields { display:flex; gap:20px; margin-top:14px; }
+.box-size-fields label { flex:1; min-width:0; }
+.setting-row input[type=number] { width:84px; min-width:0; padding:7px 8px; border:1px solid var(--border); border-radius:6px; background:white; color:inherit; font:inherit; }
+.box-size-fields .setting-row { gap:8px; }
+@media(max-width:480px) {
+  .quadrant-choices { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .box-size-fields { flex-direction:column; gap:4px; }
+}
 .apply-quadrants { display:flex; align-items:center; gap:6px; margin-top:14px; font-size:11px; color:#7b8499; }
 .apply-quadrants input { accent-color:var(--accent); }
 .workspace-dialog-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:20px; }

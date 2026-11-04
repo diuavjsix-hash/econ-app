@@ -1,12 +1,9 @@
+import { SVG_RENDERER } from './svg-renderer.js';
 import { clipSegment } from './ruler.js';
 import { toScreen } from './viewport.js';
 
 export function drawDashedLine(segment, viewport, { selected = false, editable = true, preview = false, clipId } = {}) {
-  const node = (tag, attrs) => {
-    const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value);
-    return element;
-  };
+  const node = (...args) => SVG_RENDERER.element(...args);
   const group = node('g', { class: `graph-dashed${preview ? ' dashed-preview' : ''}`, 'data-dashed-id': segment.id ?? '', style: `--dashed-color:${segment.color ?? '#7b879c'}` });
   const visible = clipSegment(segment.anchor, segment.end, viewport.bounds);
   if (!visible) return group;

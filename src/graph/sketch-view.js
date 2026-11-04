@@ -1,28 +1,12 @@
 import { displayedSketchSegments, sketchHandlePoints } from './sketch.js';
 import { isLinePointVisible } from './display.js';
 import { toScreen } from './viewport.js';
-const NS='http://www.w3.org/2000/svg';
-function node(tag,attrs,text) {
-  const element=document.createElementNS(NS,tag);
-  for (const [key,value] of Object.entries(attrs)) element.setAttribute(key,String(value));
-  if (text) element.textContent=text;
-  return element;
-}
+import { STROKE_RENDERER } from './svg-renderer.js';
+const node=(...args)=>STROKE_RENDERER.element(...args);
 export function drawSketch(curve, viewport, state, {selected=false, editable=false, clipId, preview=false, handlesOnly=false}={}) {
   const group=node('g',{class:handlesOnly?'sketch-handles':preview?'sketch-draft':'graph-sketch',style:`--line-color:${curve.color??'#4c8e9a'}`});
-  let last=null;
-  const d=displayedSketchSegments(curve,viewport.bounds,state).map(points=>{
-    const [a,b]=points.map(point=>toScreen(point,viewport));
-    const connected=last && Math.hypot(a.x-last.x,a.y-last.y)<1e-6;last=b;
-    return `${connected?'':`M${a.x} ${a.y}`}L${b.x} ${b.y}`;
-  }).join(' ');
-  if (d && !handlesOnly) {
-    group.append(node('path',{d,fill:'none',class:`plotted-line${selected?' is-selected':''}`,'aria-hidden':'true'}));
-    if (!preview) {
-      const hit=node('path',{d,fill:'none',class:'line-hit','clip-path':`url(#${clipId})`,'data-id':curve.id,'data-action':'move',tabindex:0,role:'button','aria-label':`${curve.name} 이동`,'aria-pressed':selected});
-      group.append(hit);
-    }
-  }
+  const d=STROKE_RENDERER.pathData(displayedSketchSegments(curve,viewport.bounds,state),viewport);
+  if (!handlesOnly) STROKE_RENDERER.append(group,curve,d,{selected,clipId,interactive:!preview});
   if (!selected || !editable || preview) return group;
   const points=sketchHandlePoints(curve), labels={start:'시작점',end:'끝점',middle:'가운데 점',tangent:'접선 방향',leftReach:'시작 쪽 휘어짐',rightReach:'끝 쪽 휘어짐'};
   for (const key of ['leftReach','rightReach','tangent']) {

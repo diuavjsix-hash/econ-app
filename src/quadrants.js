@@ -9,14 +9,17 @@ export function mountQuadrants(root, store) {
   const applyAll = root.querySelector('#apply-all-quadrants');
   const apply = root.querySelector('#apply-workspace');
   const close = root.querySelector('#close-workspace');
+  const boxWidth=root.querySelector('#workspace-box-width'),boxHeight=root.querySelector('#workspace-box-height');
   let chosen = false, preset, slots, mode;
 
   function renderDraft() {
     for (const choice of choices) choice.setAttribute('aria-pressed', String(choice.dataset.quadrants === mode));
     for (const choice of layoutChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.layout === preset));
     for (const cell of customGrid.children) cell.setAttribute('aria-pressed', String(slots.some(s => s.row === Number(cell.dataset.row) && s.column === Number(cell.dataset.column))));
-    apply.disabled = slots.length === 0;
+    root.querySelector('#workspace-box-size').hidden=mode!=='edgeworth';
+    apply.disabled = slots.length === 0 || (mode==='edgeworth' && (!boxWidth.validity.valid || !boxHeight.validity.valid));
   }
+  boxWidth.addEventListener('input',renderDraft); boxHeight.addEventListener('input',renderDraft);
   for (const [id, layout] of Object.entries(LAYOUTS)) {
     const choice = document.createElement('button'); choice.dataset.layout = id;
     const preview = document.createElement('span'); preview.className = 'layout-preview'; preview.setAttribute('aria-hidden', 'true');
@@ -48,6 +51,7 @@ export function mountQuadrants(root, store) {
   function open() {
     const state = store.getState();
     preset = state.layout.preset; slots = structuredClone(state.layout.slots); mode = state.quadrantMode;
+    boxWidth.value=String(state.boxSize.width); boxHeight.value=String(state.boxSize.height);
     applyAll.checked = !chosen;
     apply.textContent = chosen ? '적용' : '시작'; close.hidden = !chosen;
     renderDraft(); dialog.showModal();
@@ -57,7 +61,7 @@ export function mountQuadrants(root, store) {
   apply.addEventListener('click', () => {
     const state = store.getState();
     const preserveDirections = state.layout.preset === preset && JSON.stringify(state.layout.slots) === JSON.stringify(slots);
-    store.configureLayout(preset, slots, mode, { allQuadrants: applyAll.checked, preserveDirections });
+    store.configureLayout(preset, slots, mode, { allQuadrants: applyAll.checked, preserveDirections, boxSize:{width:boxWidth.valueAsNumber,height:boxHeight.valueAsNumber} });
     chosen = true; dialog.close();
   });
   close.addEventListener('click', () => dialog.close());

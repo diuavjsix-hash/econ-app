@@ -4,7 +4,17 @@
 
 구역 칠하기의 `fills` 컬렉션을 추가해 schemaVersion을 10으로 올렸습니다. 영역 선택의 `selectedIds`·단일 편집용 `selectedId`·드래그 사각형·선택 강조와 칠하기 도구/미리보기는 UI 상태이며 출력하지 않습니다.
 
+공통 클래스 리팩터링 후에도 문서·undo·JSON은 일반 객체입니다. 클래스 인스턴스·contactGeometry 능력·접점 후보/강조·기하 캐시 키·입력 컴포넌트 상태는 저장하지 않습니다. 곡선끼리 이동 자석은 허용 이동으로 보정한 실제 곡선 좌표만 반영하며 새 binding을 만들지 않습니다. 점/점선을 그 접점에 배치하면 최종 수학 좌표를 저장하고 이후 곡선 이동을 따라가는 관계는 만들지 않습니다. 기존 직선↔자유 곡선의 명시적 접점 유지 binding은 별도 기능으로 유지합니다.
+
 ## 최상위 필드
+
+### PPC·에지워드 상자의 추가 필드
+
+기존 버전 10의 곡선·좌표계에 선택 필드를 추가하며 기존 종류의 출력은 유지합니다. `curves[].family='ppc'`는 원점 중심 양의 ¼타원입니다. `anchor`는 매개각 π/4인 점이고 `shape=1`은 공통 객체 형식 보존용입니다. `geometry`는 `{type:'ellipse-arc',center:{x:0,y:0},radii:{x:a,y:b},angleRange:[0,Math.PI/2],domain:'nonnegative',movement:...}`이며 a=anchor.x×√2, b=anchor.y×√2입니다. 실제 JSON의 angleRange에는 숫자가 출력됩니다. 표시 근사 선분은 출력하지 않습니다.
+
+에지워드 포맷에서 `coordinateSystem.type='edgeworth'`, `totals:{width,height}`, `oppositeOrigin:{x:width,y:height}`, `oppositeAxisNames:{x,y}`, `oppositeXPositive`, `oppositeYPositive`를 추가합니다. 기본 A 원점/축 필드는 그대로이고 B 방향은 A와 반대입니다. 모든 도형은 A 기준 수학 좌표이며 B 기준 좌표가 필요하면 `{x:width-p.x,y:height-p.y}`로 계산할 수 있습니다. 화면 크기·상자 픽셀 크기는 저장하지 않습니다. 복원 구현 시 `[1]` 사분면만으로 일반 그래프와 구분하지 말고 type을 먼저 읽어야 합니다. 현재 앱은 JSON 불러오기를 제공하지 않습니다.
+
+### 공통 필드
 
 | 필드 | 설명 |
 | --- | --- |

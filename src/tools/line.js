@@ -1,22 +1,22 @@
 import { angleFromSlope, formatNumber, lineEquation, normalizeSlope, slopeFromAngle } from '../graph/math.js';
+import { RangeControl, NumberControl } from '../ui/controls.js';
 
 export function mountLineTool(root, store) {
   const button = root.querySelector('#line-tool');
   const settings = root.querySelector('#line-settings');
-  const slider = root.querySelector('#slope-slider');
-  const slopeInput = root.querySelector('#slope-input');
+  const slider = new RangeControl(root,'slope-slider');
+  const numeric = new NumberControl(root, 'slope-input'), slopeInput = numeric.input;
   const presets = root.querySelectorAll('[data-slope]');
   let editingSlope = false;
   let verticalSide = 90;
   button.addEventListener('click', () => store.addLine());
-  slider.addEventListener('input', () => {
-    verticalSide = Number(slider.value) < 0 ? -90 : 90;
-    store.updateSelected({ slope: slopeFromAngle(Number(slider.value)) });
+  slider.bind(value => {
+    verticalSide = value < 0 ? -90 : 90;
+    store.updateSelected({ slope: slopeFromAngle(value) });
   });
-  slopeInput.addEventListener('input', () => {
-    if (slopeInput.value === '' || !Number.isFinite(slopeInput.valueAsNumber)) return;
+  numeric.bind(value => {
     editingSlope = true;
-    store.updateSelected({ slope: slopeInput.valueAsNumber });
+    store.updateSelected({ slope: value });
     editingSlope = false;
   });
   slopeInput.addEventListener('change', () => {
@@ -35,9 +35,7 @@ export function mountLineTool(root, store) {
     const { slope } = selected;
     settings.style.setProperty('--selected-color', selected.color);
     const angle = slope === null ? verticalSide : angleFromSlope(slope);
-    slider.value = String(angle);
-    slider.style.setProperty('--progress', `${(angle + 90) / 180 * 100}%`);
-    slider.setAttribute('aria-valuetext', slope === null ? '수직선' : formatNumber(slope));
+    slider.setValue(angle,slope === null ? '수직선' : formatNumber(slope));
     if (!editingSlope) slopeInput.value = slope === null ? '' : String(slope);
     slopeInput.placeholder = slope === null ? '수직' : '';
     root.querySelector('#equation-value').textContent = lineEquation(selected);

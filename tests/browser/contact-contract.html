@@ -1,0 +1,63 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>도구 간 접점 계약 검증</title>
+<style>@import url('/src/styles.css');@import url('/src/editor.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap;font:12px monospace}</style>
+<button id="run">도구 간 접점 검증</button><pre id="result">준비</pre><div id="stage"></div>
+<script type="module">
+import { CURVE_CONTACT_CASES } from '/tests/fixtures/curve-contact-cases.js';
+import { mountGraph } from '/src/graph/canvas.js';
+import { createViewport, toScreen } from '/src/graph/viewport.js';
+import { serializeDocument } from '/src/export.js';
+const stage=document.querySelector('#stage'),out=document.querySelector('#result');
+let store,svg,dispose;
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-7;
+const view=()=>createViewport(stage.clientWidth,stage.clientHeight,'first',store.getState());
+const marker=()=>svg.querySelector('.snap-feedback[data-snap-kind="tangent"]');
+function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:91,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x*r.width/v.width,clientY:r.top+s.y*r.height/v.height,...flags}));}
+const move=(p,flags={})=>send('pointermove',p,flags),click=(p,flags={})=>{send('pointerdown',p,flags);send('pointerup',p,flags)};
+document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok,name)=>{if(!ok)throw Error(name);passed.push(name)};try{
+ for(const config of [{width:800,height:540,flip:false},{width:800,height:540,flip:true},{width:312,height:400,flip:false}]){
+  stage.style.width=config.width+'px';stage.style.height=config.height+'px';
+  for(const fixture of CURVE_CONTACT_CASES){
+   dispose?.();const setup=fixture.setup();store=setup.store;store.updateDiagram({flipX:config.flip,flipY:config.flip});
+   dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};
+   const name=`${config.width}${config.flip?' reflected':''} ${fixture.name}`,c=[...store.getState().curves,...store.getState().sketches].find(c=>c.id===setup.moving);
+   const p=setup.expected??{x:3,y:3},raw={...c.anchor,[fixture.axis??'y']:c.anchor[fixture.axis??'y']+0.01};
+   send('pointerdown',c.anchor,{},svg.querySelector(`[data-id="${c.id}"][data-action="move"]`));move(raw,{shiftKey:Boolean(fixture.axis)});
+   check(marker(),`${name}: movement finds the common contact`);send('pointerup',raw);
+   const curves=JSON.stringify([store.getState().curves,store.getState().sketches]);
+   store.update({mouseSelected:true});const pointer={x:p.x+0.08,y:p.y+0.06};move(pointer);
+   check(marker()&&svg.querySelectorAll('.snap-feedback-ring').length===1,`${name}: point hover recovers one tangent marker after movement ends`);
+   check(svg.querySelector(`[data-snap-source="${setup.target}"]`)&&svg.querySelector(`[data-snap-source="${setup.moving}"]`),`${name}: point hover highlights both sources`);
+   check(svg.querySelector('.snap-feedback-label').textContent.includes('접점 맞춤'),`${name}: point hover keeps the common tangent wording`);
+   document.dispatchEvent(new KeyboardEvent('keydown',{key:'Alt',altKey:true,bubbles:true}));check(!marker(),`${name}: Alt clears point contact immediately`);
+   document.dispatchEvent(new KeyboardEvent('keyup',{key:'Alt',bubbles:true}));check(marker(),`${name}: Alt release restores point contact`);
+   store.update({pointSnap:false});move(pointer);check(!marker(),`${name}: point adjustment OFF bypasses contact`);
+   store.update({pointSnap:true});move(pointer);const before=serializeDocument(store.getState());click(pointer);
+   check(near(store.getState().points.at(-1).anchor,p),`${name}: point creation stores the exact contact`);
+   store.undo();check(same(serializeDocument(store.getState()),before),`${name}: point creation undoes independently`);
+   store.redo();check(near(store.getState().points.at(-1).anchor,p),`${name}: point redo retains the contact`);store.undo();
+   const pointId=store.addPoint({x:2,y:6});store.update({handSelected:true});
+   send('pointerdown',{x:2,y:6},{},svg.querySelector(`[data-id="${pointId}"][data-action="move"]`));move(pointer);
+   check(marker()&&near(store.getState().points.at(-1).anchor,p),`${name}: moving a point uses the same target`);send('pointerup',pointer);store.undo();
+   store.update({dashedSelected:true});click({x:1.5,y:p.y},{altKey:true});move({x:p.x+0.08,y:p.y},{shiftKey:true});
+   check(marker()&&svg.querySelector('.dashed-preview.is-snapped'),`${name}: Shift dashed preview uses the same contact`);
+   click({x:p.x+0.08,y:p.y},{shiftKey:true});
+   check(near(store.getState().dashedLines.at(-1).end,p),`${name}: dashed creation stores the exact contact`);
+   const dashId=store.getState().dashedLines.at(-1).id;store.update({handSelected:true});store.selectObject(dashId);
+   // Start away from the contact, then edit the endpoint back to it.
+   store.updateSelected({end:{x:2,y:6}});send('pointerdown',{x:2,y:6},{},svg.querySelector(`[data-id="${dashId}"][data-action="end"]`));move(pointer);
+   check(marker()&&near(store.getState().dashedLines.at(-1).end,p),`${name}: dashed endpoint editing uses the same target`);send('pointerup',pointer);
+   const dash=store.getState().dashedLines.at(-1),originalVector={x:dash.end.x-dash.anchor.x,y:dash.end.y-dash.anchor.y};
+   const mid={x:(dash.anchor.x+dash.end.x)/2,y:(dash.anchor.y+dash.end.y)/2};
+   send('pointerdown',mid,{},svg.querySelector(`[data-id="${dashId}"][data-action="move"]`));move({x:mid.x+0.08,y:mid.y+0.06});
+   const shifted=store.getState().dashedLines.at(-1);
+   check(marker()&&near(shifted.end,p)&&near({x:shifted.end.x-shifted.anchor.x,y:shifted.end.y-shifted.anchor.y},originalVector),`${name}: moving a dashed segment shares the target without stretching`);
+   send('pointerup',{x:mid.x+0.08,y:mid.y+0.06});
+   check(curves===JSON.stringify([store.getState().curves,store.getState().sketches]),`${name}: downstream tools preserve both curves`);
+   move(pointer); // Hand mode clears feedback; return to point hover for layout checking.
+   store.update({mouseSelected:true});move(pointer);const b=svg.querySelector('.snap-feedback-label').getBBox();
+   check(b.x>=0&&b.x+b.width<=stage.clientWidth,`${name}: shared contact label remains inside the canvas`);
+  }
+ }
+ dispose?.();out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
+}catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};
+</script></html>

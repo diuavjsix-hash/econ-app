@@ -4,6 +4,9 @@ import { displayedSumSegments } from './sum.js';
 import { displayedSketchSegments, sketchControls } from './sketch.js';
 import { isIndifference, indifferenceLineIntersections } from './indifference.js';
 import { SNAP_CAPTURE_PX, SNAP_RELEASE_PX, chooseSnapCandidate } from './snap-policy.js';
+import { axisSegments } from './axes.js';
+import { buildCurveContactTargets } from './curve-contacts.js';
+import { independentSnapState, geometryKey } from './snap-context.js';
 
 export const SNAP_RADIUS = SNAP_CAPTURE_PX;
 export const INTERSECTION_RADIUS = SNAP_CAPTURE_PX;
@@ -152,6 +155,9 @@ function intersections(a, b) {
 
 /** Exact axis crossings stay available even when an axis-gap band hides the stroke. */
 export function buildInterceptTargets(state,bounds,excludeObjectId=null) {
+  return interceptTargets(independentSnapState(state, excludeObjectId), bounds);
+}
+function interceptTargets(state,bounds) {
   const axes=[];
   if (bounds.yMin<=0 && bounds.yMax>=0) axes.push({axis:'x',shape:straightPiece('axis-x',{x:bounds.xMin,y:0},{x:bounds.xMax,y:0})});
   if (bounds.xMin<=0 && bounds.xMax>=0) axes.push({axis:'y',shape:straightPiece('axis-y',{x:0,y:bounds.yMin},{x:0,y:bounds.yMax})});
@@ -166,10 +172,10 @@ export function buildInterceptTargets(state,bounds,excludeObjectId=null) {
   };
   if (axes.length===2) add({x:0,y:0},'origin');
   const sourcePieces=[];
-  for (const line of state.lines) if (line.id!==excludeObjectId && displayedLineSegments(line,bounds,state).length) {
+  for (const line of state.lines) if (displayedLineSegments(line,bounds,state).length) {
     sourcePieces.push(...displayedLineSegments(line,bounds,rawState).map(points=>straightPiece(line.id,...points)));
   }
-  for (const curve of state.curves) if (curve.id!==excludeObjectId && displayedCurveSegments(curve,bounds,state).length) {
+  for (const curve of state.curves) if (displayedCurveSegments(curve,bounds,state).length) {
     if (isIndifference(curve)) {
       for (const {axis} of axes) {
         const line=axis==='x'?{anchor:{x:0,y:0},slope:0}:{anchor:{x:0,y:0},slope:null};
@@ -179,10 +185,10 @@ export function buildInterceptTargets(state,bounds,excludeObjectId=null) {
     }
     sourcePieces.push(...displayedCurveSegments(curve,bounds,rawState).map(points=>piece(curve.id,points)));
   }
-  for (const sketch of state.sketches??[]) if (sketch.id!==excludeObjectId && displayedSketchSegments(sketch,bounds,state).length) {
+  for (const sketch of state.sketches??[]) if (displayedSketchSegments(sketch,bounds,state).length) {
     sourcePieces.push(...sketchControls(sketch).map(points=>piece(sketch.id,points)));
   }
-  for (const sum of state.sums??[]) if (sum.id!==excludeObjectId && displayedSumSegments(sum,state,bounds).length) {
+  for (const sum of state.sums??[]) if (displayedSumSegments(sum,state,bounds).length) {
     sourcePieces.push(...displayedSumSegments(sum,rawState,bounds).map(points=>straightPiece(sum.id,...points)));
   }
   for (const source of sourcePieces) for (const {axis,shape} of axes) for (const point of intersections(source,shape)) add(point,axis,source.id);
@@ -191,6 +197,7 @@ export function buildInterceptTargets(state,bounds,excludeObjectId=null) {
 
 /** Use exactly the visible straight, quadratic and tangent geometry; no stored pixels. */
 export function buildSnapTargets(state, bounds, excludeObjectId = null) {
+  state = independentSnapState(state, excludeObjectId);
   const shapes = [];
   for (const line of state.lines) {
     shapes.push(...displayedLineSegments(line, bounds, state).map(points => straightPiece(line.id, ...points)));
@@ -199,30 +206,29 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
     shapes.push(...displayedCurveSegments(curve, bounds, state).map((points) => piece(curve.id, points)));
   }
   for (const ruler of state.dashedLines ?? []) {
-    if (ruler.id === excludeObjectId) continue;
     const segment = clipSegment(ruler.anchor, ruler.end, bounds);
     if (segment) shapes.push(straightPiece(ruler.id, ...segment));
   }
   for (const sum of state.sums ?? []) {
-    if (sum.id === excludeObjectId) continue;
     shapes.push(...displayedSumSegments(sum, state, bounds).map(points => straightPiece(sum.id, ...points)));
   }
   for (const sketch of state.sketches ?? []) {
-    if (sketch.id===excludeObjectId) continue;
     shapes.push(...displayedSketchSegments(sketch,bounds,state).map(points=>straightPiece(sketch.id,...points)));
   }
 
-  if (bounds.yMin <= 0 && bounds.yMax >= 0) shapes.push(straightPiece('axis-x', { x: bounds.xMin, y: 0 }, { x: bounds.xMax, y: 0 }));
-  if (bounds.xMin <= 0 && bounds.xMax >= 0) shapes.push(straightPiece('axis-y', { x: 0, y: bounds.yMin }, { x: 0, y: bounds.yMax }));
-  const intercepts=buildInterceptTargets(state,bounds,excludeObjectId);
+  for (const axis of axisSegments(state,bounds)) shapes.push(straightPiece(axis.id,...axis.points));
+  const intercepts=interceptTargets(state,bounds);
   const crossings = [...intercepts];
   // A kink is a deliberate point target, not only the nearest point on either arm.
   // Register it before computed intersections so coincident crossings keep its identity.
-  for (const curve of state.curves) if (curve.id!==excludeObjectId && curve.family==='complements'
+  for (const curve of state.curves) if (curve.family==='complements'
     && isLinePointVisible(curve.anchor,bounds,state)) {
     crossings.push({ point:{...curve.anchor}, ids:[curve.id], sourceId:curve.id, kind:'kink', label:'꺾임 맞춤' });
   }
-  const exactSketches = new Map((state.sketches ?? []).filter(sketch=>sketch.id!==excludeObjectId)
+  // Reconstruct contacts from document geometry, not a previous drag's transient UI state.
+  // Every point/endpoint consumer receives them through this one registry.
+  crossings.push(...buildCurveContactTargets(state, bounds));
+  const exactSketches = new Map((state.sketches ?? [])
     .map(sketch=>[sketch.id,sketchControls(sketch).map(points=>piece(sketch.id,points))]));
   const addCrossing = (point,ids,kind='intersection') => {
     if (!crossings.some(item=>distance(point,item.point)<1e-7)) crossings.push({point,ids,kind});
@@ -230,7 +236,6 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
   const exactIndifferences=new Set(state.curves.filter(isIndifference).map(c=>c.id));
   const exactLines=new Set(state.lines.map(line=>line.id));
   for (const curve of state.curves.filter(isIndifference)) {
-    if (curve.id===excludeObjectId) continue;
     for (const line of state.lines) for (const {point,kind} of indifferenceLineIntersections(curve,line,bounds)) {
       if (isLinePointVisible(point,bounds,state)) addCrossing(point,[curve.id,line.id],kind);
     }
@@ -256,6 +261,18 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
     }
   }
   return { shapes, crossings, intercepts };
+}
+
+/** Point/sketch handles and all dashed operations share one cache and source policy. */
+export class SnapTargetCache {
+  constructor() { this.clear(); }
+  clear() { this.key = null; this.targets = null; }
+  get(state, bounds, excludeObjectId = null) {
+    const sources = independentSnapState(state, excludeObjectId);
+    const key = JSON.stringify([excludeObjectId, geometryKey(sources, bounds)]);
+    if (key !== this.key) { this.targets = buildSnapTargets(sources, bounds); this.key = key; }
+    return this.targets;
+  }
 }
 
 /** Candidates on the allowed movement axis, before magnet priority/hysteresis. */

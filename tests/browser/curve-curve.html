@@ -1,0 +1,42 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>곡선 접점 자석 검증</title>
+<style>@import url('/src/styles.css');@import url('/src/editor.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap;font:12px monospace}</style>
+<button id="run">곡선 접점 검증</button><pre id="result">준비</pre><div id="stage"></div>
+<script type="module">
+import {createStore} from '/src/state.js';
+import {mountGraph} from '/src/graph/canvas.js';
+import {createViewport,toScreen} from '/src/graph/viewport.js';
+import {serializeDocument} from '/src/export.js';
+const stage=document.querySelector('#stage'),out=document.querySelector('#result');
+let store,svg,moving,target,dispose;
+const near=(a,b)=>Math.abs(a-b)<1e-7;
+const view=()=>createViewport(stage.clientWidth,stage.clientHeight,'first',store.getState());
+function setup(flip=false){
+ dispose?.();store=createStore();target=store.addSketch({x:1,y:0.1},{x:7,y:0.1},{x:4,y:2.1},{mode:'horizontal'});
+ moving=store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2},{mode:'horizontal'});store.updateDiagram({flipX:flip,flipY:flip});
+ dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};
+}
+function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:81,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x,clientY:r.top+s.y,...flags}));}
+const marker=()=>svg.querySelector('.snap-feedback[data-snap-kind="tangent"]');
+document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok,name)=>{if(!ok)throw Error(name);passed.push(name)};try{
+ for(const flip of [false,true]){
+  setup(flip);const original=serializeDocument(store.getState()),fixed=JSON.stringify(store.getState().sketches[0]);
+  send('pointerdown',{x:4,y:2},{},svg.querySelector(`[data-id="${moving}"][data-action="move"]`));send('pointermove',{x:4,y:2.02});
+  check(marker()&&near(store.getState().sketches[1].anchor.y,2.1),'curve body snaps at the common tangent under '+(flip?'reflected':'normal')+' axes');
+  check(svg.querySelectorAll('.snap-feedback-ring').length===1&&svg.querySelectorAll('.snap-feedback-core').length===1,'one shared contact marker');
+  check(svg.querySelector(`[data-snap-source="${target}"]`)&&svg.querySelector(`[data-snap-source="${moving}"]`),'both matched curves share the common highlight');
+  check(svg.querySelector('.snap-feedback-label').textContent.includes('접점 맞춤'),'common tangency wording');
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:'Alt',altKey:true,bubbles:true}));
+  check(!marker()&&near(store.getState().sketches[1].anchor.y,2.02),'Alt immediately bypasses curve-to-curve snapping');
+  document.dispatchEvent(new KeyboardEvent('keyup',{key:'Alt',altKey:false,bubbles:true}));check(marker(),'releasing Alt restores curve contact');
+  send('pointerup',{x:4,y:2.02});check(!marker(),'pointer release clears contact feedback');
+  check(JSON.stringify(store.getState().sketches[0])===fixed&&!store.getState().sketches[1].binding,'target stays unchanged and movement creates no binding');
+  store.undo();check(JSON.stringify(serializeDocument(store.getState()))===JSON.stringify(original),'one undo restores the complete original document');
+ }
+ stage.style.width='312px';stage.style.height='400px';await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));setup();
+ send('pointerdown',{x:4,y:2},{pointerType:'touch'},svg.querySelector(`[data-id="${moving}"][data-action="move"]`));send('pointermove',{x:4,y:2.02},{pointerType:'touch',shiftKey:true});
+ check(marker()&&near(store.getState().sketches[1].anchor.x,4),'mobile-size touch drag preserves Shift lock and contact');
+ const label=svg.querySelector('.snap-feedback-label'),b=label.getBBox();check(b.x>=0&&b.x+b.width<=stage.clientWidth,'mobile contact label stays inside canvas');
+ send('pointercancel',{x:4,y:2.02},{pointerType:'touch'});check(!marker(),'touch cancellation clears curve contact feedback');
+ out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
+}catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};
+</script></html>

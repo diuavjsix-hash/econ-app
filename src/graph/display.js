@@ -10,6 +10,11 @@ export const MAX_AXIS_GAP = 2;
 export function lineDisplayRegions(bounds, state) {
   if (!state.axisGapEnabled) return [bounds];
   const gap = state.axisGap ?? DEFAULT_AXIS_GAP;
+  if (state.quadrantMode==='edgeworth') {
+    const region={xMin:Math.max(bounds.xMin,gap),xMax:Math.min(bounds.xMax,state.boxSize.width-gap),
+      yMin:Math.max(bounds.yMin,gap),yMax:Math.min(bounds.yMax,state.boxSize.height-gap)};
+    return region.xMin<region.xMax && region.yMin<region.yMax?[region]:[];
+  }
   const intervals = (min, max) => [[min, Math.min(max, -gap)], [Math.max(min, gap), max]]
     .filter(([from, to]) => to > from);
   return intervals(bounds.xMin, bounds.xMax).flatMap(([xMin, xMax]) =>

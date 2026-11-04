@@ -1,5 +1,98 @@
 # 구현 구조
 
+## 공통화 재점검과 보수 · 2026-11-04
+
+모델의 편집/복제/선택/직렬화, 곡선 전략, 조작/손잡이, 공통 숫자 입력, SVG/맞춤 표시, 기록과 검사 진입점을 점검했습니다. 공통 클래스를 사용하는 기반은 실제 경로에 적용돼 있으나, 대상 제외와 캐시를 소비 도구가 따로 처리하고 곡선 전략 등록을 검증하지 않는 틈이 있었습니다.
+
+`snap-context.independentSnapState`가 이동 도형과 그 계산 종속 도형을 먼저 걸러 공통 대상·절편·곡선 접점 계산에 전달합니다. `relations.dependencyIds`는 binding과 합의 sourceIds를 함께 제공하며 `dependentIds`와 순환 검사 `canAttach`가 이를 공유합니다. 폴더의 parentId는 계산 관계가 아닙니다. 도구별 skip 분기를 제거해 새 계산 경로가 자기 도형이나 추종 도형을 다시 포함하지 않도록 했습니다. 특히 이동 점이 자신을 따라오는 직선에 붙는 문제를 수정했습니다.
+
+점/자유 곡선 손잡이·점선은 `SnapTargetCache.get(state,bounds,excludeId)`를 사용합니다. 제외 도형·현재 수학 기하·그래프·포맷·상자 총량·축 간격·표시 범위가 바뀌면 갱신하고 도구/선택·포인터 선호 변경만으로는 새로 만들지 않습니다. 칠하기 캐시도 `geometryKey`를 사용하되 영역 경계 정책에 맞춰 축 간격을 OFF로 고정합니다. 화면 픽셀과 자석 후보는 계속 문서에 저장하지 않습니다.
+
+곡선 전략은 `registerCurveFamilies`에서 기반 상속, `value/contact/moveAnchor/fitPoint/fitLine/shapeFromPoint` 구현과 `contactGeometry` 능력을 검사합니다. smooth/linear는 tangentVector 구현도 필수이고 kink만 명시적으로 제외됩니다. 접점 어댑터는 종류 이름 대신 능력으로 선택합니다. 조작 등록은 필수 핸들러가 함수인지도 검사하며 직선 기울기 숫자 입력도 다른 숫자 필드와 같은 NumberControl 검증을 사용합니다. 신규 곡선의 도구 간 연속 사례 검사는 계속 별도로 필요합니다.
+
+## 접점의 도구 간 공통 계약 · 2026-11-04
+
+곡선끼리 이동은 원본 기하를 계산했지만 점/점선 대상 목록은 표시 선분을 사용해, 놓은 뒤 접점이 사라지거나 근사 교점으로 분류되는 누락이 있었습니다. 표시·거리 정책의 통일만으로는 기하와 소비 도구의 통일이 보장되지 않았습니다.
+
+`graph/curve-contacts.js`의 `ContactBranch` 계층·`contactDirectionRanges`·`contactsAtDirection`·`searchContactDirections`·`isolatedContact`·`coincidentCurves`를 이동과 정지 접점 발견이 함께 사용합니다. 이동 모듈은 허용 이동을 맞추고, `buildCurveContactTargets`는 움직이지 않은 실제 두 접점의 위치 차이가 1e-7 이내인 경우만 등록합니다. 단순 근접을 접점으로 만들거나 직전 드래그 상태를 저장하지 않습니다. `snap.buildSnapTargets`가 `kind:'tangent'`와 두 `ids`를 공통 목록에 넣으므로 점 생성/이동·점선 생성/끝점/전체 이동이 같은 위치·우선순위·표시를 사용합니다. 이동/삭제/undo/redo/그래프 전환 시 기존 기하 캐시 키로 새로 계산합니다. 영구 관계와 JSON 형식은 바꾸지 않습니다.
+
+`tests/snap-contact-contract.test.js`는 이동 결과 채택→후보를 버리고 실제 도형 복제→점/점선 재포착의 연속 계약을 검사합니다. 모든 등록 곡선 종류가 공통 사례 또는 비매끄러운 제외에 있어야 하므로 종류가 늘고 소비 도구 검사가 빠지면 실패합니다. 같은 사례를 브라우저에서도 실제 canvas 핸들러로 반복해 단순 단위 함수 연결만으로 통과하지 않게 합니다. 이 검사는 기존 CI의 앱/브라우저 명령에 자동 포함되며 `scripts/check.mjs`의 수학 모듈 의존 경계에도 공통 접점 모듈을 추가했습니다.
+
+## 곡선↔곡선 접점 이동 자석 · 2026-11-04
+
+`graph/curve-curve-tangency.js`는 공통 접선 방향에서 움직이는 곡선과 고정 곡선의 접촉점을 찾습니다. `curve-contacts.js`의 `ContactBranch` 아래 원본 이차 베지어·직선 구간·해석 곡선 어댑터가 접점과 단위 접선 벡터를 제공합니다. 기본 곡선은 원본 제어점과 보이는 양 끝 접선 연장, 자유 곡선은 원본 두 제어점 묶음을 사용합니다. 해석 곡선은 종류 클래스의 정확한 `contact`와 `tangentVector` 훅을 사용합니다. 표시 선분은 해석 곡선의 탐색 방향 범위를 제한하는 데만 쓰며 맞춤 점/접선은 원본에서 다시 계산합니다.
+
+자유 평행이동은 같은 접선 방향의 두 점 사이 보정량을 최소화합니다. Shift는 잠긴 좌표의 차이를 0으로, 원점 확대/축소는 두 접점과 원점의 공선 조건을, 준선형은 기존 이동 축의 반대 좌표 차이를 0으로 풀어 줍니다. 선형 가지와 곡선은 실제 같은 접선 방향에서 유한 구간과 허용 이동의 교점을 사용합니다. 방향 구간 48분할·64단계 황금분할/이분법으로 최소점과 부호 변화/중근 후보를 찾고, 위치 오차 1e-7·접선 외적 1e-7·유한 범위·표시/축 띠를 검사합니다. 수학적으로 모든 병적 구간의 근을 완전히 분리한다고 보장하는 기호 해법은 아닙니다. 같은 곡선/겹친 선형 구간과 완전보완재 꺾임은 제외하며 자기/종속 곡선은 `canAttach`로 제외합니다.
+
+결과는 기존 `{anchor,point,key,sourceId,ids,kind:'tangent',distance,pointerDistance}` 계약입니다. `point-magnets.snapMovingCurve`가 기존 점·직선 접점과 함께 공통 우선순위/유지 정책으로 선택합니다. key는 대상과 양쪽 구간/후보를 식별하고 공통 렌더러가 두 곡선을 같은 색으로 강조합니다. 컨트롤러/기록/JSON에 새 형식이나 영구 관계를 추가하지 않습니다. 접한 뒤 점·점선은 공통 목록의 원본 접점을 사용하며 일반 곡선끼리 교점은 기존 표시 근사를 유지합니다.
+
+## 확장 경계·공통 UI·자동 검사 보강 · 2026-11-04
+
+`graph/interactions.js`의 `ShapeInteraction` 계약 아래 이동·직선·기본/해석/자유 곡선·점·점선·선택 전용 컨트롤러를 둡니다. `drag`와 `keyboard`는 도형 스냅샷을 수정하지 않고 `{patch,tangentSnap?,dashedSnap?}`를 반환합니다. canvas는 이 결과를 현재 조작의 공통 피드백과 store에 적용하고 포인터 캡처·기록 묶음·취소/전환 수명을 관리합니다. 선택 도형 손잡이는 `editing-handles.js`로 분리했습니다. 새 조작은 컨트롤러에 등록하며 canvas의 pointermove/keydown에 도형별 분기를 복사하지 않습니다. 생성 초안·칠하기 hover·좌표 투영의 조율은 canvas에 남습니다.
+
+`models/curve-families.js`는 `shapeKeyPatch`, `isEndpointAction`, `endpointPatch`, `endpointHandles` 훅을 제공합니다. PPC의 드래그·방향키·숫자 필드는 같은 반지름 변경 함수를 사용합니다. `models/contracts.js`는 등록되는 클래스가 `GraphObject`를 상속하고 필수 `updateGeometry`/획의 `visiblePieces`를 구현하는지, 객체 타입과 컬렉션 등록이 일치하는지 시작 시 검사합니다. `GraphObject`의 미구현 메서드는 조용히 무시하지 않고 오류를 냅니다. 폴더/합의 미지원 이동도 오류이며 폴더 복제 시에는 별도 이동 없이 독립 자료를 복사합니다. 클래스의 구체적인 수학 정확성은 기존 회귀 검사로 확인합니다.
+
+`ui/controls.js`는 `toolButton`, `numberField`, `rangeField` 마크업과 `InputControl`→`NumberControl`→`RangeControl`의 동작을 공유합니다. 레이블/값은 HTML 이스케이프하며 아이콘은 정적 앱 라이브러리만 전달합니다. NumberControl은 빈 값·비유한 값·허용 범위 밖 입력을 생략하고, RangeControl은 값·진행 색·접근성 표시를 함께 갱신합니다. 입력 기록은 기존 `mountHistory`에 맡겨 별도 기록을 만들지 않습니다. `dispose`는 등록한 입력 리스너를 제거합니다. 현재 도형 고유 패널의 배치/설명과 생성 초안까지 모두 범용 컴포넌트화한 것은 아닙니다.
+
+검사 진입점은 `scripts/check.mjs`, `scripts/test.mjs`, `scripts/browser-test.mjs`입니다. 구문/수학 모듈 경계 검사·Node 앱 검사·빌드·브라우저 검사 순서로 `.github/workflows/check.yml`에 연결했습니다. 브라우저 실행기는 별도 localhost 서버에 `/tests/browser/`와 공통 사례 `/tests/fixtures/`를 추가 공개하고, 난수 보고 경로와 임시 독립 프로필로 기존 Chrome/Chromium/Edge를 headless 실행합니다. 결과 전송·시간 제한·해당 프로필의 Browser.close·경로 확인 후 프로필 제거를 수행합니다. 개발 서버와 정적 빌드는 tests를 공개/포함하지 않습니다. Node 패키지 설치가 없으며 브라우저 실행기만 Node 22+의 내장 WebSocket을 사용합니다. 원격 GitHub 실행 여부는 로컬 검사 통과와 별개입니다.
+
+## 공통 클래스와 상속 · 2026-11-03
+
+도형의 공통 동작은 [GraphObject 기반 클래스](../src/models/graph-object.js)에, 도형별 차이는 [하위 클래스와 팩토리](../src/models/objects.js)에 둡니다. `objectModel(data)`가 문서의 평범한 객체를 해당 행동 클래스에 연결합니다. store의 `updateSelected`, 복제, 영역 선택, 공통 맞춤 강조, JSON 내보내기와 직선/곡선/합 렌더링은 이 모델의 동일한 메서드를 사용합니다. 클래스 인스턴스를 store·undo 스냅샷·JSON에 넣지 않으므로 기존 `structuredClone`·기록·JSON 10 구조를 유지합니다.
+
+```mermaid
+classDiagram
+  GraphObject <|-- DrawableObject
+  GraphObject <|-- GroupObject
+  DrawableObject <|-- MovableObject
+  DrawableObject <|-- SumObject
+  MovableObject <|-- StrokeObject
+  MovableObject <|-- PointObject
+  MovableObject <|-- FillObject
+  StrokeObject <|-- LineObject
+  StrokeObject <|-- CurveObject
+  StrokeObject <|-- SketchObject
+  StrokeObject <|-- SegmentObject
+  CurveObject <|-- AnalyticCurveObject
+  SegmentObject <|-- DashedObject
+  SegmentObject <|-- RulerObject
+```
+
+| 공통 구현 | 책임과 사용처 |
+| --- | --- |
+| `GraphObject` | 이름 편집·필드 복사/직렬화·복제 준비·따라가기 해제·기하 비교. `applyPatch`는 공통 이름 처리를 한 뒤 하위 `updateGeometry`를 호출 |
+| `DrawableObject` | 같은 `visiblePieces`로 영역 선택과 맞춤 강조용 기하 제공. 합도 이동 기능 없이 이 계층을 공유 |
+| `MovableObject` | 좌표 검증·기준점 갱신·독립 이동 사본. 구역은 다각형도 함께 이동하도록 확장 |
+| `StrokeObject` / `SegmentObject` | 선의 법선 방향 복제 배치 / 점선·이전 자의 유한 두 끝점 검증·클리핑·직렬화 |
+| `CurveObject` / `AnalyticCurveObject` | 기본 곡선 공통 표시 / 해석 곡선의 고유 이동·형태·직렬화를 곡선 종류 클래스에 위임 |
+
+[곡선 종류 클래스](../src/models/curve-families.js)는 `AnalyticCurveFamily`에서 표시 세분화·직선 교점 탐색·점/직선 맞춤·모양 입력의 공통 절차를 상속합니다. `RadialCurveFamily`는 PPC·거듭제곱형·완전보완재의 원점 고정 확대/축소를 공유하고, `PowerCurveFamily`는 콥더글라스와 직각 쌍곡선의 값/역함수·접점·통과점 계산을 공유합니다. `PpcFamily`, `ComplementsFamily`, `SubstitutesFamily`, `QuasilinearFamily`는 실제 기하가 다른 부분만 재정의합니다. 기존 `graph/indifference.js`는 이 클래스들을 호출하는 호환 함수만 보유하며 계산 복사본을 두지 않습니다. 모양 슬라이더와 store도 같은 클래스의 `shapeValue`·`shapeFromValue`·`applyPatch`를 사용합니다.
+
+`SnapPolicy`는 16/24px 포착·유지·해제의 공통 절차를 담당합니다. 점·점선·곡선 생성은 `PrioritySnapPolicy`, 직선/곡선의 점·접선 맞춤과 절편 맞춤은 `NearestSnapPolicy`를 사용하며 원래의 우선순위/동률 규칙을 유지합니다. `SvgRenderer`는 SVG 노드·경로 작성을, 이를 상속하는 `StrokeRenderer`는 직선·기본/해석/자유 곡선·합의 획·선택 강조·히트 영역·접근성 속성을 공유합니다. 점선과 공통 맞춤 표시도 같은 SVG 생성기를 사용합니다. 도형 고유 손잡이와 생성 절차, 관계 해석·기록 정책은 각 역할에 남겨 두었습니다.
+
+새 도형은 해당 기반 클래스를 상속해 기하/고유 속성만 구현한 뒤 `models/object-types.js`(컬렉션·이름·복제 가능 여부)와 `OBJECT_MODELS`에 등록합니다. 새 해석 곡선은 가장 가까운 곡선 종류 클래스를 상속해 `CURVE_FAMILIES`에 등록합니다. 소비 모듈에 이름/복제/직렬화/선택 조건문을 복사하지 않습니다. 수학 계산 모듈은 이 객체 레지스트리를 역으로 import하지 않아 의존 순환을 만들지 않도록 합니다.
+
+### 확장 시 함께 확인할 경로
+
+| 추가/수정 내용 | 확장 지점과 완료 조건 |
+| --- | --- |
+| 새 도형 | 모델/컬렉션·조작 등록, 표시·선택·복제 가능 여부·직렬화·독립 기록을 함께 확인 |
+| 새 해석 곡선 | 적합한 종류 클래스를 상속하고 contactGeometry/필수 훅 등록 검사·곡선별 연속 사례 추가 |
+| 새 자석 의미 | 공통 원본 기하와 대상 목록에 연결하고 이동→놓기→점/점선 재포착까지 확인 |
+| 새로운 제외/표시 범위 | independentSnapState/geometryKey를 확장해 모든 소비 도구의 제외·캐시 갱신을 확인 |
+| 포인터/키보드 편집 | interactions와 종류별 편집 훅을 함께 사용하고 손잡이·숫자 입력·한 번 undo의 결과 비교 |
+| UI 입력/맞춤 표시 | controls와 snap-feedback/policy를 사용하고 좁은 화면·반전·Shift/Alt·취소/기록 검사 |
+
+등록 검사는 구현 누락을 잡고, 기하 검사와 도구 간 연속 검사는 실제 의미가 일치하는지 확인합니다. 클래스 상속만으로 새 기능의 모든 소비 경로가 자동 검증되는 것은 아닙니다.
+
+## PPC·에지워드 상자 · 2026-11-03
+
+`graph/ppc.js`는 원점 중심 양의 ¼타원 `x²/a²+y²/b²=1`의 값/역함수·해석 직선 교점/중근·접점·수준 맞춤과 적응형 표시 선분을 계산합니다. 기존 해석 곡선 어댑터 `indifference.js`를 통해 `family:'ppc'`로 curves에 저장합니다. anchor는 타원의 매개각 π/4인 점이고 반지름은 각각 anchor×√2입니다. 몸체·복제·자석은 원점 고정 확대/축소, 양 축 끝점은 해당 반지름만 변경하며, 모양 손잡이·비율 슬라이더는 anchor.x×anchor.y를 유지합니다. shape는 기존 공통 객체 형식의 1로 유지하고 실제 타원 비율은 anchor에서 구합니다. 표시/일반 최근접점은 0.0005 내부 단위·최대 깊이 18의 선분 근사, 직선 교점/접점·축 절편은 원본 타원 계산입니다. 원/타원 전체·중심 이동·회전·합산은 제공하지 않습니다.
+
+`quadrantMode:'edgeworth'`는 별도 그래프 두 개가 아닌 하나의 좌표 영역입니다. 각 그래프의 `boxSize:{width,height}`와 `boxAxisNames:{x,y}`는 문서/숨긴 그래프/undo에 포함합니다. `createViewport`는 총량 bounds를 고정하고 같은 x/y 단위 배율로 화면에 맞춰 상자 비율을 보존합니다. canvas는 A 원점과 반대 모서리 B 원점의 네 축·화살표·이름을 그립니다. 전체 축 반전도 같은 투영만 바꿉니다. `graph/axes.js`의 `axisSegments`를 snap·공통 feedback·fill이 함께 사용해 상자 위/오른쪽 경계를 복제하지 않습니다. 축 간격을 켜면 네 변 안쪽을 잘라 표시하며 도형 좌표는 유지합니다. 기존 해석 곡선은 A 원점 기준이고 B 전용 생성/효용 계산은 없습니다.
+
+`quadrants.js`는 첫 설정과 재설정에 같은 포맷 선택·총량 입력을 사용하고 `configureLayout`은 포맷 적용 대상 그래프에 총량을 함께 저장합니다. 그래프 설정에서는 활성 그래프만 수정합니다. canvas의 pointerdown은 편집 입력란을 먼저 blur하여 숫자 입력과 다음 드래그가 한 기록으로 합쳐지는 것을 막습니다. 실제 입력 6→끝점 드래그 7→undo 6을 확인했습니다. 내보내기 추가 필드는 [JSON 형식](json-format.md)에 정리했습니다.
+
 현재 앱은 프레임워크나 외부 런타임 패키지 없이 동작하는 JavaScript ES module 기반의 정적 웹 앱입니다. Node.js 기본 모듈은 개발 서버·빌드·테스트에만 사용됩니다. 이 문서는 현재 구현을 설명하며, 대규모 프로젝트의 최종 구조를 확정하는 문서는 아닙니다.
 
 ## 직각 쌍곡선 · 2026-11-03
@@ -54,6 +147,14 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | --- | --- |
 | `index.html` | CSS와 ES module 진입점 로드; 경로는 상대 경로 |
 | `src/main.js` | 화면 마크업과 아이콘 생성, store 생성, 각 기능 mount |
+| `src/models/graph-object.js`, `objects.js`, `object-types.js`, `contracts.js` | 공통 행동 상속·도형 어댑터·컬렉션/능력 목록·필수 구현 등록 검사 |
+| `src/models/curve-families.js` | 곡선 종류 상속·고유 이동/편집/접점·기하 능력과 등록 계약 |
+| `src/ui/controls.js` | 도구 버튼·숫자/슬라이더 마크업과 공통 검증·접근성 값/진행 표시 |
+| `src/graph/interactions.js`, `editing-handles.js` | 도형별 조작과 포인터/키보드 훅·선택 손잡이 |
+| `src/graph/curve-contacts.js`, `curve-curve-tangency.js` | 공유 원본 접점 기하와 허용 이동 제약에 맞춘 곡선끼리 자석 |
+| `src/graph/snap-context.js` | 자기/계산 종속 도형 공통 제외·캐시용 수학 기하 키 |
+| `src/graph/ppc.js`, `axes.js` | ¼타원 기하와 공통 유한 좌표축 |
+| `src/graph/svg-renderer.js` | SVG 노드·경로와 공통 획/히트 영역·접근성 속성 |
 | `src/editor-ui.js`, `src/editor.css` | 도구막대·현재 작업별 편집 패널·그래프 설정 창과 반응형 표현 |
 | `src/duplicate.js` | 원본을 바꾸지 않는 복제 준비, 기울기 배율·자동 옆 배치·숫자 검증 |
 | `src/graph/sum.js` | 수직합·수평합의 원본 평가·역함수·기여분 절단·분할·표시 근사 |
@@ -69,7 +170,7 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/objects.js` | 생성 순서의 객체 조회와 상위 항목 이동의 순환 검사 |
 | `src/graph/math.js` | 직선 방향, 기울기↔각도, 절편, 화면 경계 클리핑, 표시용 식 |
 | `src/graph/curve.js` | 우상향·우하향 프리셋, 곡선 점·베지어 제어점·접선 연장·경계 교차 구간·드래그 곡률 계산 |
-| `src/graph/indifference.js` | 네 무차별곡선과 직각 쌍곡선의 해석 기하·고유 이동·크기/모양·정확한 직선 접점/교점 |
+| `src/graph/indifference.js` | 곡선 종류 클래스의 기하·고유 이동·모양·직선 접점/교점 호환 함수 |
 | `src/graph/snap-policy.js`, `snap-feedback.js/.css`, `sketch-magnets.js` | 16/24px 공통 자석 규칙·단일 맞춤 표시·곡선 생성 접점 후보 |
 | `src/graph/dashed-magnets.js` | 점선 생성/끝점/전체 이동의 Shift 교차·후보 유지·길이 보존 |
 | `src/graph/fill.js`, `fill-style.js`, `src/tools/fill.js` | 닫힌 구역 탐색·독립 다각형·색/알파벳·글자 위치·칠하기 패널 |
@@ -80,7 +181,7 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/graph/ruler-view.js` | 비활성화된 자 렌더 구현; 현재 canvas에서 호출하지 않음 |
 | `src/tools/ruler.js` | 비활성화된 자 UI 구현; 현재 main에서 mount하지 않음 |
 | `src/graph/point.js` | 좌표 표시용 반올림 |
-| `src/graph/snap.js` | 도형의 최근접점·교점·실제 절편 계산과 화면 거리 기준 점 보정 |
+| `src/graph/snap.js` | 최근접점·교점·절편·공통 접점 대상과 SnapTargetCache, 점 보정 |
 | `src/graph/intercepts.js` | 직선 절편 자석·Shift 제한·접선/절편 후보 선택과 유지 |
 | `src/graph/point-magnets.js` | 기존 점을 통과하는 선/곡선 이동·정확한 최근접/축 교차·점/접선/절편 후보 선택 |
 | `src/graph/tangency.js` | 직선↔곡선 전체 평행 이동의 정확한 접점·화면 거리 포착/해제 계산 |
@@ -100,6 +201,11 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `server.cmd`, `start-server.cmd`, `stop-server.cmd` | Windows 더블클릭 실행 파일; 작업 폴더와 무관하게 PowerShell 제어 스크립트 호출 |
 | `scripts/server.ps1` | Node 실행 파일 탐색, 서버 시작·종료·상태 확인과 메뉴 |
 | `scripts/build.mjs` | 앱 파일을 `dist/`로 복사; 번들링·압축 없음 |
+| `scripts/check.mjs`, `test.mjs`, `browser-test.mjs`, `.github/workflows/check.yml` | 구문/경계·앱·독립 브라우저 회귀와 CI 진입점; 배포 없음 |
+| `tests/architecture.test.js`, `models.test.js`, `interactions.test.js` | 등록 실패·공통 모델 행동·포인터/키보드 제약 |
+| `tests/ppc.test.js`, `edgeworth.test.js` | 타원/반지름·상자/양 원점 축·기록/JSON 회귀 9개 |
+| `tests/curve-curve-tangency.test.js`, `snap-contact-contract.test.js`, `snap-targets.test.js` | 곡선 접점·전체 종류 연속 계약·공통 제외/캐시/의존 회귀 32개 |
+| `tests/browser/`, `tests/fixtures/` | 실제 canvas 합성 입력·전체 앱 화면 검사와 공유 곡선 사례 |
 | `scripts/generate-doc-example.mjs` | 실제 serializer로 문서용 두 그래프 JSON 예시를 재생성 |
 | `tests/display.test.js` | 축 간격·정확한 형상·스냅·손잡이·기록·그래프별 설정·반전 클리핑 테스트 8개 |
 | `tests/graph.test.js` | 직선·상태·좌표·축 이름·JSON 회귀 테스트 13개 |

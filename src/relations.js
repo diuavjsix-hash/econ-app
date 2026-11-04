@@ -3,12 +3,32 @@ import { directionOf } from './graph/math.js';
 import { sketchMinimum } from './graph/sketch.js';
 
 export const dependencyId = object => object.binding?.sourceId ?? null;
+export const dependencyIds = object => [...new Set([dependencyId(object), ...(object.sourceIds ?? [])].filter(Boolean))];
+/** Geometry exclusion follows calculation dependencies, never list/folder membership. */
+export function dependentIds(state, id) {
+  const excluded = new Set([id]), followers = new Map();
+  for (const object of objectsOf(state)) for (const source of dependencyIds(object)) {
+    if (!followers.has(source)) followers.set(source, []);
+    followers.get(source).push(object.id);
+  }
+  const queue = [id];
+  for (let i = 0; i < queue.length; i++) for (const next of followers.get(queue[i]) ?? []) {
+    if (!excluded.has(next)) { excluded.add(next); queue.push(next); }
+  }
+  return excluded;
+}
 export function canAttach(state, id, sourceId) {
   const byId = new Map(objectsOf(state).map(object=>[object.id,object]));
-  const seen = new Set([id]);
-  for (let next=sourceId; next; next=dependencyId(byId.get(next) ?? {})) {
-    if (seen.has(next) || !byId.has(next)) return false;
-    seen.add(next);
+  const visiting = new Set([id]), done = new Set();
+  const stack = [{ next: sourceId, exit: false }];
+  while (stack.length) {
+    const { next, exit } = stack.pop();
+    if (exit) { visiting.delete(next); done.add(next); continue; }
+    if (visiting.has(next) || !byId.has(next)) return false;
+    if (done.has(next)) continue;
+    visiting.add(next);
+    stack.push({ next, exit: true });
+    for (const source of dependencyIds(byId.get(next))) stack.push({ next: source, exit: false });
   }
   return true;
 }

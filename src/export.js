@@ -1,61 +1,25 @@
 import { DEFAULT_AXIS_GAP } from './graph/display.js';
-import { directionOf, interceptOf } from './graph/math.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
-import { curveControlPoints, curveTangentRays } from './graph/curve.js';
-import { sketchControls } from './graph/sketch.js';
-import { isIndifference, indifferenceMovement } from './graph/indifference.js';
+import { objectModel } from './models/objects.js';
+const serializeObjects = objects => (objects ?? []).map(object => objectModel(object).serialize());
 
 function serializeDiagram(state) {
   const baseOrigin = QUADRANT_MODES[state.quadrantMode].origin;
   const origin = baseOrigin === 'center' ? 'center' : `${state.flipY ? 'top' : 'bottom'}-${baseOrigin.endsWith('center') ? 'center' : state.flipX ? 'right' : 'left'}`;
   return {
     objectOrder: [...state.objectOrder],
-    fills: (state.fills ?? []).map(({ id, name, label, color, opacity, parentId, anchor, rings }) => ({
-      id, type: 'fill', name, ...(label ? { label } : {}), color, opacity, parentId, anchor: { ...anchor }, rings: structuredClone(rings),
-    })),
-    sketches:(state.sketches??[]).map(({collapsed,...curve})=>({...structuredClone(curve),geometry:{type:'piecewise-quadratic-bezier',controlPoints:structuredClone(sketchControls(curve))}})),
-    sums: (state.sums ?? []).map(({ id, name, color, parentId, direction, nonnegative, sourceIds }) => ({
-      id, type: 'sum', name, color, parentId, direction, nonnegative, sourceIds: [...sourceIds],
-    })),
-    groups: state.groups.map(({ id, name, parentId }) => ({ id, type: 'group', name, parentId })),
-    points: state.points.map((point) => ({
-      id: point.id, type: 'point', name: point.name, color: point.color, parentId: point.parentId,
-      anchor: { ...point.anchor }, showCoordinates: Boolean(point.showCoordinates),
-      ...(point.binding ? {binding:{...point.binding}}:{}),
-    })),
-    dashedLines: state.dashedLines.map(({ id, name, color, parentId, anchor, end }) => ({
-      id, type: 'dashed', name, color, parentId, anchor: { ...anchor }, end: { ...end },
-    })),
-    rulers: state.rulers.map(({ id, name, color, parentId, anchor, end, style, showMeasurement }) => ({
-      id, type: 'ruler', name, color, parentId, anchor: { ...anchor }, end: { ...end }, style, showMeasurement,
-    })),
-    coordinateSystem: { origin, quadrants: [...QUADRANT_MODES[state.quadrantMode].quadrants], xPositive: state.flipX ? 'left' : 'right', yPositive: state.flipY ? 'down' : 'up', axesVisible: true, axisNames: { ...state.axisNames }, lineAxisGap: { enabled: Boolean(state.axisGapEnabled), distance: state.axisGap ?? DEFAULT_AXIS_GAP } },
+    fills: serializeObjects(state.fills),
+    sketches: serializeObjects(state.sketches),
+    sums: serializeObjects(state.sums),
+    groups: serializeObjects(state.groups),
+    points: serializeObjects(state.points),
+    dashedLines: serializeObjects(state.dashedLines),
+    rulers: serializeObjects(state.rulers),
+    coordinateSystem: { origin, quadrants: [...QUADRANT_MODES[state.quadrantMode].quadrants], xPositive: state.flipX ? 'left' : 'right', yPositive: state.flipY ? 'down' : 'up', axesVisible: true, axisNames: { ...state.axisNames }, lineAxisGap: { enabled: Boolean(state.axisGapEnabled), distance: state.axisGap ?? DEFAULT_AXIS_GAP },
+      ...(state.quadrantMode==='edgeworth'?{type:'edgeworth',totals:{...state.boxSize},oppositeOrigin:{x:state.boxSize.width,y:state.boxSize.height},oppositeAxisNames:{...state.boxAxisNames},oppositeXPositive:state.flipX?'right':'left',oppositeYPositive:state.flipY?'up':'down'}:{}) },
     showGrid: state.showGrid,
-    lines: state.lines.map((line) => {
-      const direction = directionOf(line.slope);
-      return {
-        id: line.id, type: 'line', name: line.name, color: line.color, parentId: line.parentId,
-        slope: line.slope, intercept: interceptOf(line), anchor: { ...line.anchor },
-        ...(line.binding ? {binding:{...line.binding}}:{}),
-        vertical: line.slope === null,
-        xIntercept: line.slope === null ? line.anchor.x : null,
-        // a*x + b*y + c = 0 also covers vertical lines without Infinity in JSON.
-        implicit: { a: -direction.y, b: direction.x, c: direction.y * line.anchor.x - direction.x * line.anchor.y },
-      };
-    }),
-    curves: state.curves.map((curve) => isIndifference(curve) ? {
-      id:curve.id,type:'curve',name:curve.name,color:curve.color,parentId:curve.parentId,
-      family:curve.family,anchor:{...curve.anchor},shape:curve.shape,
-      ...(curve.family==='quasilinear'?{linearAxis:curve.linearAxis}:{}),
-      geometry:{type:'indifference',domain:'nonnegative',movement:indifferenceMovement(curve)},
-    } : ({
-      id: curve.id, type: 'curve', name: curve.name, color: curve.color, variant: curve.variant, parentId: curve.parentId,
-      anchor: { ...curve.anchor }, span: curve.span, slope: curve.slope, bend: curve.bend,
-      geometry: {
-        type: 'quadratic-bezier', controlPoints: curveControlPoints(curve),
-        extensions: { type: 'tangent-rays', rays: curveTangentRays(curve) },
-      },
-    })),
+    lines: serializeObjects(state.lines),
+    curves: serializeObjects(state.curves),
   };
 }
 

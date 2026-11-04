@@ -1,10 +1,10 @@
 import { FILL_COLORS } from '../graph/fill-style.js';
+import { rangeField, RangeControl } from '../ui/controls.js';
 
 export function fillControls(mode) {
   return `${mode === 'paint' ? '<div class="fill-next"><span>다음 구역</span><span id="fill-next-badge" class="fill-next-badge">A</span></div>' : `<div class="fill-colors" role="group" aria-label="구역 색">${FILL_COLORS.map(([color, name]) =>
     `<button class="fill-color" data-fill-mode="${mode}" data-fill-color="${color}" style="--fill-color:${color}" aria-label="${name}" aria-pressed="false" title="${name}"></button>`).join('')}</div>`}
-    <label class="setting-row" for="fill-${mode}-opacity">진하기<output id="fill-${mode}-value">24%</output></label>
-    <input id="fill-${mode}-opacity" type="range" min="10" max="60" step="1" value="24" />`;
+    ${rangeField({id:`fill-${mode}-opacity`,label:'진하기',outputId:`fill-${mode}-value`,output:'24%',min:10,max:60,step:1,value:24})}`;
 }
 
 export function mountFillTool(root, store) {
@@ -15,8 +15,9 @@ export function mountFillTool(root, store) {
     if (swatch.dataset.fillMode === 'paint') store.update({ fillColor: color });
     else store.updateSelected({ color });
   });
-  for (const mode of ['paint', 'edit']) root.querySelector(`#fill-${mode}-opacity`).addEventListener('input', event => {
-    const opacity = Number(event.target.value) / 100;
+  const opacityControls={};
+  for (const mode of ['paint', 'edit']) opacityControls[mode]=new RangeControl(root,`fill-${mode}-opacity`).bind(value => {
+    const opacity = value / 100;
     if (mode === 'paint') store.update({ fillOpacity: opacity });
     else store.updateSelected({ opacity });
   });
@@ -31,8 +32,8 @@ export function mountFillTool(root, store) {
       const opacity = mode === 'paint' ? state.fillOpacity : selected?.opacity;
       (mode === 'paint' ? options : settings).style.setProperty('--selected-color', color ?? state.fillColor);
       for (const swatch of root.querySelectorAll(`[data-fill-mode="${mode}"]`)) swatch.setAttribute('aria-pressed', String(swatch.dataset.fillColor === color));
-      const input = root.querySelector(`#fill-${mode}-opacity`), value = Math.round((opacity ?? 0.24) * 100);
-      input.value = String(value); input.style.setProperty('--progress', `${(value - 10) / 50 * 100}%`);
+      const value = Math.round((opacity ?? 0.24) * 100);
+      opacityControls[mode].setValue(value);
       root.querySelector(`#fill-${mode}-value`).textContent = `${value}%`;
     }
   });

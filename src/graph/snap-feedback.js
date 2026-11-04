@@ -1,18 +1,11 @@
-import { displayedLineSegments, displayedCurveSegments } from './display.js';
-import { displayedSketchSegments } from './sketch.js';
-import { displayedSumSegments } from './sum.js';
-import { clipSegment } from './ruler.js';
+import { objectModelsOf } from '../models/objects.js';
 import { toScreen } from './viewport.js';
 import { pointCoordinatesLabel } from './point.js';
+import { axisSegments } from './axes.js';
+import { SVG_RENDERER } from './svg-renderer.js';
 
 export const SNAP_MARKER = Object.freeze({ ring:11, core:5, free:9, gap:16, offset:28, padding:8 });
-const NS='http://www.w3.org/2000/svg';
-const node=(tag,attributes,text)=>{
-  const element=document.createElementNS(NS,tag);
-  for (const [key,value] of Object.entries(attributes)) element.setAttribute(key,String(value));
-  if (text!==undefined) element.textContent=text;
-  return element;
-};
+const node=(...args)=>SVG_RENDERER.element(...args);
 
 /** Adapters pass geometry results here; no tool creates its own marker or wording. */
 export function snapFeedbackModel(candidate,{coordinates=false}={}) {
@@ -29,25 +22,18 @@ export function snapFeedbackTargets(ids,state,viewport) {
   const selected=new Set(ids),targets=[],{bounds}=viewport;
   const path=(id,pieces,quadratic=false)=>{
     if (!pieces.length) return;
-    const d=pieces.map(piece=>{
-      const [a,b,c]=piece.map(p=>toScreen(p,viewport));
-      return `M${a.x} ${a.y}${quadratic?`Q${b.x} ${b.y} ${c.x} ${c.y}`:`L${b.x} ${b.y}`}`;
-    }).join(' ');
+    const d=SVG_RENDERER.pathData(pieces,viewport,{quadratic,connect:false});
     targets.push({id,tag:'path',attributes:{d}});
   };
-  for (const line of state.lines??[]) if (selected.has(line.id)) path(line.id,displayedLineSegments(line,bounds,state));
-  for (const curve of state.curves??[]) if (selected.has(curve.id)) path(curve.id,displayedCurveSegments(curve,bounds,state),true);
-  for (const curve of state.sketches??[]) if (selected.has(curve.id)) path(curve.id,displayedSketchSegments(curve,bounds,state));
-  for (const sum of state.sums??[]) if (selected.has(sum.id)) path(sum.id,displayedSumSegments(sum,state,bounds));
-  for (const dashed of state.dashedLines??[]) if (selected.has(dashed.id)) {
-    const segment=clipSegment(dashed.anchor,dashed.end,bounds); if (segment) path(dashed.id,[segment]);
+  for (const model of objectModelsOf(state)) if (selected.has(model.data.id)) {
+    const object=model.data,geometry=model.highlightGeometry(bounds,state);
+    if (geometry?.kind==='path') path(object.id,geometry.pieces,geometry.quadratic);
+    else if (geometry?.kind==='point') {
+      const screen=toScreen(geometry.point,viewport);
+      targets.push({id:object.id,tag:'circle',attributes:{cx:screen.x,cy:screen.y,r:9}});
+    }
   }
-  for (const point of state.points??[]) if (selected.has(point.id)) {
-    const screen=toScreen(point.anchor,viewport);
-    targets.push({id:point.id,tag:'circle',attributes:{cx:screen.x,cy:screen.y,r:9}});
-  }
-  if (selected.has('axis-x')&&bounds.yMin<=0&&bounds.yMax>=0) path('axis-x',[[{x:bounds.xMin,y:0},{x:bounds.xMax,y:0}]]);
-  if (selected.has('axis-y')&&bounds.xMin<=0&&bounds.xMax>=0) path('axis-y',[[{x:0,y:bounds.yMin},{x:0,y:bounds.yMax}]]);
+  for (const axis of axisSegments(state,bounds)) if (selected.has(axis.id)) path(axis.id,[axis.points]);
   return targets;
 }
 

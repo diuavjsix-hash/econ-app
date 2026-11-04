@@ -4,7 +4,7 @@ import { sketchControls, quadraticPoint } from './sketch.js';
 import { clipSegment, validPoint } from './ruler.js';
 import { canAttach } from '../relations.js';
 import { isIndifference, indifferenceContact, indifferenceOnLine, indifferenceMoveDistance } from './indifference.js';
-import { SNAP_CAPTURE_PX, SNAP_RELEASE_PX } from './snap-policy.js';
+import { SNAP_CAPTURE_PX, SNAP_RELEASE_PX, SHAPE_SNAP_POLICY } from './snap-policy.js';
 
 export const TANGENT_CAPTURE_PX = SNAP_CAPTURE_PX;
 export const TANGENT_RELEASE_PX = SNAP_RELEASE_PX;
@@ -54,9 +54,7 @@ function normalTranslation(offset,normal,axis) {
   return validPoint(delta)?{delta,distance:Math.abs(correction)}:null;
 }
 function chooseCandidate(candidates,previous) {
-  const retained=previous && candidates.find(candidate=>candidate.key===previous.key && candidate.distance<=TANGENT_RELEASE_PX);
-  return retained || candidates.filter(candidate=>candidate.distance<=TANGENT_CAPTURE_PX)
-    .sort((a,b)=>a.distance-b.distance || a.pointerDistance-b.pointerDistance)[0] || null;
+  return SHAPE_SNAP_POLICY.choose(candidates,previous);
 }
 
 /** Translate only. The raw pointer-derived anchor, never the last snapped anchor, drives release. */

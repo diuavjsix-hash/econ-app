@@ -3,6 +3,7 @@ import { displayedSketchSegments } from './sketch.js';
 import { displayedSumSegments } from './sum.js';
 import { clipSegment, validPoint } from './ruler.js';
 import { buildSnapTargets } from './snap.js';
+import { axisSegments } from './axes.js';
 
 // All tolerances are mathematical distances, independent of screen size or zoom.
 const EPS = 1e-8, FLATNESS = 0.0005;
@@ -78,8 +79,7 @@ function boundarySegments(state, bounds) {
     const segment = clipSegment(dashed.anchor, dashed.end, bounds);
     if (segment) add(dashed.id)(...segment);
   }
-  if (bounds.yMin <= 0 && bounds.yMax >= 0) add('axis-x')({ x: bounds.xMin, y: 0 }, { x: bounds.xMax, y: 0 });
-  if (bounds.xMin <= 0 && bounds.xMax >= 0) add('axis-y')({ x: 0, y: bounds.yMin }, { x: 0, y: bounds.yMax });
+  for (const axis of axisSegments(state,bounds)) add(axis.id)(...axis.points);
   // Keep exact line/curve tangencies connected even between display mesh vertices.
   const tangencies = buildSnapTargets(raw, bounds).crossings.filter(crossing => crossing.kind === 'tangent');
   for (const contact of tangencies) for (const id of contact.ids) {

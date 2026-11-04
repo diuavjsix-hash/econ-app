@@ -6,7 +6,8 @@ export function mountSketchTool(root, store) {
   const mode=root.querySelector('#sketch-mode');
   button.addEventListener('click',()=>store.update({sketchSelected:!store.getState().sketchSelected}));
   mode.addEventListener('change',()=>store.update({sketchMode:mode.value}));
-  for (const [id,key] of [['#sketch-left','leftReach'],['#sketch-right','rightReach']]) root.querySelector(id).addEventListener('input',event=>store.updateSelected({[key]:Number(event.target.value)/100}));
+  const reachControls={};
+  for (const [id,key] of [['sketch-left','leftReach'],['sketch-right','rightReach']]) reachControls[key]=new RangeControl(root,id).bind(value=>store.updateSelected({[key]:value/100}));
   root.querySelector('#sketch-minimum').addEventListener('click',()=>store.markMinimum());
   root.querySelector('#point-through-line').addEventListener('click',()=>store.lineThroughSelectedPoint({follow:root.querySelector('#point-line-follow').checked}));
   root.querySelector('#detach-binding').addEventListener('click',()=>store.detachSelected());
@@ -31,7 +32,8 @@ export function mountSketchTool(root, store) {
       root.querySelector('#binding-description').textContent=`${label} · ${source?.name ?? ''}`;
     }
     if (!curve) return;
-    root.querySelector('#sketch-left').value=String(Math.round(curve.leftReach*100)); root.querySelector('#sketch-right').value=String(Math.round(curve.rightReach*100));
+    reachControls.leftReach.setValue(Math.round(curve.leftReach*100)); reachControls.rightReach.setValue(Math.round(curve.rightReach*100));
     for (const button of root.querySelectorAll('[data-sketch-shape]')) button.disabled=Boolean(curve.binding);
   });
 }
+import { RangeControl } from '../ui/controls.js';

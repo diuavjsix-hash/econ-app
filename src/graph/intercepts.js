@@ -1,8 +1,9 @@
 import { buildInterceptTargets } from './snap.js';
 import { directionOf } from './math.js';
 import { canAttach } from '../relations.js';
-import { snapLineToTangency, TANGENT_CAPTURE_PX, TANGENT_RELEASE_PX } from './tangency.js';
+import { snapLineToTangency } from './tangency.js';
 import { snapShapeToPoint, chooseShapeMagnet } from './point-magnets.js';
+import { INTERCEPT_SNAP_POLICY } from './snap-policy.js';
 
 function lineIntercept(line,axis) {
   const d=directionOf(line.slope);
@@ -31,8 +32,7 @@ export function snapLineToIntercept(line,state,bounds,unit,{previous=null,altKey
     candidates.push({...target,key:`intercept:${target.sourceId??'axes'}:${target.axis}:${target.point.x}:${target.point.y}`,anchor,
       distance:Math.max(interceptDistance,Math.abs(correction))*unit,kind:'intercept'});
   }
-  const retained=previous && candidates.find(candidate=>candidate.key===previous.key && candidate.distance<=TANGENT_RELEASE_PX);
-  return retained || candidates.filter(candidate=>candidate.distance<=TANGENT_CAPTURE_PX).sort((a,b)=>a.distance-b.distance)[0] || null;
+  return INTERCEPT_SNAP_POLICY.choose(candidates,previous);
 }
 
 /** Keep a captured magnet stable, then choose the nearest eligible intercept or tangent. */

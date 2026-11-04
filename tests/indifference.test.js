@@ -125,7 +125,7 @@ test('creation, preference edits, repeated copies, history, graph isolation, del
     const first=store.duplicateSelected();store.selectObject(id);const second=store.duplicateSelected();
     const copies=store.getState().curves.filter(c=>[first,second].includes(c.id));assert.equal(copies.length,2);
     assert.notDeepEqual(copies[0].anchor,copies[1].anchor);
-    for (const copy of copies) {assert.equal(copy.family,family);assert.equal(copy.shape,family==='rectangular-hyperbola'?1:2);
+    for (const copy of copies) {assert.equal(copy.family,family);assert.equal(copy.shape,['rectangular-hyperbola','ppc'].includes(family)?1:2);
       if (family==='quasilinear') assert.equal(copy.anchor.x,original.anchor.x);
       if (family==='cobb-douglas'||family==='complements') close(copy.anchor.y/copy.anchor.x,original.anchor.y/original.anchor.x);
     }

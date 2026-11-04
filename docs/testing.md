@@ -1,5 +1,82 @@
 # 검증과 재현
 
+## 현재 반영의 검증 기준 · 2026-11-04
+
+이번 커밋 범위는 PPC·에지워드 상자부터 공통 모델/조작/UI, 곡선끼리 접점·도구 간 재포착·공통 제외/캐시·등록 계약 보수까지입니다. 최신 로컬 결과는 **앱 313개·별도 headless Chrome 572개·구문/의존 경계 106개 모듈·정적 빌드 통과**입니다. 아래 날짜별 결과는 중간 단계의 이력이며 최신 합계와 혼동하지 않습니다.
+
+앱 검사는 서버를 제외한 313개입니다. Windows 서버 3개는 소스/실행 파일을 변경하지 않아 이번에 재실행하지 않았습니다. 브라우저는 독립 임시 프로필을 사용하며 원래 사용자 탭을 건드리지 않습니다. 실제 브라우저에서 실행하지만 포인터/키/터치는 합성 입력입니다. 기하/저장 기준 일치와 문서 링크·JSON 블록·전체 예시 재생성도 확인합니다. `.local/` 결과 자료는 Git에서 제외하며 다른 환경에서는 아래 명령으로 재현합니다.
+
+CI는 동일 명령을 push/PR/수동 실행에 연결합니다. 로컬 통과를 원격 CI 통과로 표현하지 않으며 해당 커밋의 Actions 결과에서 별도로 확인합니다. 배포 단계는 없습니다.
+
+문서화 정리에서 위 로컬 검사를 다시 실행해 같은 결과를 확인했습니다. 문서 **14개**의 로컬 링크 **86개**, JSON 블록 **6개**, 전체 예시의 그래프 2개/객체 15개와 실제 serializer 재생성 일치도 확인했습니다. 현재 인계는 요약으로 재구성하고 이전 인계는 이력에 보존했습니다. 최종 로컬 결과는 `.local/commit-foundation-node-result.txt`, `.local/commit-foundation-browser-result.json`입니다.
+
+## 2026-11-04 · 공통화 재점검과 보수
+
+모델/편집/복제/선택/저장·조작/손잡이·입력·자석/표시·기록/CI를 점검했습니다. 직선/기본·해석 곡선의 자기 제외와 이동 점의 종속 직선 제외 누락을 먼저 실패 검사로 확인하고 공통 필터로 수정했습니다. 대상/캐시/의존 그래프 회귀 8개와 곡선 등록 회귀 1개를 추가해 앱 **313개 통과**입니다. 대상 캐시는 포맷·상자 총량·축 간격·범위·기하·제외 ID·undo/redo/삭제/그래프 변경을 검증하며 소비 도구 전환에서 같은 목록을 사용합니다. 의존 순회는 합의 공유 분기를 순환으로 오인하지 않고 10,000단계에서도 재귀 호출 없이 동작하는지 확인했습니다. 이는 대량 도형의 전체 앱 성능 검사가 아닙니다.
+
+별도 headless Chrome **572개 통과**(기존 558+추가 14)입니다. 공통 canvas fixture에 800px/312px 점 이동→추종 직선 갱신/자기 자석 제외→단일 undo와 자유 곡선 끝점 자기 제외를 10개 추가했습니다. 전체 앱의 1280×800/390×844에서 공통 숫자 컴포넌트의 빈 기울기 거부와 0 허용 4개를 추가했습니다. 기존 접점 도구 간 연속 검사도 함께 통과했습니다. 키/포인터는 합성이며 물리 모바일 조작은 아닙니다. 결과는 `.local/common-audit-node-result.txt`, `.local/common-audit-browser-result.json`입니다.
+
+구문/경계 106개 모듈·정적 빌드·리팩터링 전 기하/직렬화 기준 일치도 확인했습니다. 등록 검사는 smooth/linear/kink 능력과 필수 기하/편집 훅 누락을 거절하고, 조작 등록의 null 핸들러 거절도 기존 검사에 포함합니다. Windows 서버 3개·원격 CI·장시간 편집/물리 터치·모든 브라우저 조합은 이번에 검증하지 않았습니다.
+
+whitespace 검사와 문서 13개/로컬 링크 66개/JSON 블록 6개/전체 예시 재생성 일치도 통과했습니다. 사용자 기존 Chrome 탭과 컴퓨터 전용 실행 파일 세 개의 내용/Git 플래그는 유지했습니다.
+
+## 2026-11-04 · 접점의 도구 간 통일성 회귀
+
+수정 전에 ‘곡선 이동 자석→놓기→점/점선 재포착’ 검사가 `tangent` 대신 근사 `intersection`을 반환하며 실패하는 것을 확인했습니다. 원본 접점 계산을 공통 모듈로 옮기고 공통 대상 목록에 등록한 뒤 앱 **304개 통과**입니다. 새 `snap-contact-contract.test.js` 14개는 9종 사례의 위치/두 대상/공통 표시·점/점선·양 끝점 전체 이동·Shift·16/24px·모양/JSON·undo/redo, 가시성/제외/삭제/다른 그래프/근접/교차/겹침을 확인합니다. 등록된 곡선 종류가 사례 또는 명시적 비매끄러운 제외에 없으면 실패합니다.
+
+별도 headless Chrome **558개 통과**(기존 98+새 연속 계약 459+완료 1)입니다. `contact-contract.html`은 단위 검사와 같은 9개 사례를 실제 canvas에서 이동→놓기→점 hover/생성/이동→점선 생성/끝점/전체 이동 순서로 검사합니다. 각 사례를 800×540 정상/반전·312×400 크기에 반복하고 공통 원/접점 문구/두 대상 강조·Alt 즉시 해제/복원·보정 OFF·독립 undo/redo·원본 보존·문구 경계를 17개 단언으로 확인합니다. 키/포인터는 합성이며 물리 모바일 조작이 아닙니다. 결과는 `.local/contact-contract-node-result.txt`, `.local/contact-contract-browser-result.json`입니다. 테스트 서버는 공통 사례만 `/tests/fixtures/` 경로로 추가 제공하며 앱 빌드에는 테스트를 포함하지 않습니다.
+
+이 회귀는 기존 `scripts/test.mjs`·`scripts/browser-test.mjs`와 CI에 포함합니다. 새 곡선 종류를 추가할 때 공통 사례 또는 명시적 제외 등록도 필요합니다. 접점의 유한 방향 탐색 한계와 영구 연결 미지원은 유지하며, 일반 곡선끼리의 교점은 기존 표시 근사입니다. Windows 서버 3개와 원격 CI는 이번 변경에서 실행하지 않았습니다.
+
+구문/의존 경계 104개 모듈·정적 빌드·whitespace, 문서 13개/로컬 링크 66개/JSON 블록 6개/전체 예시 재생성 일치도 통과했습니다. 리팩터링 전 기하·직렬화 기준은 정확히 일치합니다. 사용자 기존 Chrome 탭과 서버 실행 파일 세 개의 내용/Git 플래그는 변경하지 않았습니다.
+
+## 2026-11-04 · 곡선끼리 접점 이동 자석
+
+앱 **290개 통과**(기존 280+`curve-curve-tangency.test.js` 10, Windows 서버 3개 별도). 원본 포물선의 접촉 위치/미분 일치·기본/자유 곡선·PPC와 콥더글라스·준선형 양축·Shift·16/24px 포착/유지/해제·Alt·점 우선·겹침/단순 교차/의존/다른 그래프/화면 밖 제외·형태/대상/관계/JSON 보존과 단일 undo/redo를 검사했습니다. 리팩터링 전 기하/직렬화 기준 결과도 정확히 일치했습니다. 구문/의존 경계 검사는 101개 모듈을 통과했습니다.
+
+정적 빌드·whitespace 검사와 문서 13개/로컬 링크 66개/JSON 블록 6개/기존 전체 예시 재생성 일치 검증도 통과했습니다.
+
+별도 headless Chrome 검사 **98개 통과**입니다. 새 `tests/browser/curve-curve.html`은 실제 캔버스 핸들러에 합성 포인터/키/터치 이벤트를 보내 두 곡선 강조·공통 이중 원 하나·접점 문구·Alt 즉시 해제/복원·축 반전·놓기/취소·단일 기록·312×400 모바일 크기의 Shift와 라벨 경계를 21개로 확인합니다. 완료 검사 1개를 포함해 기존 76개에서 22개 늘었습니다. 이전의 1280×800/390×844 전체 앱 검사도 함께 실행했습니다. 결과는 `.local/curve-curve-browser-result.json`입니다. 합성 이벤트이며 물리 모바일 조작이나 모든 브라우저의 시각 검증을 뜻하지 않습니다.
+
+접점 탐색은 원본 기하의 접선 방향을 48개 구간으로 나누고 최대 64회씩 최소화/근 찾기를 수행합니다. 위치/접선 잔차를 다시 검사하지만 병적인 곡선이나 매우 좁은 해를 모두 찾는다는 보장은 없습니다. L자 곡선·직선끼리 겹침·전체 일치와 허용 이동으로 도달할 수 없는 접점은 제외합니다. 영구적인 곡선끼리 연결 관계는 추가하지 않았습니다. 점/점선 접점 배치 누락은 위 후속 작업에서 수정했습니다. Windows 서버 3개와 원격 CI는 이번 변경에서 실행하지 않았습니다.
+
+## 2026-11-04 · 확장 경계·공통 UI·CI 보강
+
+앱 **280개 통과**(기존 272+`architecture.test.js` 2+`interactions.test.js` 6, 서버 3개 별도). 새 검사는 필수 편집/획 훅과 등록 일치의 실패, 폴더/합의 미지원 이동, 포인터/키보드 축 반전·직선 수직/회전·Shift·점선 길이/끝점·곡선 종류별 이동/형태·PPC 반지름 제한·연결 자유 곡선의 제약을 확인합니다. 구문·수학 원시 모듈의 DOM/편집 의존 경계도 검사합니다.
+
+실제 별도 headless Chrome 프로세스에서 **76개 통과**했습니다. 저장소의 `tests/browser/suite.js`는 공통 입력의 빈 값/범위 거부·HTML 이스케이프·dispose·진행 색/접근성을 검사하고, `snap-feedback.html`의 합성 회귀 30개를 실행합니다. 이어 실제 1280×800/390×844 iframe에서 앱 시작·에지워드·직선/PPC·이름/반지름/비율 입력·끝점 키보드·복제/단일 undo/redo·히트 영역·단일 편집 패널·유일한 ID·연결 라벨·가로 넘침과 브라우저 런타임 오류를 검사합니다. iframe의 실제 viewport 너비도 단언합니다. 키/포인터/터치 입력은 합성이며 물리 기기 조작·모든 브라우저의 픽셀/접근성 완전 검증을 뜻하지 않습니다. 결과는 `.local/foundation-browser-result.json`입니다.
+
+실행 방법(프로젝트 폴더, 설치된 Node 경로를 PATH 환경에 맞춰 지정):
+
+```sh
+node scripts/check.mjs
+node scripts/test.mjs
+node scripts/build.mjs
+node scripts/browser-test.mjs
+```
+
+브라우저 실행기만 Node 22+의 내장 WebSocket을 사용하며 별도 Node 패키지를 설치하지 않습니다. `BROWSER_PATH`로 기존 Chromium 실행 파일을 지정하거나 표준 설치 위치를 확인합니다. Windows PowerShell 예시는 `$env:BROWSER_PATH='C:/Program Files/Google/Chrome/Application/chrome.exe'`입니다. 실행기는 독립 임시 프로필·임시 localhost 서버·45초 제한을 사용하고 해당 브라우저만 닫은 뒤 확인한 임시 경로를 제거합니다. 이 컴퓨터의 기본 제한 환경에서 Crashpad 실행이 실패해 허용된 실행 환경으로 같은 검사를 수행했습니다. 사용자 기존 Chrome 프로필/탭은 사용하지 않았습니다. 설치된 브라우저가 없거나 실패/시간 초과이면 검사 자체가 실패하며 조용히 건너뛰지 않습니다. [Chrome headless 설명](https://developer.chrome.com/docs/automation-and-testing/headless)을 참고했습니다.
+
+`.github/workflows/check.yml`은 push/PR/수동 실행에서 Node 24로 구문/경계→앱 검사→빌드→브라우저 검사를 수행합니다. 저장소 읽기 권한만 사용하고 Node 패키지 설치·캐시·배포 단계는 없습니다. [checkout](https://github.com/actions/checkout)과 [setup-node](https://github.com/actions/setup-node)의 공식 사용법을 따릅니다. 구성 파일은 로컬에서 작성했으며 아직 커밋·푸시하지 않아 **원격 Actions 실행은 미검증**입니다. 서버 파일을 바꾸지 않아 Windows 서버 3개도 이번에는 실행하지 않았습니다.
+
+## 2026-11-03 · 공통 클래스·상속 리팩터링
+
+정적 빌드·whitespace 확인, 문서 13개/로컬 링크 65개/JSON 블록 6개 및 기존 전체 예시 재생성 일치 검증을 통과했습니다.
+
+새 `models.test.js` **10개** 포함 앱 **272개 통과**(서버 3개 포함 전체 정의 275개, 서버 재실행 안 함). 추상 기반의 직접 생성 차단·모든 도형 종류/컬렉션 계약·혼합 객체의 공통 이름 편집과 한 번 undo·문서/기록/JSON의 일반 객체 유지·공유된 유한 선분 검증·복제/직렬화의 참조 격리·칠한 다각형의 전체 이동·모든 도형의 표시/선택/강조 일치·곡선 종류별 상속/공통 슬라이더 입력·자석 우선순위/포착/유지·렌더러의 끊긴 획/연속 이차 곡선/반전 투영을 검사합니다. 기존 앱 262개도 같은 클래스 경로를 통과합니다.
+
+`.local/class-refactor-baseline.mjs --check`로 변경 전 기록한 여섯 종류 곡선의 값/역함수·표시·접점/교점·몸체 이동·형태/손잡이·점/직선 맞춤과 혼합 문서 JSON 결과의 정확 일치를 확인했습니다. 브라우저의 기존 `.local/snap-feedback-integration-check.html`은 최신 클래스 기반 코드에서 **30개 통과**했습니다. 점/점선/곡선 생성·선/곡선 이동·공통 표시·Shift/Alt·포착/해제·기록/취소·반전·모바일 크기 캔버스·터치 취소 조합의 **합성 이벤트 검사**이며 물리 터치 조작 결과로 표현하지 않습니다. 임시 public 복사본은 빌드 전에 제거합니다. 결과는 `.local/class-refactor-snap-result.json`입니다.
+
+실제 별도 앱 탭(1280×720)에서 에지워드 시작·직선/PPC 추가, 이름/반지름/비율 편집, 복제·undo/redo와 JSON 10의 직선/타원/상자 출력을 확인했습니다. 콘솔 오류는 없었으며 `.local/class-refactor-desktop.jpg`에 기록했습니다. 이번 브라우저 viewport 크기 변경은 적용되지 않아 390×844 전체 앱을 새로 검증했다고 표시하지 않습니다. 이전 요청의 모바일 결과와 위 합성 캔버스 검증은 구분해 유지합니다. 사용자 기존 탭은 새로고침하지 않았습니다.
+
+## 2026-11-03 · PPC·에지워드 상자
+
+새 `ppc.test.js` 5개·`edgeworth.test.js` 4개 포함 앱 **262개 통과**(전체 정의 서버 3개 포함 265개). 정적 빌드·whitespace 확인, 문서 13개/로컬 링크 59개/JSON 블록 6개와 기존 전체 예시의 재생성 일치도 통과했습니다. PPC의 정확한 타원 방정식·유한 정의역/역함수·두 직선 교점/중근·수평/수직 끝점 접선·가로/세로 독립 조절·비율/면적 보존·몸체/점 맞춤·Alt/축 띠 제외·복제/기록/그래프/JSON을 검증합니다. 에지워드는 총량 고정 bounds·동일 배율/화면 크기/반전 투영·그래프 격리/숨김 보존·undo·입력 유효성·네 축의 공통 스냅/강조·상자 전체/분할 칠하기·네 변 축 띠·JSON을 검사합니다. 기존 family 순회 회귀에도 PPC를 포함합니다. Windows 서버 3개는 재실행하지 않았습니다.
+
+실제 별도 탭에서 첫 포맷의 에지워드 선택→시작, PPC 추가, 가로 반지름 6 입력→끝점 드래그 7→undo 6, 비율 슬라이더 방향키 조절, 상자 총량 10→12 변경과 JSON의 `ellipse-arc`/`type:edgeworth`/총량을 확인했습니다. 편집 입력란 focus가 남아 입력과 다음 드래그 기록이 합쳐지는 문제를 수정한 후 재검증했습니다. 1280×800와 390×844에서 포맷 네 버튼/총량/상자/곡선 편집 배치를 확인했고 모바일 문서 가로 넘침과 콘솔 error가 없었습니다. 자료는 `.local/ppc-edgeworth-desktop.jpg`, `.local/ppc-edgeworth-mobile-format.jpg`, `.local/ppc-edgeworth-mobile.jpg`입니다. 기존 사용자 Chrome 탭은 새로고침하지 않았습니다.
+
+위 조작은 실제 브라우저 입력이며 모든 종류의 물리 터치·Shift/Alt·포인터 취소·축 반전 조합을 실제로 조작한 결과는 아닙니다. B 원점 전용 곡선 생성·배분/계약곡선 계산, PPC 중심 이동/회전/합산은 지원하지 않습니다. 새 자석 표시를 만들지 않고 공통 snap feedback을 재사용합니다.
+
 ## 2026-11-03 · 문서화·커밋 정리
 
 앱 테스트 **253개**, 정적 빌드·whitespace 확인을 다시 통과했습니다. Windows 서버 테스트 3개는 대상 코드를 변경하지 않아 재실행하지 않았습니다. 문서 13개의 로컬 링크 **58개**, JSON 코드 블록 **6개**를 확인했고 최신 예시의 그래프 2개·객체 15개·중복 ID/계층/원본 참조·직각 쌍곡선의 고정 지수와 재생성 일치를 검증했습니다. 도우미는 `.local/commit-doc-audit.mjs`이며 제품 코드나 커밋에 포함하지 않습니다.
@@ -128,8 +205,13 @@
 | --- | ---: | --- |
 | graph.test.js | 13 | 직선·수직·좌표·축·JSON |
 | curve.test.js | 8 | 기본 곡선·단조성·클리핑·접선 연장 |
-| indifference.test.js | 15 | 네 무차별곡선과 직각 쌍곡선의 고유 이동·기하·접점/교점/모서리·점 맞춤·복제/기록/그래프·JSON 10·경계 |
+| indifference.test.js | 15 | 네 무차별곡선·직각 쌍곡선·PPC의 공통 순회·고유 이동·기하·접점/교점/모서리·점 맞춤·복제/기록/그래프·JSON 10·경계 |
 | hyperbola.test.js | 3 | xy=k 고정·크기/손잡이·정확한 자석·반복 복제/기록/JSON |
+| models.test.js | 10 | 추상 기반·공통 편집/복제/직렬화·일반 객체 기록·선택/강조·곡선/스냅/렌더 상속 계약 |
+| architecture.test.js | 3 | 모델/곡선 종류의 필수 구현/능력 등록 실패·지원하지 않는 이동의 명시적 실패·폴더 계약 |
+| interactions.test.js | 6 | 등록된 포인터/키보드·반전/Shift·수직/회전·점선 길이·곡선/연결 제약 |
+| ppc.test.js | 5 | ¼타원·독립 반지름/비율·정확한 접점/교점·자석·복제/기록/JSON |
+| edgeworth.test.js | 4 | 총량/동일 배율/반전·독립 그래프/기록·네 축 스냅/칠하기·JSON |
 | dashed-magnets.test.js | 14 | 점선 생성/끝점/전체 이동·Shift 교차·길이 유지·Alt·포착/해제 |
 | snap-feedback.test.js | 8 | 공통 거리·표시 계약·후보 정규화·대상 강조·곡선 생성 유지/기록 |
 | kink-snap.test.js | 6 | 꼭짓점 우선·팔에서 꺾임 전환·Shift/Alt·점선 길이·숨긴 대상 제외 |
@@ -150,16 +232,21 @@
 | editor-ui.test.js | 4 | 패널 문맥·모드 배타·그래프 전환·방향별 추가 |
 | tangency.test.js | 14 | 자유/기본 곡선 접선·수직/사선·포착/해제·Alt·표시 범위·종속 제외·기록·Shift 축 제한 |
 | curve-tangency.test.js | 12 | 복제 곡선 자체 이동·변경 기울기·수직/사선·Shift/Alt·해제·표시 영역·종속 제외·모양/기록 보존 |
+| curve-curve-tangency.test.js | 10 | 곡선끼리 원본 위치/미분 일치·기본/자유/해석 곡선·제약 이동·공통 표시·포착/해제·제외·기록 |
+| snap-contact-contract.test.js | 14 | 전체 곡선 종류 등록 계약·공통 9사례의 이동→점/점선 재포착·단일 기하/표시·기록·제외/변경 |
+| snap-targets.test.js | 8 | 공통 자기/종속 제외·합/계층 구분·10,000단계 의존 순회·캐시 공유/무효화·기록/그래프 |
 | movement.test.js | 4 | Shift 축 선택·경계·스냅 제한·반전·기록 |
 | server.test.js | 3 | 동시 시작·포트 충돌·다른 프로세스 보호 |
 | selection.test.js | 10 | 영역/축/곡선/합·다중 상태·일괄 삭제/관계/계층/기록·그래프 격리·삭제 키 보호 |
-| 합계 | 256 | 앱 253개 + Windows 서버 3개; 서버는 이번 정리에서 재실행하지 않음 |
+| 합계 | 316 | 앱 313개 + Windows 서버 3개; 서버는 이번 변경에서 재실행하지 않음 |
 
-Node.js 20 이상에서 의존성 설치 없이 실행합니다.
+앱/단위 검사·빌드는 Node.js 20 이상, 브라우저 실행기는 Node.js 22 이상과 설치된 Chromium 계열 브라우저가 필요합니다. 별도 패키지를 설치하지 않습니다. 기본 앱 검사와 선택적 Windows 서버 검사를 나누어 실행합니다.
 
 ```sh
-node --test
+node scripts/check.mjs
+node scripts/test.mjs
 node scripts/build.mjs
+node scripts/browser-test.mjs
 node scripts/generate-doc-example.mjs
 git diff --check
 ```
@@ -167,12 +254,16 @@ git diff --check
 이 컴퓨터의 일반 PowerShell에서 node를 찾지 못하면 다음 경로를 사용합니다.
 
 ```powershell
-& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" --test
+& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/check.mjs
+& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/test.mjs
 & "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/build.mjs
+& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/browser-test.mjs
 & "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/generate-doc-example.mjs
 ```
 
 Windows 서버 테스트는 .local/server-test-* 안에 임시 서버를 만들고 정리합니다. 실제 실행 중인 프로젝트 서버를 테스트 서버로 사용하지 않습니다. 제한 환경에서는 Win32_Process CIM 조회가 차단될 수 있습니다. 이 경우 서버 테스트 2개가 권한 오류로 실패할 수 있으므로 해당 권한을 갖춘 환경에서 다시 실행하고, 이를 앱 계산 실패와 구분합니다. 테스트를 중단했다면 남은 프로세스는 PID·시작 시각·정확한 스크립트 경로를 대조한 후 정리합니다. 이 검증에서 일반 작업 서버를 임의 종료하지 않습니다.
+
+Windows 서버 검사만 실행하려면 `node --test tests/server.test.js` 또는 `npm run test:server`를 사용합니다. `node --test` 전체 실행은 서버 검사도 포함하므로 기본 앱 검사 명령과 결과 개수가 다릅니다.
 
 빌드는 index.html, src/, public/을 dist/로 복사합니다. 새 editor.css도 포함합니다. 이전 dist 파일을 자동 삭제하지 않으므로 원본에서 파일을 제거한 작업이라면 잔여 파일을 별도로 확인합니다. 이번 변경에는 배포 동작이 없습니다.
 
@@ -197,5 +288,5 @@ Windows 서버 테스트는 .local/server-test-* 안에 임시 서버를 만들�
 - 실제 모바일 터치, 모든 브라우저/운영체제 조합.
 - 자유 곡선 복제·원본 삭제·수직 접선의 모든 UI 경로. 관련 기하·상태는 자동 테스트로 확인했습니다.
 - 사용자 작업 시간·실수율의 비교 실험, 많은 도형을 장시간 편집할 때의 성능.
-- JSON 불러오기·자동 저장·자유 곡선끼리 접점·자유 곡선/그래프 간 합산. 현재 기능 자체가 없습니다.
+- JSON 불러오기·자동 저장·곡선끼리 영구 접점 연결·자유 곡선/그래프 간 합산. 현재 기능 자체가 없습니다. 곡선끼리 이동 자석은 위 최신 검증 범위에 포함합니다.
 - GitHub Pages 실배포와 호스팅 동작. 정적 빌드 성공을 배포 성공으로 표현하지 않습니다.

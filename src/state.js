@@ -1,15 +1,17 @@
+import { objectModel } from './models/objects.js';
+import { OBJECT_TYPES } from './models/object-types.js';
 import { DEFAULT_AXIS_GAP, MIN_AXIS_GAP, MAX_AXIS_GAP } from './graph/display.js';
 import { prepareDuplicate, DUPLICATABLE, placeCopiesNearby } from './duplicate.js';
 import { validPoint, rulerMetrics } from './graph/ruler.js';
 import { LAYOUTS, normalizeSlots } from './layouts.js';
 import { normalizeSlope, directionOf } from './graph/math.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
-import { CURVE_PRESETS, MAX_BEND } from './graph/curve.js';
+import { CURVE_PRESETS } from './graph/curve.js';
 import { canReparent, objectsOf } from './objects.js';
 import { sumError } from './graph/sum.js';
-import { validSketch, unitVector, projectOnLine, translatedSketch } from './graph/sketch.js';
+import { validSketch, unitVector, projectOnLine } from './graph/sketch.js';
 import { resolveRelations, canAttach, dependencyId } from './relations.js';
-import { INDIFFERENCE_FAMILIES, isIndifference, moveIndifference, radialIndifference } from './graph/indifference.js';
+import { INDIFFERENCE_FAMILIES } from './graph/indifference.js';
 import { validFill, fillKey } from './graph/fill.js';
 import { nextFillColor, nextFillLabel } from './graph/fill-style.js';
 
@@ -22,7 +24,7 @@ export function createStore() {
     lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], fills: [], rulers: [], groups: [], objectOrder: [],
     fillSelected: false, fillColor: '#6068e8', fillAutoColor: true, fillOpacity: 0.24,
     selectedId: null, handSelected: true, duplicatePanel: false, sumPanel: false, sketchSelected: false, sketchMode: 'auto', activeTool: 'point', mouseSelected: false, rulerSelected: false, dashedSelected: false, dashedMode: 'free', dashedSnap: true, pointSnap: true, pointCoordinates: false, showGrid: true,
-    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
+    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
   let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1, nextDashedId = 1;
   let nextSumId = 1;
@@ -34,8 +36,8 @@ export function createStore() {
     state.selectedIds=objectsOf(state).filter(object=>requested.has(object.id)).map(object=>object.id);
     state.selectedId=state.selectedIds.length===1?state.selectedIds[0]:null;
   };
-  const documentKeys = ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups', 'objectOrder', 'quadrantMode', 'axisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
-  const emptyDocument = () => ({ lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], fills: [], rulers: [], groups: [], objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
+  const documentKeys = ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups', 'objectOrder', 'quadrantMode', 'axisNames', 'boxSize', 'boxAxisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
+  const emptyDocument = () => ({ lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], fills: [], rulers: [], groups: [], objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
   let layout = { preset: 'single', slots: structuredClone(LAYOUTS.single.slots) };
@@ -117,7 +119,7 @@ export function createStore() {
       if (state.sumPanel || state.duplicatePanel) {state.sumPanel=false;state.duplicatePanel=false;state.handSelected=true;}
       endHistory(); syncDiagram(); activeDiagramId = id; loadDiagram(); historyRevision++; emit();
     },
-    configureLayout(preset, customSlots, quadrantMode, { allQuadrants = true, preserveDirections = false } = {}) {
+    configureLayout(preset, customSlots, quadrantMode, { allQuadrants = true, preserveDirections = false, boxSize = null } = {}) {
       const slots = normalizeSlots(preset === 'custom' ? customSlots : LAYOUTS[preset]?.slots);
       if (!slots) return false;
       endHistory(); syncDiagram();
@@ -130,6 +132,9 @@ export function createStore() {
       slots.forEach((slot, index) => {
         if (!preserveDirections) { diagrams[index].flipX = slot.flipX; diagrams[index].flipY = slot.flipY; }
         if ((allQuadrants || diagrams[index].id === activeDiagramId) && Object.hasOwn(QUADRANT_MODES, quadrantMode)) diagrams[index].quadrantMode = quadrantMode;
+        if (quadrantMode==='edgeworth' && (allQuadrants || diagrams[index].id===activeDiagramId)) {
+          for (const key of ['width','height']) if (Number.isFinite(boxSize?.[key]) && boxSize[key]>=1 && boxSize[key]<=100) diagrams[index].boxSize[key]=boxSize[key];
+        }
       });
       loadDiagram(); historyRevision++; emit();
       return true;
@@ -222,7 +227,9 @@ export function createStore() {
       if (['select', 'point'].includes(patch.activeTool)) state.activeTool = patch.activeTool;
       for (const axis of ['x', 'y']) {
         if (typeof patch.axisNames?.[axis] === 'string') state.axisNames[axis] = patch.axisNames[axis].slice(0, 80);
+        if (typeof patch.boxAxisNames?.[axis] === 'string') state.boxAxisNames[axis] = patch.boxAxisNames[axis].slice(0, 80);
       }
+      for (const key of ['width','height']) if (Number.isFinite(patch.boxSize?.[key]) && patch.boxSize[key]>=1 && patch.boxSize[key]<=100) state.boxSize[key]=patch.boxSize[key];
       emit();
     },
     addLine() {
@@ -387,7 +394,6 @@ export function createStore() {
         names.add(object.name);
       }
       const ids = new Map();
-      const collections = { line: 'lines', curve: 'curves', sketch: 'sketches', point: 'points', dashed: 'dashedLines', group: 'groups' };
       for (const object of copies) {
         const previous = object.id;
         object.id = object.type === 'line' ? `line-${nextId++}` : object.type === 'curve' ? `curve-${nextCurveId++}` : object.type === 'sketch' ? `sketch-${nextSketchId++}` : object.type === 'point' ? `point-${nextPointId++}` : object.type === 'dashed' ? `dashed-${nextDashedId++}` : `group-${nextGroupId++}`;
@@ -395,7 +401,7 @@ export function createStore() {
       }
       for (const object of copies) {
         object.parentId = ids.get(object.parentId) ?? object.parentId;
-        state[collections[object.type]].push(object); state.objectOrder.push(object.id);
+        state[OBJECT_TYPES[object.type].collection].push(object); state.objectOrder.push(object.id);
       }
       setSelection([ids.get(source.id)]);
       historyRevision++;
@@ -405,66 +411,7 @@ export function createStore() {
     updateSelected(patch) {
       const object = objectsOf(state).find((item) => item.id === state.selectedId);
       if (!object) return;
-      if (typeof patch.name === 'string') object.name = patch.name.slice(0, 80);
-      if (object.type === 'fill') {
-        if (typeof patch.color === 'string' && /^#[0-9a-f]{6}$/i.test(patch.color)) object.color = patch.color;
-        if (Number.isFinite(patch.opacity)) object.opacity = Math.max(0.1, Math.min(0.6, patch.opacity));
-        if (validPoint(patch.anchor)) {
-          const dx = patch.anchor.x - object.anchor.x, dy = patch.anchor.y - object.anchor.y;
-          const moved = object.rings.map(ring => ring.map(point => ({ x: point.x + dx, y: point.y + dy })));
-          if (validFill({ rings: moved })) { object.rings = moved; object.anchor = { ...patch.anchor }; }
-        }
-      }
-      if (object.type==='sketch') {
-        const next=structuredClone(object);
-        if (validPoint(patch.anchor)) {
-          const desired=object.binding && patch.translate ? projectOnLine(patch.anchor,state.lines.find(line=>line.id===object.binding.sourceId)).point : patch.anchor;
-          if (patch.translate) Object.assign(next,translatedSketch(object,{x:desired.x-object.anchor.x,y:desired.y-object.anchor.y}));
-          else next.anchor={...patch.anchor};
-        }
-        for (const key of ['start','end']) if (validPoint(patch[key])) next[key]={...patch[key]};
-        if (validPoint(patch.tangent) && !object.binding) next.tangent=unitVector(patch.tangent);
-        for (const key of ['leftReach','rightReach']) if (Number.isFinite(patch[key])) next[key]=Math.max(0.05,Math.min(2,patch[key]));
-        if (next.binding && validPoint(patch.anchor)) {
-          const line=state.lines.find(line=>line.id===next.binding.sourceId);
-          const projection=projectOnLine(next.anchor,line);
-          next.anchor=projection.point; next.binding.parameter=projection.parameter;next.binding.direction=directionOf(line.slope);
-        }
-        if (validSketch(next)) Object.assign(object,next);
-      }
-      if (object.type === 'sum' && typeof patch.nonnegative === 'boolean') object.nonnegative = patch.nonnegative;
-      if (isIndifference(object)) {
-        if (validPoint(patch.anchor)) {
-          const next=patch.reshape && object.family==='complements' ? patch.anchor : moveIndifference(object,object.anchor,patch.anchor);
-          if (validPoint(next) && (!radialIndifference(object) || (next.x>=0.02 && next.y>=0.02))) object.anchor={...next};
-        }
-        if (Number.isFinite(patch.shape) && object.family!=='rectangular-hyperbola') object.shape=Math.max(0.15,Math.min(20,patch.shape));
-        if (object.family==='quasilinear' && ['x','y'].includes(patch.linearAxis) && patch.linearAxis!==object.linearAxis) {
-          // Reflect the complete geometry, including a possibly negative linear-axis level.
-          object.anchor={x:object.anchor.y,y:object.anchor.x};object.linearAxis=patch.linearAxis;
-        }
-      } else if (object.type === 'curve') {
-        if (Object.hasOwn(CURVE_PRESETS, patch.variant)) {
-          object.variant = patch.variant;
-          object.slope = CURVE_PRESETS[patch.variant].slope;
-          object.color = CURVE_PRESETS[patch.variant].color;
-        }
-        if (Number.isFinite(patch.bend)) object.bend = Math.max(0, Math.min(MAX_BEND, patch.bend));
-      } else if (object.type === 'line' && 'slope' in patch) object.slope = normalizeSlope(patch.slope);
-      if (object.type === 'point') {
-        if (typeof patch.showCoordinates === 'boolean') object.showCoordinates = patch.showCoordinates;
-      }
-      if (object.type === 'ruler' || object.type === 'dashed') {
-        const anchor = validPoint(patch.anchor) ? patch.anchor : object.anchor;
-        const end = validPoint(patch.end) ? patch.end : object.end;
-        const length = rulerMetrics({ anchor, end }).length;
-        if (Number.isFinite(length) && length >= 1e-8) { object.anchor = { ...anchor }; object.end = { ...end }; }
-        if (object.type === 'ruler' && ['solid', 'dashed'].includes(patch.style)) object.style = patch.style;
-        if (object.type === 'ruler' && typeof patch.showMeasurement === 'boolean') object.showMeasurement = patch.showMeasurement;
-      }
-      if (!isIndifference(object) && !['group', 'ruler', 'dashed', 'sum', 'sketch', 'fill'].includes(object.type) && Number.isFinite(patch.anchor?.x) && Number.isFinite(patch.anchor?.y)) {
-        object.anchor = { x: patch.anchor.x === 0 ? 0 : patch.anchor.x, y: patch.anchor.y === 0 ? 0 : patch.anchor.y };
-      }
+      objectModel(object).applyPatch(patch, state);
       emit();
     },
     moveObject(id, parentId) {

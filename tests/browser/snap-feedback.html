@@ -1,0 +1,73 @@
+<!doctype html><meta charset="utf-8"><title>공통 맞춤 UI 검증</title>
+<style>@import url('/src/styles.css');@import url('/src/editor.css');body{display:block;overflow:auto;padding:20px}#stage{position:relative;width:800px;height:540px;border:1px solid #ddd}pre{white-space:pre-wrap;font:12px monospace}button{padding:10px}</style>
+<button id="run">공통 맞춤 통합 검증</button><pre id="result">준비</pre><div id="stage"></div>
+<script type="module">
+import {createStore} from '/src/state.js';import {mountGraph} from '/src/graph/canvas.js';
+import {createViewport,toScreen} from '/src/graph/viewport.js';import {serializeDocument} from '/src/export.js';
+const stage=document.querySelector('#stage'),out=document.querySelector('#result');let dispose,store,svg,line;
+const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-8,same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const view=()=>createViewport(stage.clientWidth,stage.clientHeight,store.getState().quadrantMode,store.getState());
+function setup(mode='point',flip=false){dispose?.();store=createStore();line=store.addLine();store.updateSelected({slope:-1,anchor:{x:6,y:4}});store.updateDiagram({flipX:flip,flipY:flip});store.update({[mode==='point'?'mouseSelected':mode==='sketch'?'sketchSelected':mode==='dashed'?'dashedSelected':'handSelected']:true});dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};}
+function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:71,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x*r.width/v.width,clientY:r.top+s.y*r.height/v.height,...flags}));}
+const move=(p,flags={})=>send('pointermove',p,flags),click=(p,flags={})=>{send('pointerdown',p,flags);send('pointerup',p,flags)};
+const marker=()=>svg.querySelector('.snap-feedback:not([data-snap-kind="free"])');
+const style=()=>{const ring=svg.querySelector('.snap-feedback-ring'),core=svg.querySelector('.snap-feedback-core'),text=svg.querySelector('.snap-feedback-label');return ring&&[ring.getAttribute('r'),core.getAttribute('r'),getComputedStyle(core).stroke,getComputedStyle(ring).strokeWidth,getComputedStyle(text).font,getComputedStyle(text).fill]};
+document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok,label)=>{if(!ok)throw Error(label);passed.push(label)};try{
+ setup();move({x:6.17,y:4.17});const commonStyle=style();check(marker()&&svg.querySelectorAll('.snap-feedback').length===1,'point hover uses exactly one common matched marker');
+ check(svg.querySelector(`[data-snap-source="${line}"]`)&&svg.querySelector('.snap-feedback-label').textContent.includes('선 맞춤'),'point hover highlights its source and uses shared wording');
+ move({x:8,y:8});check(!marker()&&svg.querySelectorAll('.snap-feedback-free').length===1,'free drawing uses one common free cursor');
+ setup('dashed');click({x:2,y:4});move({x:5.74,y:4.2},{shiftKey:true});
+ check(same(style(),commonStyle)&&svg.querySelector('.dashed-preview.is-snapped'),'dashed drawing shares point marker style and highlights its draft');
+ check(svg.querySelectorAll('.snap-feedback-ring').length===1&&svg.querySelectorAll('.snap-feedback-core').length===1,'dashed drawing has no duplicate marker');
+ const end=svg.querySelector('.dashed-preview .dashed-segment');check(end.getAttribute('y1')===end.getAttribute('y2'),'Shift dashed drawing stays horizontal while matched');
+ store.update({handSelected:true});check(!marker()&&!svg.querySelector('.dashed-preview'),'tool switch clears the draft and common feedback');
+ setup('sketch');click({x:1,y:7});click({x:7,y:7});const before=serializeDocument(store.getState());move({x:6.17,y:4.17});
+ check(same(style(),commonStyle)&&marker()?.dataset.snapKind==='tangent','curve third-point tangency shares the exact marker style');
+ check(svg.querySelector('.snap-feedback-label').textContent.includes('접점 맞춤')&&svg.querySelector(`[data-snap-source="${line}"]`),'curve creation shows tangent wording and highlights the target line');
+ check(svg.querySelector('.sketch-draft.is-snapped')&&same(serializeDocument(store.getState()),before),'tangent preview highlights the curve without editing the document');
+ document.dispatchEvent(new KeyboardEvent('keydown',{key:'Alt',altKey:true,bubbles:true}));check(!marker(),'Alt immediately clears curve feedback without a pointer move');
+ document.dispatchEvent(new KeyboardEvent('keyup',{key:'Alt',altKey:false,bubbles:true}));check(marker()?.dataset.snapKind==='tangent','releasing Alt immediately restores the common tangent preview');
+ move({x:6.29,y:4.29});check(marker()?.dataset.snapKind==='tangent','curve tangent remains captured beyond the capture radius');
+ move({x:6.4,y:4.4});check(!marker(),'curve tangent releases beyond 24px');
+ move({x:6.17,y:4.17});click({x:6.17,y:4.17});check(store.getState().sketches[0]?.binding?.sourceId===line,'third-click completion retains the original tangent binding');
+ store.undo();check(same(serializeDocument(store.getState()),before),'curve creation undoes in one step without feedback data in JSON');
+ setup('hand');const point=store.addPoint({x:4,y:4});store.update({handSelected:true});send('pointerdown',{x:4,y:4},{},svg.querySelector(`[data-id="${point}"]`));move({x:6.17,y:4.17});
+ check(same(style(),commonStyle)&&near(store.getState().points[0].anchor,{x:6,y:4}),'moving a point uses the same marker at its corrected coordinate');send('pointerup',{x:6.17,y:4.17});check(!marker(),'pointer release clears movement feedback');
+ setup('hand');store.selectObject(line);store.removeSelected();const curve=store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2}),moving=store.addLine();store.updateSelected({slope:0,anchor:{x:4,y:3}});const movingBefore=serializeDocument(store.getState());
+ send('pointerdown',{x:4,y:3},{},svg.querySelector(`[data-id="${moving}"][data-action="move"]`));move({x:4,y:2.2});
+ check(same(style(),commonStyle)&&svg.querySelector(`[data-snap-source="${curve}"]`),'moving a line onto a curve uses shared target highlight and marker');
+ check(store.getState().lines[0].anchor.y===2&&!store.getState().lines[0].binding,'moving tangency preserves independent line geometry');
+ send('pointerup',{x:4,y:2.2});store.undo();check(same(serializeDocument(store.getState()),movingBefore),'moving tangency remains one undo step');
+ setup('hand');store.selectObject(line);store.updateSelected({slope:0,anchor:{x:4,y:2}});const movingCurve=store.addSketch({x:1,y:6.2},{x:7,y:6.2},{x:4,y:2.2});
+ send('pointerdown',{x:4,y:2.2},{},svg.querySelector(`[data-id="${movingCurve}"][data-action="move"]`));move({x:4,y:2.15});
+ check(same(style(),commonStyle)&&svg.querySelector(`[data-snap-source="${line}"]`),'moving a curve onto a line shares the same feedback');send('pointercancel',{x:4,y:2.15});check(!marker(),'pointer cancellation clears the common feedback');
+ setup('sketch',true);click({x:1,y:7});click({x:7,y:7});move({x:6.17,y:4.17});check(same(style(),commonStyle),'reversed axes preserve common tangent feedback');
+ store.configureLayout('horizontal2');check(!marker(),'layout/history revision clears transient feedback');
+ stage.style.width='312px';stage.style.height='400px';await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+ setup('sketch');click({x:1,y:7});click({x:7,y:7});move({x:6.17,y:4.17});const label=svg.querySelector('.snap-feedback-label'),box=label.getBBox();
+ check(marker()&&box.x>=0&&box.x+box.width<=stage.clientWidth&&box.y>=0&&box.y+box.height<=stage.clientHeight,'common tangent label stays inside a mobile canvas');
+ check(getComputedStyle(svg.querySelector('.snap-feedback')).pointerEvents==='none','feedback never intercepts drawing input');
+ move({x:5,y:4.8},{pointerType:'touch'});check(marker()&&!svg.classList.contains('has-mouse-cursor'),'touch matches remain visible without a fake mouse cursor');
+ send('pointercancel',{x:5,y:4.8},{pointerType:'touch'});check(!marker(),'touch cancellation clears curve-creation feedback');
+ setup('hand');store.selectObject(line);store.updateSelected({slope:0,anchor:{x:4,y:4}});
+ const bound=store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:4},{lineId:line}),other=store.addLine();store.updateSelected({slope:0,anchor:{x:4,y:4.2}});store.selectObject(bound);
+ send('pointerdown',{x:4,y:4},{},svg.querySelector(`[data-id="${bound}"][data-action="sketch-middle"]`));move({x:4,y:4.2});
+ check(store.getState().sketches[0].anchor.y===4&&!svg.querySelector(`[data-snap-source="${other}"]`),'bound or rejected handle edits never display a match the shape did not adopt');
+ send('pointerup',{x:4,y:4.2});
+ for(const size of [800,312]){
+  stage.style.width=size+'px';stage.style.height='400px';setup('hand');store.selectObject(line);store.removeSelected();
+  const p=store.addPoint({x:3,y:3}),follow=store.lineThroughSelectedPoint();store.selectObject(follow);store.updateSelected({slope:0});store.selectObject(p);
+  const original=serializeDocument(store.getState());
+  send('pointerdown',{x:3,y:3},{},svg.querySelector(`[data-id="${p}"][data-action="move"]`));move({x:3.08,y:3.1});
+  check(near(store.getState().points[0].anchor,{x:3.08,y:3.1}),size+': moving point never sticks to its following line');
+  check(!svg.querySelector(`[data-snap-source="${follow}"]`),size+': dependent geometry has no self-snap highlight');
+  check(near(store.getState().lines[0].anchor,store.getState().points[0].anchor),size+': following line still tracks the independent point movement');
+  send('pointerup',{x:3.08,y:3.1});store.undo();check(same(serializeDocument(store.getState()),original),size+': point and following line remain one undo step');
+  setup('point');store.selectObject(line);store.removeSelected();
+  const free=store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2});store.selectObject(free);store.update({handSelected:true});
+  const start=store.getState().sketches[0].start;send('pointerdown',start,{},svg.querySelector(`[data-id="${free}"][data-action="sketch-start"]`));move({x:start.x+0.08,y:start.y+0.1});
+  check(near(store.getState().sketches[0].start,{x:start.x+0.08,y:start.y+0.1})&&!svg.querySelector(`[data-snap-source="${free}"]`),size+': free-curve endpoint excludes its own stroke');send('pointerup',start);
+ }
+ out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
+}catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};
+</script>

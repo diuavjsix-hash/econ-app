@@ -2,9 +2,17 @@ export const QUADRANT_MODES = {
   first: { label: '1사분면', quadrants: [1], origin: 'bottom-left' },
   upper: { label: '1·2사분면', quadrants: [1, 2], origin: 'bottom-center' },
   all: { label: '전체 사분면', quadrants: [1, 2, 3, 4], origin: 'center' },
+  edgeworth: { label: '에지워드 상자', quadrants: [1], origin: 'bottom-left' },
 };
 
-export function createViewport(width, height, mode, { flipX = false, flipY = false } = {}) {
+export function createViewport(width, height, mode, { flipX = false, flipY = false, boxSize = { width: 10, height: 8 } } = {}) {
+  if (mode==='edgeworth') {
+    const unit=Math.max(0.01,Math.min((width-96)/boxSize.width,(height-96)/boxSize.height));
+    const left=(width-boxSize.width*unit)/2,top=(height-boxSize.height*unit)/2;
+    const plot={left,right:width-left,top,bottom:height-top};
+    return {width,height,unit,plot,cx:flipX?plot.right:plot.left,cy:flipY?plot.top:plot.bottom,
+      xDirection:flipX?-1:1,yDirection:flipY?-1:1,bounds:{xMin:0,xMax:boxSize.width,yMin:0,yMax:boxSize.height}};
+  }
   const unit = Math.max(8, Math.min(56, width / 16, height / 11));
   const padding = 36;
   const plot = { left: padding, right: width - padding, top: padding, bottom: height - padding };

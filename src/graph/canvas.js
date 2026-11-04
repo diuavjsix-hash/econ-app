@@ -1,33 +1,27 @@
-import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions, isLinePointVisible, lineEditingGeometry } from './display.js';
+import { interactionFor } from './interactions.js';
+import { renderEditingHandles } from './editing-handles.js';
+import { SVG_RENDERER, STROKE_RENDERER } from './svg-renderer.js';
+import { objectModel } from '../models/objects.js';
+import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions, isLinePointVisible } from './display.js';
 import { drawDashedLine } from './dashed-view.js';
-import { constrainRuler, translateRuler } from './ruler.js';
-import { angleFromSlope, slopeFromAngle, directionOf } from './math.js';
+import { constrainRuler } from './ruler.js';
+import { directionOf } from './math.js';
 import { createViewport, toScreen as projectPoint, toWorld } from './viewport.js';
-import { bendFromPoint, curvePoint } from './curve.js';
 import { pointCoordinatesLabel } from './point.js';
-import { buildSnapTargets, snapPoint } from './snap.js';
+import { SnapTargetCache, snapPoint } from './snap.js';
+import { geometryKey } from './snap-context.js';
 import { objectsOf, selectedIdsOf } from '../objects.js';
-import { displayedSumSegments } from './sum.js';
-import { projectOnLine, unitVector, validSketch, distance, sketchHandlePoints, translatedSketch } from './sketch.js';
+import { unitVector, validSketch, distance } from './sketch.js';
 import { drawSketch } from './sketch-view.js';
-import { snapMovingCurve } from './point-magnets.js';
-import { snapMovingLine } from './intercepts.js';
-import { dragTranslation, axisAlignedSnap } from './movement.js';
-import { isIndifference, moveIndifference, indifferenceShapeHandle, shapeIndifference } from './indifference.js';
+import { axisAlignedSnap } from './movement.js';
 import { selectionRectangle, objectsInRectangle } from './selection.js';
-import { snapDashedPoint, snapMovingDashed } from './dashed-magnets.js';
+import { snapDashedPoint } from './dashed-magnets.js';
 import { buildFillRegions, findFillRegion, fillKey, fillLabelPosition } from './fill.js';
 import { renderSnapFeedback } from './snap-feedback.js';
 import { snapSketchTangent } from './sketch-magnets.js';
 
 let nextCanvasId = 1;
-const SVG_NS = 'http://www.w3.org/2000/svg';
-function element(tag, attributes, text) {
-  const node = document.createElementNS(SVG_NS, tag);
-  for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
+const element = (...args) => SVG_RENDERER.element(...args);
 
 export function mountGraph(container, store) {
   const canvasId = nextCanvasId++;
@@ -45,12 +39,12 @@ export function mountGraph(container, store) {
   let tangentSnap = null;
   let dashedSnap = null;
   let pointer = null;
-  let snapCache = { signature: '', targets: null };
+  const snapCache = new SnapTargetCache();
   let fillCache = { signature: '', regions: [] }, fillHover = null, fillMessage = '';
   const fillLabelCache = new Map();
 
   function fillRegions() {
-    const signature = JSON.stringify([viewport.bounds, currentState.lines, currentState.curves, currentState.sketches, currentState.sums, currentState.dashedLines]);
+    const signature = geometryKey({ ...currentState, axisGapEnabled: false }, viewport.bounds);
     if (signature !== fillCache.signature) fillCache = { signature, regions: buildFillRegions(currentState, viewport.bounds) };
     return fillCache.regions;
   }
@@ -90,11 +84,7 @@ export function mountGraph(container, store) {
   }
 
   function dashedTargets() {
-    const state = { ...currentState, dashedLines: currentState.dashedLines.filter(line => line.id !== drag?.object.id) };
-    const signature = JSON.stringify([viewport.bounds, state.axisGapEnabled, state.axisGap,
-      state.lines, state.curves, state.sketches, state.sums, state.dashedLines, drag?.object.id]);
-    if (signature !== snapCache.signature) snapCache = { signature, targets: buildSnapTargets(state, viewport.bounds, drag?.object.id) };
-    return snapCache.targets;
+    return snapCache.get(currentState, viewport.bounds, drag?.object.id ?? null);
   }
   function dashedOptions(event, axis = null) {
     return { axis, previous: dashedSnap, enabled: currentState.dashedSnap, altKey: event.altKey,
@@ -113,17 +103,7 @@ export function mountGraph(container, store) {
     const snapping = currentState.dashedSelected || drag?.object.type === 'dashed' ? currentState.dashedSnap : currentState.pointSnap;
     if (currentState.dashedSelected || drag?.object.type === 'dashed') return dashedPosition(point, event);
     if (!snapping || event.altKey || point.x < bounds.xMin || point.x > bounds.xMax || point.y < bounds.yMin || point.y > bounds.yMax) return point;
-    const signature = JSON.stringify([
-      bounds, currentState.axisGapEnabled, currentState.axisGap,
-      currentState.lines.map(({ id, anchor, slope }) => [id, anchor, slope]),
-      currentState.curves,
-      currentState.sums,
-      currentState.sketches,
-      currentState.dashedLines.filter(r => r.id !== drag?.object.id).map(({ id, anchor, end }) => [id, anchor, end]),
-      drag?.object.id ?? null,
-    ]);
-    if (signature !== snapCache.signature) snapCache = { signature, targets: buildSnapTargets(currentState, bounds, drag?.object.id ?? null) };
-    snapTarget = snapPoint(point, snapCache.targets, viewport.unit,{previous,axis});
+    snapTarget = snapPoint(point, snapCache.get(currentState, bounds, drag?.object.id ?? null), viewport.unit,{previous,axis});
     return snapTarget?.point ?? point;
   }
 
@@ -225,6 +205,17 @@ export function mountGraph(container, store) {
     }
     axisName(currentState.axisNames.x, { x: xEnd - 10 * xDirection, y: cy + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'end' : 'start', 'aria-label': `수평축 ${currentState.axisNames.x}` }, plot.right - plot.left - 20);
     axisName(currentState.axisNames.y, { x: cx + 13 * xDirection, y: yEnd + (yDirection === 1 ? 5 : -5), 'text-anchor': xDirection === 1 ? 'start' : 'end', 'aria-label': `수직축 ${currentState.axisNames.y}` }, (xDirection === 1 ? plot.right - cx : cx - plot.left) - 13);
+    if (currentState.quadrantMode==='edgeworth') {
+      const opposite=toScreen({x:bounds.xMax,y:bounds.yMax}),b=element('g',{class:'graph-axes','aria-label':'B 좌표축'});
+      b.append(element('line',{x1:plot.left,y1:opposite.y,x2:plot.right,y2:opposite.y}),
+        element('line',{x1:opposite.x,y1:plot.top,x2:opposite.x,y2:plot.bottom}),
+        element('path',{d:`M${cx+7*xDirection} ${opposite.y-4}l${-7*xDirection} 4 ${7*xDirection} 4 M${opposite.x-4} ${cy-7*yDirection}l4 ${7*yDirection} 4 ${-7*yDirection}`,fill:'none'}));
+      svg.append(b);
+      axisName(currentState.boxAxisNames.x,{x:cx+10*xDirection,y:opposite.y+(yDirection===1?-16:24),'text-anchor':xDirection===1?'start':'end','aria-label':`B 수평축 ${currentState.boxAxisNames.x}`},plot.right-plot.left-20);
+      axisName(currentState.boxAxisNames.y,{x:opposite.x-13*xDirection,y:cy+(yDirection===1?-7:13),'text-anchor':xDirection===1?'end':'start','aria-label':`B 수직축 ${currentState.boxAxisNames.y}`},plot.right-plot.left-26);
+      axisName('Oₐ',{x:cx-10*xDirection,y:cy+20*yDirection,'text-anchor':xDirection===1?'end':'start'},40);
+      axisName('Oᵦ',{x:opposite.x+10*xDirection,y:opposite.y-12*yDirection,'text-anchor':xDirection===1?'start':'end'},40);
+    }
 
     const defs = element('defs', {});
     const clip = element('clipPath', { id: clipId });
@@ -243,59 +234,22 @@ export function mountGraph(container, store) {
     svg.append(shapes);
     const ordered = [...currentState.lines, ...currentState.curves].sort((a, b) => Number(selectedIds.has(a.id)) - Number(selectedIds.has(b.id)));
     for (const line of ordered) {
-      if (line.type === 'curve') {
-        const segments = displayedCurveSegments(line, bounds, currentState);
-        if (!segments.length) continue;
-        let previousEnd = null;
-        const d = segments.map((points) => {
-          const [start, control, end] = points.map(toScreen);
-          const connected = previousEnd && Math.hypot(start.x - previousEnd.x, start.y - previousEnd.y) < 1e-6;
-          previousEnd = end;
-          return `${connected ? '' : `M${start.x} ${start.y}`}Q${control.x} ${control.y} ${end.x} ${end.y}`;
-        }).join(' ');
-        const selected = selectedIds.has(line.id);
-        const group = element('g', { class: 'graph-curve', style: `--line-color:${line.color}` });
-        group.append(element('path', { d, class: `plotted-line${selected ? ' is-selected' : ''}`, fill: 'none', 'aria-hidden': 'true' }));
-        const hit = element('path', { d, fill: 'none', class: 'line-hit', 'clip-path': `url(#${lineClipId})`, 'data-id': line.id, 'data-action': 'move', tabindex: 0, role: 'button', 'aria-label': `${line.name} 이동`, 'aria-pressed': selected });
-        hit.append(element('title', {}, `${line.name} · 드래그하여 이동`));
-        group.append(hit);
-        shapes.append(group);
-        continue;
-      }
-      const segments = displayedLineSegments(line, bounds, currentState);
-      if (!segments.length) continue;
-      const d = segments.map(points => {
-        const [a, b] = points.map(toScreen);
-        return `M${a.x} ${a.y}L${b.x} ${b.y}`;
-      }).join(' ');
-      const selected = selectedIds.has(line.id);
-      const group = element('g', { class: 'graph-line', style: `--line-color:${line.color}` });
-      group.append(element('path', { d, fill: 'none', class: `plotted-line${selected ? ' is-selected' : ''}`, 'aria-hidden': 'true' }));
-      const hit = element('path', { d, fill: 'none', class: 'line-hit', 'clip-path': `url(#${lineClipId})`, 'data-id': line.id, 'data-action': 'move', tabindex: 0, role: 'button', 'aria-label': `${line.name} 이동`, 'aria-pressed': selected });
-      hit.append(element('title', {}, `${line.name} · 드래그하여 이동`));
-      group.append(hit);
-      shapes.append(group);
+      const model=objectModel(line),pieces=model.visiblePieces(bounds,currentState);
+      if (!pieces.length) continue;
+      shapes.append(STROKE_RENDERER.render(line,pieces,viewport,{
+        quadratic:model.quadratic,connect:model.quadratic,groupClass:line.type==='curve'?'graph-curve':'graph-line',
+        selected:selectedIds.has(line.id),clipId:lineClipId,title:`${line.name} · 드래그하여 이동`,
+      }));
     }
 
     for (const sketch of currentState.sketches) shapes.append(drawSketch(sketch,viewport,currentState,{selected:selectedIds.has(sketch.id),clipId:lineClipId}));
     svg.append(element('g',{class:'sketch-draft-layer','pointer-events':'none'}));
     updateSketchDraft();
     for (const sum of currentState.sums) {
-      const segments = displayedSumSegments(sum, currentState, bounds);
-      if (!segments.length) continue;
-      let previousEnd = null;
-      const d = segments.map(([a, b]) => {
-        const start = toScreen(a), end = toScreen(b);
-        const connected = previousEnd && Math.hypot(start.x - previousEnd.x, start.y - previousEnd.y) < 1e-6;
-        previousEnd = end;
-        return `${connected ? '' : `M${start.x} ${start.y}`}L${end.x} ${end.y}`;
-      }).join(' ');
-      const selected = selectedIds.has(sum.id);
-      const group = element('g', { class: 'graph-sum', style: `--line-color:${sum.color}` });
-      group.append(element('path', { d, fill: 'none', class: `plotted-line${selected ? ' is-selected' : ''}`, 'aria-hidden': 'true' }));
-      const hit = element('path', { d, fill: 'none', class: 'line-hit', 'clip-path': `url(#${lineClipId})`, 'data-id': sum.id, 'data-action': 'select', tabindex: 0, role: 'button', 'aria-label': `${sum.name} 선택`, 'aria-pressed': selected });
-      hit.append(element('title', {}, `${sum.name} · 원본을 수정하면 자동 갱신`));
-      group.append(hit); shapes.append(group);
+      const pieces=objectModel(sum).visiblePieces(bounds,currentState);
+      if (pieces.length) shapes.append(STROKE_RENDERER.render(sum,pieces,viewport,{
+        groupClass:'graph-sum',selected:selectedIds.has(sum.id),clipId:lineClipId,action:'select',title:`${sum.name} · 원본을 수정하면 자동 갱신`,
+      }));
     }
     for (const ruler of currentState.dashedLines) svg.append(drawDashedLine(ruler, viewport, { selected: selectedIds.has(ruler.id), editable: currentState.handSelected && selectedIds.size===1, clipId }));
     svg.append(element('g', { class: 'dashed-draft-layer', 'pointer-events': 'none' }));
@@ -347,44 +301,8 @@ export function mountGraph(container, store) {
       svg.append(element('rect',{x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),width:Math.abs(b.x-a.x),height:Math.abs(b.y-a.y),class:'selection-marquee','pointer-events':'none','aria-hidden':'true'}));
     }
     const selected = objectsOf(currentState).find((object) => object.id === currentState.selectedId);
-    if (currentState.handSelected && selected?.type==='sketch') {
-      svg.append(drawSketch(selected,viewport,currentState,{selected:true,editable:true,clipId:lineClipId,handlesOnly:true}));return;
-    }
-    if (!currentState.handSelected || !selected || ['ruler', 'point', 'group', 'dashed', 'sum', 'sketch', 'fill'].includes(selected.type)) return;
-    if (selected.type === 'curve') {
-      const handles = element('g', { class: 'curve-handles', style: `--line-color:${selected.color}` });
-      const shapePoint=isIndifference(selected)?indifferenceShapeHandle(selected,bounds):curvePoint(selected,0.6);
-      const bendPoint = toScreen(shapePoint);
-      const anchor = toScreen(selected.anchor);
-      const shapeLabel=selected.family==='rectangular-hyperbola'?'크기 조절':'모양 조절';
-      const handle = element('circle', { cx: bendPoint.x, cy: bendPoint.y, r: 7, class: 'rotate-handle bend-handle', 'data-id': selected.id, 'data-action': isIndifference(selected)?'ic-shape':'bend', tabindex: 0, role: 'button', 'aria-label': `${selected.name} ${shapeLabel}` });
-      handle.append(element('title', {}, isIndifference(selected)?`드래그하여 ${shapeLabel}`:'위아래로 드래그하여 휘어짐 조절'));
-      const center = element('circle', { cx: anchor.x, cy: anchor.y, r: 5, class: 'move-handle', 'data-id': selected.id, 'data-action': 'move' });
-      center.append(element('title', {}, '드래그하여 이동'));
-      // A handle on an axis stays whole; an offscreen handle stays hidden.
-      for (const [node, point] of [[handle, shapePoint], [center, selected.anchor]]) {
-        if (isLinePointVisible(point, bounds, currentState)) handles.append(node);
-      }
-      svg.append(handles);
-      return;
-    }
-    const editing = lineEditingGeometry(selected, displayedLineSegments(selected, bounds, currentState));
-    if (!editing) return;
-    const { points } = editing;
-    const anchor = toScreen(editing.anchor);
-    const handles = element('g', { class: 'line-handles', style: `--line-color:${selected.color}` });
-    for (const [index, endpoint] of points.entries()) {
-      const edge = toScreen(endpoint);
-      const distance = Math.hypot(edge.x - anchor.x, edge.y - anchor.y);
-      const fraction = distance === 0 ? 0 : Math.min(90, distance * 0.7) / distance;
-      const handle = element('circle', { cx: anchor.x + (edge.x - anchor.x) * fraction, cy: anchor.y + (edge.y - anchor.y) * fraction, r: 7, class: 'rotate-handle', 'data-id': selected.id, 'data-action': 'rotate', tabindex: 0, role: 'button', 'aria-label': `${selected.name} 기울기 조절 ${index + 1}` });
-      handle.append(element('title', {}, '드래그하여 기울기 조절'));
-      handles.append(handle);
-    }
-    const center = element('circle', { cx: anchor.x, cy: anchor.y, r: 5, class: 'move-handle', 'data-id': selected.id, 'data-action': 'move' });
-    center.append(element('title', {}, '드래그하여 이동'));
-    handles.append(center);
-    svg.append(handles);
+    const handles=renderEditingHandles(selected,viewport,currentState,lineClipId);
+    if (handles) svg.append(handles);
   }
 
   function tangentTarget(point, event) {
@@ -453,41 +371,14 @@ export function mountGraph(container, store) {
     if (!aligned) {snapTarget=null;return anchor;}
     return aligned;
   }
-  function sketchMoveAnchor(curve,anchor,axis) {
-    if (!axis || !curve.binding) return anchor;
-    const line=currentState.lines.find(line=>line.id===curve.binding.sourceId);
-    const direction=line && directionOf(line.slope),locked=axis==='x'?'y':'x';
-    return direction && direction[locked]===0?anchor:curve.anchor;
+  function interactionContext() {
+    return {state:currentState,viewport,snappedMove,dashedPosition,dashedTargets,dashedOptions,tangentSnap};
   }
-  function editSketch(curve, action, point, event, start) {
-    if (action==='move') {
-      const moved=dragTranslation(curve.anchor,start,point,event.shiftKey);
-      if (curve.binding) {
-        tangentSnap=null;
-        store.updateSelected({anchor:sketchMoveAnchor(curve,moved.anchor,moved.axis),translate:true});return;
-      }
-      const raw={...curve,...translatedSketch(curve,{x:moved.anchor.x-curve.anchor.x,y:moved.anchor.y-curve.anchor.y})};
-      tangentSnap=snapMovingCurve(raw,currentState,viewport.bounds,viewport.unit,
-        {previous:tangentSnap,reference:point,altKey:event.altKey,axis:moved.axis});
-      const anchor=tangentSnap?.anchor??moved.anchor;
-      store.updateSelected({...translatedSketch(curve,{x:anchor.x-curve.anchor.x,y:anchor.y-curve.anchor.y}),translate:true});return;
-    }
-    const key=action.replace('sketch-','');
-    if (['start','end','middle'].includes(key)) {
-      const origin=key==='middle'?curve.anchor:curve[key];
-      const moved=event.shiftKey?dragTranslation(origin,start??origin,point,true):{anchor:point,axis:null};
-      let anchor=snappedMove(moved.anchor,event,moved.axis);
-      if (key==='middle') anchor=sketchMoveAnchor(curve,anchor,moved.axis);
-      store.updateSelected({[key==='middle'?'anchor':key]:anchor});
-    }
-    else if (key==='tangent') {
-      if (distance(point,curve.anchor)>1e-6) store.updateSelected({tangent:{x:point.x-curve.anchor.x,y:point.y-curve.anchor.y}});
-    } else if (key==='leftReach' || key==='rightReach') {
-      const endpoint=key==='leftReach'?curve.start:curve.end, sign=key==='leftReach'?-1:1;
-      const direction=unitVector(curve.tangent);
-      const length=sign*((point.x-curve.anchor.x)*direction.x+(point.y-curve.anchor.y)*direction.y);
-      store.updateSelected({[key]:length/distance(endpoint,curve.anchor)});
-    }
+  function applyInteraction(result) {
+    if (!result) return;
+    if (Object.hasOwn(result,'tangentSnap')) tangentSnap=result.tangentSnap;
+    if (Object.hasOwn(result,'dashedSnap')) dashedSnap=result.dashedSnap;
+    if (result.patch) store.updateSelected(result.patch);
   }
   function worldPoint(event) {
     const bounds = svg.getBoundingClientRect();
@@ -514,6 +405,9 @@ export function mountGraph(container, store) {
 
   svg.addEventListener('pointerdown', (event) => {
     if (drag || marquee) return;
+    // Canvas pointer handlers prevent the browser's normal focus change. Finish a
+    // preceding inspector input before starting a separate drawing/drag history step.
+    if (event.button===0 && document.activeElement?.matches('input,textarea,[contenteditable="true"]')) document.activeElement.blur();
     pointer = event;
     if (event.button === 0 && currentState.fillSelected) {
       event.preventDefault();
@@ -575,14 +469,10 @@ export function mountGraph(container, store) {
     if (currentState.handSelected && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();svg.focus({preventScroll:true});store.selectObject(object.id,{toggle:true});return;
     }
-    if (object.type === 'sum') { event.preventDefault(); store.selectObject(object.id); return; }
-    if (object.binding && ['point','line'].includes(object.type) && target.dataset.action==='move') {event.preventDefault();store.selectObject(object.id);return;}
-    let anchor = object.anchor;
-    if (object.type === 'line') {
-      const editing = lineEditingGeometry(object, displayedLineSegments(object, viewport.bounds, currentState));
-      if (!editing) return;
-      anchor = editing.anchor;
-    }
+    const controller=interactionFor(object);
+    if (!controller.canDrag(object,target.dataset.action)) {event.preventDefault();store.selectObject(object.id);return;}
+    const anchor=controller.start(object,interactionContext());
+    if (!anchor) return;
     drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), object: { ...structuredClone(object), anchor } };
     dashedSnap = null;
     snapTarget = null; tangentSnap = null;
@@ -613,63 +503,7 @@ export function mountGraph(container, store) {
     }
     if (event.pointerId !== drag.pointerId) return;
     const point = worldPoint(event);
-    if (isIndifference(drag.object)) {
-      if (drag.action==='ic-shape') store.updateSelected(shapeIndifference(drag.object,point));
-      else {
-        const moved=dragTranslation(drag.object.anchor,drag.start,point,event.shiftKey);
-        const anchor=moveIndifference(drag.object,drag.start,point,moved.axis);
-        tangentSnap=snapMovingCurve({...drag.object,anchor},currentState,viewport.bounds,viewport.unit,
-          {previous:tangentSnap,reference:point,altKey:event.altKey});
-        store.updateSelected({anchor:tangentSnap?.anchor??anchor});
-      }
-      return;
-    }
-    if (drag.object.type==='sketch') {
-      editSketch(drag.object,drag.action,point,event,drag.start);
-      return;
-    }
-    if (drag.object.type === 'dashed') {
-      if (drag.action === 'move') {
-        const moved=dragTranslation(drag.object.anchor,drag.start,point,event.shiftKey);
-        const geometry=translateRuler(drag.object,{x:moved.anchor.x-drag.object.anchor.x,y:moved.anchor.y-drag.object.anchor.y},viewport.bounds);
-        dashedSnap=snapMovingDashed({...drag.object,...geometry},dashedTargets(),viewport.unit,dashedOptions(event,moved.axis));
-        store.updateSelected(dashedSnap?.geometry??geometry);
-      }
-      else {
-        const origin=drag.action==='start'?drag.object.anchor:drag.object.end;
-        const moved=dragTranslation(origin,drag.start,point,event.shiftKey,viewport.bounds);
-        const anchor=dashedPosition(moved.anchor,event,moved.axis);
-        store.updateSelected(drag.action === 'start' ? { anchor } : { end: anchor });
-      }
-      return;
-    }
-    if (drag.action === 'move') {
-      const margin = ['point', 'fill'].includes(drag.object.type) ? 0 : 24 / viewport.unit;
-      const bounds = viewport.bounds;
-      const moved=dragTranslation(drag.object.anchor,drag.start,point,event.shiftKey,bounds,margin);
-      let anchor=moved.anchor;
-      if (drag.object.type === 'point') anchor = snappedMove(anchor,event,moved.axis);
-      if (drag.object.type === 'line') {
-        tangentSnap = snapMovingLine({...drag.object,anchor},currentState,bounds,viewport.unit,
-          {previous:tangentSnap,reference:point,altKey:event.altKey,axis:moved.axis});
-        anchor = tangentSnap?.anchor ?? anchor;
-      }
-      if (drag.object.type === 'curve') {
-        tangentSnap=snapMovingCurve({...drag.object,anchor},currentState,bounds,viewport.unit,
-          {previous:tangentSnap,reference:point,altKey:event.altKey,axis:moved.axis});
-        anchor=tangentSnap?.anchor??anchor;
-      }
-      store.updateSelected({ anchor });
-    } else if (drag.action === 'bend') {
-      store.updateSelected({ bend: bendFromPoint(drag.object, point) });
-    } else {
-      const dx = point.x - drag.object.anchor.x;
-      if (Math.hypot(dx, point.y - drag.object.anchor.y) < 0.25) return;
-      const dy = point.y - drag.object.anchor.y;
-      // A small screen-space snap makes an exact vertical line easy to reach by mouse.
-      const slope = Math.abs(dx * viewport.unit) < 4 ? null : dy / dx;
-      store.updateSelected({ slope });
-    }
+    applyInteraction(interactionFor(drag.object).drag(drag.object,drag.action,drag.start,point,event,interactionContext()));
   };
   svg.addEventListener('pointermove',movePointer);
   const refreshModifiers = event => {
@@ -735,50 +569,8 @@ export function mountGraph(container, store) {
     if ((event.ctrlKey || event.metaKey) && ['Enter',' '].includes(event.key)) {store.selectObject(id,{toggle:true});return;}
     store.selectObject(id);
     const line = objectsOf(currentState).find((item) => item.id === id);
-    if (!line || line.type === 'sum') {
-      svg.querySelector(`[data-id="${id}"]`)?.focus();
-      return;
-    }
-    const step = event.shiftKey ? 1 : 0.1;
-    if (line.type==='sketch') {
-      if (event.key.startsWith('Arrow')) {
-        const points=sketchHandlePoints(line),key=action.replace('sketch-','');
-        const origin=points[key]??line.anchor;
-        editSketch(line,action,{x:origin.x+(event.key==='ArrowRight'?step:event.key==='ArrowLeft'?-step:0)*viewport.xDirection,y:origin.y+(event.key==='ArrowUp'?step:event.key==='ArrowDown'?-step:0)*viewport.yDirection},{...event,altKey:true},origin);
-      }
-      [...svg.querySelectorAll('[data-id]')].find(node=>node.dataset.id===id && node.dataset.action===action)?.focus();return;
-    }
-    if (event.key.startsWith('Arrow')) {
-      if (line.type === 'dashed') {
-        const delta = { x: (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0) * viewport.xDirection, y: (event.key === 'ArrowUp' ? step : event.key === 'ArrowDown' ? -step : 0) * viewport.yDirection };
-        if (action === 'move') store.updateSelected(translateRuler(line, delta, viewport.bounds));
-        else {
-          const key = action === 'start' ? 'anchor' : 'end', point = line[key], { bounds } = viewport;
-          store.updateSelected({ [key]: { x: Math.max(bounds.xMin, Math.min(bounds.xMax, point.x + delta.x)), y: Math.max(bounds.yMin, Math.min(bounds.yMax, point.y + delta.y)) } });
-        }
-      } else if (isIndifference(line)) {
-        if (action==='ic-shape') {
-          if (line.family==='rectangular-hyperbola') {
-            const scale=['ArrowUp','ArrowRight'].includes(event.key)?1.05:1/1.05;
-            store.updateSelected(shapeIndifference(line,{x:line.anchor.x*scale,y:line.anchor.y*scale}));
-          } else if (line.family==='complements') {
-            const p=indifferenceShapeHandle(line);p.y+=['ArrowUp','ArrowRight'].includes(event.key)?step:-step;
-            store.updateSelected(shapeIndifference(line,p));
-          } else store.updateSelected({shape:line.shape*(['ArrowUp','ArrowRight'].includes(event.key)?1.05:1/1.05)});
-        } else {
-          const anchor={x:line.anchor.x+(event.key==='ArrowRight'?step:event.key==='ArrowLeft'?-step:0)*viewport.xDirection,
-            y:line.anchor.y+(event.key==='ArrowUp'?step:event.key==='ArrowDown'?-step:0)*viewport.yDirection};
-          store.updateSelected({anchor});
-        }
-      } else if (action === 'rotate') {
-        let angle = angleFromSlope(line.slope) + (['ArrowUp', 'ArrowRight'].includes(event.key) ? step : -step);
-        if (angle > 90) angle -= 180;
-        if (angle < -90) angle += 180;
-        store.updateSelected({ slope: slopeFromAngle(angle) });
-      } else if (action === 'bend') {
-        store.updateSelected({ bend: line.bend + (['ArrowUp', 'ArrowRight'].includes(event.key) ? 1 : -1) * (event.shiftKey ? 0.05 : 0.01) });
-      } else store.updateSelected({ anchor: { x: line.anchor.x + (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0) * viewport.xDirection, y: line.anchor.y + (event.key === 'ArrowUp' ? step : event.key === 'ArrowDown' ? -step : 0) * viewport.yDirection } });
-    }
+    if (!line) return;
+    if (event.key.startsWith('Arrow')) applyInteraction(interactionFor(line).keyboard(line,action,event,interactionContext()));
     // Rendering recreates SVG nodes, so restore keyboard focus to the same control.
     [...svg.querySelectorAll('[data-id]')].find((node) => node.dataset.id === id && node.getAttribute('aria-label') === label)?.focus();
   });

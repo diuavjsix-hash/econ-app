@@ -6,6 +6,8 @@ import { nearestQuadraticPoint, quadraticCoordinatePoints } from './snap.js';
 import { canAttach } from '../relations.js';
 import { snapCurveToTangency, TANGENT_CAPTURE_PX, TANGENT_RELEASE_PX } from './tangency.js';
 import { isIndifference, indifferenceThroughPoint, indifferenceMoveDistance } from './indifference.js';
+import { SHAPE_SNAP_POLICY } from './snap-policy.js';
+import { snapCurveToCurveTangency } from './curve-curve-tangency.js';
 
 /** Translate a whole line or curve through a visible, independent, existing point. */
 export function snapShapeToPoint(shape,state,bounds,unit,{previous=null,reference=shape.anchor,altKey=false,axis=null}={}) {
@@ -43,9 +45,7 @@ export function snapShapeToPoint(shape,state,bounds,unit,{previous=null,referenc
       });
     });
   }
-  const retained=previous && candidates.find(candidate=>candidate.key===previous.key && candidate.distance<=TANGENT_RELEASE_PX);
-  return retained || candidates.filter(candidate=>candidate.distance<=TANGENT_CAPTURE_PX)
-    .sort((a,b)=>a.distance-b.distance || a.pointerDistance-b.pointerDistance)[0] || null;
+  return SHAPE_SNAP_POLICY.choose(candidates,previous);
 }
 
 /** An explicit point can take over from a farther computed magnet; keep point capture stable. */
@@ -62,5 +62,6 @@ export function chooseShapeMagnet(candidates,previous) {
 export function snapMovingCurve(curve,state,bounds,unit,options={}) {
   const point=snapShapeToPoint(curve,state,bounds,unit,{...options,previous:options.previous?.kind==='point'?options.previous:null});
   const tangent=snapCurveToTangency(curve,state,bounds,unit,{...options,previous:options.previous?.kind==='tangent'?options.previous:null});
-  return chooseShapeMagnet([point,tangent?{...tangent,kind:'tangent'}:null],options.previous);
+  const curveTangent=snapCurveToCurveTangency(curve,state,bounds,unit,{...options,previous:options.previous?.key?.startsWith('curve-tangent:')?options.previous:null});
+  return chooseShapeMagnet([point,tangent?{...tangent,kind:'tangent'}:null,curveTangent],options.previous);
 }

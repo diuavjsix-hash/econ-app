@@ -1,9 +1,10 @@
-export const OBJECT_LABELS = { line: '직선', curve: '곡선', sketch: '자유 곡선', sum: '합', point: '점', dashed: '점선', fill: '구역', ruler: '자', group: '폴더' };
+import { OBJECT_COLLECTIONS } from './models/object-types.js';
+export { OBJECT_LABELS } from './models/object-types.js';
 export function selectedIdsOf(state) {
   return state.selectedIds ?? (state.selectedId ? [state.selectedId] : []);
 }
 export function objectsOf(state) {
-  const objects = [...state.lines, ...state.curves, ...(state.sketches ?? []), ...(state.sums ?? []), ...(state.points ?? []), ...(state.dashedLines ?? []), ...(state.fills ?? []), ...(state.rulers ?? []), ...(state.groups ?? [])];
+  const objects = OBJECT_COLLECTIONS.flatMap(collection => state[collection] ?? []);
   const order = new Map((state.objectOrder ?? []).map((id, index) => [id, index]));
   return objects.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 }

@@ -1,3 +1,4 @@
+import { rangeField, numberField, toolButton } from './ui/controls.js';
 import { mountEditorUI } from './editor-ui.js';
 import { mountHandTool } from './tools/hand.js';
 import { mountSketchTool } from './tools/sketch.js';
@@ -18,6 +19,7 @@ import { mountHistory } from './history.js';
 import { mountFillTool, fillControls } from './tools/fill.js';
 
 const icons = {
+  dashed: '<path d="M4 20 20 4" stroke-dasharray="3 3"/>',
   fill: '<path d="m5 3 11 11M9 4l9 9-8 8L1 12zM14 21h8M21 13s-2 2.6-2 4a2 2 0 0 0 4 0c0-1.4-2-4-2-4Z"/>',
   hand: '<path d="M8 12V5a2 2 0 0 1 4 0v6-7a2 2 0 0 1 4 0v7-5a2 2 0 0 1 4 0v8c0 5-2 8-6 8h-2c-2 0-3-1-5-4l-3-5a2 2 0 0 1 3-2l3 3"/>',
   duplicate: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>',
@@ -55,11 +57,11 @@ app.innerHTML = `
   <main class="app-layout">
     <section class="workspace" aria-label="그래프">
       <div class="editor-toolbar" role="group" aria-label="그리기 도구">
-        <button id="hand-tool" class="tool-button" aria-pressed="true" aria-label="선택 도구" title="선택·이동 (Esc)"><span class="tool-icon">${icon('hand')}</span><strong>선택</strong></button><button id="line-tool" class="tool-button" aria-label="직선 추가"><span class="tool-icon">${icon('line')}</span><strong>직선</strong>${icon('plus', 'add-icon')}</button>
-        <button id="sketch-tool" aria-label="곡선 그리기" title="시작점·끝점·지나는 점" class="tool-button" aria-pressed="false" aria-expanded="false" aria-controls="sketch-options"><span class="tool-icon">${icon('curve')}</span><strong>곡선</strong></button>
-        <button id="mouse-tool" class="tool-button" aria-pressed="false" aria-expanded="false" aria-controls="mouse-settings"><span class="tool-icon">${icon('point')}</span><strong>점</strong></button><button id="dashed-tool" class="tool-button" aria-pressed="false" aria-expanded="false" aria-controls="dashed-options"><span class="tool-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="3 3" aria-hidden="true"><path d="M4 20 20 4"/></svg></span><strong>점선</strong></button>
-        <button id="fill-tool" class="tool-button" aria-label="구역 칠하기" aria-pressed="false" aria-expanded="false" aria-controls="fill-options"><span class="tool-icon">${icon('fill')}</span><strong>칠하기</strong></button>
-        <span class="toolbar-separator" aria-hidden="true"></span><button id="duplicate-tool" class="export-button toolbar-command" aria-pressed="false" aria-expanded="false" aria-controls="duplicate-options"><span class="tool-icon">${icon('duplicate')}</span><strong>복제</strong></button><button id="sum-tool" aria-label="수직합·수평합 열기" title="수직합·수평합" class="export-button toolbar-command" aria-pressed="false" aria-expanded="false" aria-controls="sum-options"><span class="tool-icon">${icon('plus')}</span><strong>합치기</strong></button>
+        ${toolButton({"id":"hand-tool","label":"선택","ariaLabel":"선택 도구","title":"선택·이동 (Esc)","pressed":"true",icon:icon('hand')})}${toolButton({"id":"line-tool","label":"직선","ariaLabel":"직선 추가","command":false,icon:icon('line'),suffix:icon('plus','add-icon')})}
+        ${toolButton({"id":"sketch-tool","label":"곡선","ariaLabel":"곡선 그리기","title":"시작점·끝점·지나는 점","pressed":"false","controls":"sketch-options",icon:icon('curve')})}
+        ${toolButton({"id":"mouse-tool","label":"점","pressed":"false","controls":"mouse-settings",icon:icon('point')})}${toolButton({id:"dashed-tool",label:"점선",icon:icon("dashed"),pressed:"false",controls:"dashed-options"})}
+        ${toolButton({"id":"fill-tool","label":"칠하기","ariaLabel":"구역 칠하기","pressed":"false","controls":"fill-options",icon:icon('fill')})}
+        <span class="toolbar-separator" aria-hidden="true"></span>${toolButton({"id":"duplicate-tool","label":"복제","pressed":"false","controls":"duplicate-options","command":true,icon:icon('duplicate')})}${toolButton({"id":"sum-tool","label":"합치기","ariaLabel":"수직합·수평합 열기","title":"수직합·수평합","pressed":"false","controls":"sum-options","command":true,icon:icon('plus')})}
         <button id="delete-selection" class="export-button toolbar-command delete-selection-button" aria-label="선택한 도형 삭제" title="선택한 도형 삭제 (Delete)" disabled>${icon('trash')}<strong id="delete-selection-label">삭제</strong></button>
         <div class="toolbar-end"><button id="grid-toggle" class="icon-button grid-toggle" aria-label="격자 표시" aria-pressed="true" title="격자 표시 전환">${icon('grid')}</button></div>
       </div>
@@ -87,6 +89,7 @@ app.innerHTML = `
           <button data-add-indifference="quasilinear"><svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M5 3Q12 19 43 26M5 10Q12 26 43 33"/></svg><span>준선형효용</span><span class="quick-curve-plus" aria-hidden="true">+</span></button>
         </div></div>
         <div class="curve-quick-add" role="group" aria-label="기본 곡선 빠른 추가"><h3>기본 곡선</h3><div class="quick-curve-buttons">
+          <button data-add-indifference="ppc"><svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M6 5C28 5 42 13 42 28"/></svg><span>PPC</span><span class="quick-curve-plus" aria-hidden="true">+</span></button>
           <button data-add-indifference="rectangular-hyperbola"><svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M7 3C8 20 17 24 43 26"/></svg><span>직각 쌍곡선</span><span class="quick-curve-plus" aria-hidden="true">+</span></button>
           <button id="curve-tool" data-add-curve="descending" aria-label="우하향 곡선 추가"><svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M5 5Q13 26 43 27"/></svg><span>우하향</span><span class="quick-curve-plus" aria-hidden="true">+</span></button>
           <button id="ascending-curve-tool" data-add-curve="ascending" aria-label="우상향 곡선 추가"><svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M5 27Q27 26 43 5"/></svg><span>우상향</span><span class="quick-curve-plus" aria-hidden="true">+</span></button>
@@ -144,19 +147,21 @@ app.innerHTML = `
       </section><section id="curve-settings" aria-label="곡선 설정" hidden>
         <div class="equation-row"><div id="curve-title" class="curve-title">우하향</div><div class="line-actions"><button id="reset-curve" class="icon-button reset-button" aria-label="휘어짐 초기화" title="휘어짐 초기화">${icon('reset')}</button></div></div>
         <div class="curve-presets"><button data-curve-variant="ascending" aria-pressed="false">우상향</button><button data-curve-variant="descending" aria-pressed="true">우하향</button></div>
-        <div class="slope-heading"><label for="bend-slider">휘어짐</label><output id="bend-value" for="bend-slider">71%</output></div>
-        <input id="bend-slider" type="range" min="0" max="100" step="1" value="71" />
+        ${rangeField({"id":"bend-slider","label":"휘어짐","min":0,"max":100,"step":1,"value":71,"outputId":"bend-value","output":"71%"})}
         <div class="range-labels" aria-hidden="true"><span>0</span><span>100</span></div>
       </section><section id="indifference-settings" aria-label="곡선 설정" hidden>
         <div id="indifference-title" class="curve-title"></div>
         <p id="indifference-movement" class="mouse-hint"></p>
         <label id="indifference-axis-row" class="setting-row" for="indifference-axis">선형 축<select id="indifference-axis"><option value="y">y축 · 세로 이동</option><option value="x">x축 · 가로 이동</option></select></label>
-        <div id="indifference-shape-row"><div class="slope-heading"><label id="indifference-shape-label" for="indifference-shape">휘어짐</label></div>
-        <input id="indifference-shape" type="range" min="0" max="100" step="0.1" value="50" /></div>
+        <div id="indifference-shape-row">${rangeField({"id":"indifference-shape","label":"휘어짐","labelId":"indifference-shape-label","min":0,"max":100,"step":0.1,"value":50})}</div>
+        <div id="ppc-radii" hidden>
+          ${numberField({"id":"ppc-radius-x","label":"가로 반지름","min":0.1,"max":100,"step":0.1})}
+          ${numberField({"id":"ppc-radius-y","label":"세로 반지름","min":0.1,"max":100,"step":0.1})}
+        </div>
       </section><section id="sketch-settings" aria-label="자유 곡선 설정" hidden>
         <div class="sketch-shapes" role="group" aria-label="자유 곡선 모양"><button data-sketch-shape="cup">∪</button><button data-sketch-shape="cap">∩</button><button data-sketch-shape="left">⊂</button><button data-sketch-shape="right">⊃</button></div>
-        <details class="editor-details"><summary>휘어짐 조절</summary><div class="slope-heading"><label for="sketch-left">시작 쪽 휘어짐</label></div><input id="sketch-left" type="range" min="5" max="200" step="1" value="50" />
-        <div class="slope-heading"><label for="sketch-right">끝 쪽 휘어짐</label></div><input id="sketch-right" type="range" min="5" max="200" step="1" value="50" />
+        <details class="editor-details"><summary>휘어짐 조절</summary>${rangeField({"id":"sketch-left","label":"시작 쪽 휘어짐","min":5,"max":200,"step":1,"value":50})}
+        ${rangeField({"id":"sketch-right","label":"끝 쪽 휘어짐","min":5,"max":200,"step":1,"value":50})}
         </details><button id="sketch-minimum" class="export-button copy-action">최저점 표시</button>
       </section><section id="fill-settings" aria-label="구역 설정" hidden>
         ${fillControls('edit')}<p class="mouse-hint">선과 별도로 이동·삭제할 수 있습니다.</p>
@@ -178,7 +183,7 @@ app.innerHTML = `
     <section class="diagram-settings axis-settings" aria-labelledby="diagram-settings-title">
         <h2 id="diagram-settings-title">선택한 그래프</h2>
         <label for="diagram-name">이름<input id="diagram-name" type="text" maxlength="80" autocomplete="off" /></label>
-        <label class="setting-row" for="diagram-quadrant">사분면<select id="diagram-quadrant"><option value="first">1사분면</option><option value="upper">1·2사분면</option><option value="all">전체 사분면</option></select></label>
+        <label class="setting-row" for="diagram-quadrant">포맷<select id="diagram-quadrant"><option value="first">1사분면</option><option value="upper">1·2사분면</option><option value="all">전체 사분면</option><option value="edgeworth">에지워드 상자</option></select></label>
         <label class="setting-row" for="diagram-x-direction">x 증가<select id="diagram-x-direction"><option value="right">오른쪽 →</option><option value="left">왼쪽 ←</option></select></label>
         <label class="setting-row" for="diagram-y-direction">y 증가<select id="diagram-y-direction"><option value="up">위쪽 ↑</option><option value="down">아래쪽 ↓</option></select></label>
       </section>
@@ -186,10 +191,15 @@ app.innerHTML = `
         <h2 id="axes-title">축</h2>
         <label for="horizontal-axis-name">수평축<input id="horizontal-axis-name" type="text" value="x" placeholder="x" maxlength="80" autocomplete="off" /></label>
         <label for="vertical-axis-name">수직축<input id="vertical-axis-name" type="text" value="y" placeholder="y" maxlength="80" autocomplete="off" /></label>
+        <div id="edgeworth-settings" hidden>
+          ${numberField({"id":"box-width","label":"가로 총량","min":1,"max":100,"step":0.5})}
+          ${numberField({"id":"box-height","label":"세로 총량","min":1,"max":100,"step":0.5})}
+          <label for="box-axis-x">B 수평축<input id="box-axis-x" type="text" maxlength="80" autocomplete="off" /></label>
+          <label for="box-axis-y">B 수직축<input id="box-axis-y" type="text" maxlength="80" autocomplete="off" /></label>
+        </div>
         <label class="point-snap-setting axis-gap-toggle" for="axis-gap-toggle"><span>축에서 선 띄우기</span><input id="axis-gap-toggle" type="checkbox" role="switch" aria-controls="axis-gap-settings" /><span class="switch-track" aria-hidden="true"></span></label>
         <div id="axis-gap-settings" class="axis-gap-settings" hidden>
-          <div class="slope-heading"><label for="axis-gap-slider">간격</label><output id="axis-gap-value" for="axis-gap-slider">0.75</output></div>
-          <input id="axis-gap-slider" type="range" min="0.25" max="2" step="0.05" value="0.75" aria-label="축과 선 사이 간격" />
+          ${rangeField({"id":"axis-gap-slider","label":"간격","min":0.25,"max":2,"step":0.05,"value":0.75,"outputId":"axis-gap-value","output":"0.75","ariaLabel":"축과 선 사이 간격"})}
         </div>
       </section>
     <div class="graph-dialog-footer"><button id="clear-all" class="export-button danger-action" aria-label="선택한 그래프의 도형 전체 삭제" disabled>${icon('trash')}도형 전체 삭제</button><button id="done-graph-settings" class="export-button primary-button">완료</button></div>
@@ -199,11 +209,16 @@ app.innerHTML = `
     <h3>배치</h3>
     <div id="layout-choices" class="layout-choices"></div>
     <details id="custom-layout"><summary>직접 배치</summary><div id="custom-layout-grid" class="custom-layout-grid" role="group" aria-label="최대 3행 3열 배치"></div></details>
-    <h3>사분면</h3>
+    <h3>포맷</h3>
     <div class="quadrant-choices">
       <button data-quadrants="first" aria-pressed="true"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="32" y="6" width="26" height="26" rx="4" class="quadrant-fill"/><path d="M6 32h52M32 6v52"/></svg><span>1사분면</span></button>
       <button data-quadrants="upper" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="6" width="52" height="26" rx="4" class="quadrant-fill"/><path d="M6 32h52M32 6v52"/></svg><span>1·2사분면</span></button>
       <button data-quadrants="all" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="6" width="52" height="52" rx="4" class="quadrant-fill"/><path d="M6 32h52M32 6v52"/></svg><span>전체 사분면</span></button>
+      <button data-quadrants="edgeworth" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="9" y="13" width="46" height="38" rx="1" class="quadrant-fill"/><path d="M9 13h46v38H9zM9 43v8h8M47 13h8v8"/></svg><span>에지워드 상자</span></button>
+    </div>
+    <div id="workspace-box-size" class="box-size-fields" hidden>
+      ${numberField({"id":"workspace-box-width","label":"가로 총량","min":1,"max":100,"step":0.5,"value":10,"required":true})}
+      ${numberField({"id":"workspace-box-height","label":"세로 총량","min":1,"max":100,"step":0.5,"value":8,"required":true})}
     </div>
     <label class="apply-quadrants"><input id="apply-all-quadrants" type="checkbox" checked />모든 그래프에 적용</label>
     <div class="workspace-dialog-footer"><p>배치를 줄여도 기존 그래프는 보관됩니다.</p><button id="apply-workspace" class="export-button primary-button">시작</button></div>
