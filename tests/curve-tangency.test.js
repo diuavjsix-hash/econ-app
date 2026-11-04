@@ -106,13 +106,14 @@ test('a finite curve with no matching tangent stays free without shape changes o
   assert.deepEqual(serializeDocument(store.getState()),before);
 });
 
-test('bound curves and lines derived from the moving curve do not become new magnets',()=>{
+test('bound curves remain excluded and a minimum display does not create line magnets',()=>{
   const store=createStore(),source=addLine(store,0,{x:4,y:2});
   store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2},{lineId:source.id});
   const bound=store.getState().sketches[0];
   assert.equal(snapCurveToTangency(bound,store.getState(),bounds,56),null);
-  store.detachSelected();store.markMinimum();const dependent=store.lineThroughSelectedPoint();
-  const state=store.getState();state.lines=state.lines.filter(line=>line.id===dependent);
+  store.detachSelected();store.markMinimum();assert.equal(store.lineThroughSelectedPoint(),null);
+  const state=store.getState();state.lines=[];
+  assert.equal(state.points.length,0);
   assert.equal(snapCurveToTangency(state.sketches[0],state,bounds,56),null);
 });
 
@@ -145,14 +146,15 @@ test('straight free pieces choose a visible contact near the pointer after trans
   pointNear(result.point,{x:6,y:2.1});pointNear(result.anchor,{x:4,y:2.1});
 });
 
-test('a snapped curve drag, its dependent minimum and JSON undo together in reflected axes',()=>{
+test('a snapped curve drag and its minimum display undo together in reflected axes',()=>{
   const store=createStore(),id=cup(store);store.markMinimum();const target=addLine(store,0,{x:4,y:2.1});store.selectObject(id);
   const curve=store.getState().sketches[0],before=serializeDocument(store.getState());store.beginHistory();
   for(const flipX of [false,true]) for(const flipY of [false,true]) {
     const viewport=createViewport(800,600,'first',{flipX,flipY});
     const result=snapCurveToTangency(curve,store.getState(),viewport.bounds,viewport.unit);
     store.updateSelected({...translatedSketch(curve,{x:result.anchor.x-curve.anchor.x,y:result.anchor.y-curve.anchor.y}),translate:true});
-    near(store.getState().points[0].anchor.y,2.1);
+    near(store.getState().sketches[0].anchor.y,2.1);assert.equal(store.getState().sketches[0].showMinimum,true);
+    assert.equal(store.getState().points.length,0);
   }
   store.endHistory();const after=serializeDocument(store.getState());
   assert.deepEqual(store.getState().lines.find(line=>line.id===target.id),target);

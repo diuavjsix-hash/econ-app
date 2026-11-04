@@ -1,0 +1,52 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>상자 원점과 최저점 표시 검증</title>
+<style>@import url('/src/styles.css');@import url('/src/editor.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap}</style>
+<button id="run">검증</button><pre id="result">준비</pre><div id="stage"></div>
+<script type="module">
+import { createStore } from '/src/state.js';
+import { mountGraph } from '/src/graph/canvas.js';
+import { createViewport,toScreen,toWorld } from '/src/graph/viewport.js';
+import { displayedLineSegments } from '/src/graph/display.js';
+import { sketchMinimum } from '/src/graph/sketch.js';
+import { serializeDocument } from '/src/export.js';
+const stage=document.querySelector('#stage'),out=document.querySelector('#result');let store,svg,dispose;
+const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-7;
+const view=()=>createViewport(stage.clientWidth,stage.clientHeight,store.getState().quadrantMode,store.getState());
+function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:93,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x*r.width/v.width,clientY:r.top+s.y*r.height/v.height,...flags}));}
+const click=p=>{send('pointerdown',p);send('pointerup',p)};
+function mount(){dispose?.();dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};}
+document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok,name)=>{if(!ok)throw Error(name);passed.push(name)};try{
+ for(const size of [800,312])for(const flipX of [false,true])for(const flipY of [false,true])for(const boxSize of [{width:10,height:8},{width:1,height:100}]){
+  stage.style.width=size+'px';stage.style.height='540px';store=createStore();store.configureLayout('single',null,'edgeworth',{boxSize});store.updateDiagram({flipX,flipY});
+  const id=store.addLine();store.update({handSelected:true});mount();
+  const name=`${size} ${flipX}/${flipY} ${boxSize.width}/${boxSize.height}`,a={x:0,y:0},b={x:boxSize.width,y:boxSize.height};
+  const points=displayedLineSegments(store.getState().lines[0],view().bounds,store.getState())[0];
+  check(svg.querySelector('.graph-line .line-hit')&&near(points[0],a)&&near(points[1],b),`${name}: new visible line connects both origins`);
+  store.updateSelected({slope:0});const before=JSON.stringify(serializeDocument(store.getState()));
+  const handle=svg.querySelector(`[data-id="${id}"][data-action="rotate"]`),start=toWorld({x:Number(handle.getAttribute('cx')),y:Number(handle.getAttribute('cy'))},view());
+  send('pointerdown',start,{},handle);send('pointermove',b);
+  check(Math.abs(store.getState().lines[0].slope-boxSize.height/boxSize.width)<1e-9,`${name}: rotating onto B preserves the finite diagonal slope`);
+  check(svg.querySelector('.snap-feedback-label')?.textContent.includes('B 원점'),`${name}: rotation uses common B-origin feedback`);
+  send('pointermove',b,{altKey:true});check(!svg.querySelector('.snap-feedback'),`${name}: Alt bypasses rotation snapping`);
+  send('pointermove',b);send('pointerup',b);store.undo();
+  check(JSON.stringify(serializeDocument(store.getState()))===before,`${name}: one undo restores the rotation`);
+  store.updateSelected({anchor:{x:boxSize.width/4,y:boxSize.height/8},slope:boxSize.height/(2*boxSize.width)});
+  const pinned=svg.querySelector(`[data-id="${id}"][data-action="rotate"]`),pinStart=toWorld({x:Number(pinned.getAttribute('cx')),y:Number(pinned.getAttribute('cy'))},view());
+  send('pointerdown',pinStart,{},pinned);send('pointermove',b);send('pointerup',b);
+  check(near(store.getState().lines[0].anchor,a)&&Math.abs(store.getState().lines[0].slope-boxSize.height/boxSize.width)<1e-9,`${name}: rotation to B keeps an existing A-origin crossing pinned`);
+  store.update({mouseSelected:true});click(a);click(b);
+  check(store.getState().points.length===2&&near(store.getState().points[0].anchor,a)&&near(store.getState().points[1].anchor,b),`${name}: exact boundary clicks create A/B points`);
+  store.update({dashedSelected:true});click(a);send('pointermove',b);click(b);
+  const dashed=store.getState().dashedLines[0];check(dashed&&near(dashed.anchor,a)&&near(dashed.end,b),`${name}: finite diagonal can be drawn between both origins`);
+ }
+ for(const size of [800,312]){
+  stage.style.width=size+'px';store=createStore();const id=store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2},{mode:'horizontal'});store.markMinimum();store.update({handSelected:true});mount();
+  check(svg.querySelectorAll('[data-minimum-for]').length===1&&store.getState().points.length===0&&store.getState().lines.length===0,`${size}: minimum is one display marker, without generated objects`);
+  const marker=svg.querySelector('[data-minimum-for]');check(getComputedStyle(marker).pointerEvents==='none'&&!marker.querySelector('[tabindex],[data-action]'),`${size}: marker exposes no point, line or binding controls`);
+  store.updateSelected({anchor:{x:3,y:1}});const minimum=toScreen(sketchMinimum(store.getState().sketches[0]),view()),dot=svg.querySelector('[data-minimum-for] circle');
+  check(near({x:Number(dot.getAttribute('cx')),y:Number(dot.getAttribute('cy'))},minimum),`${size}: display follows the actual finite minimum`);
+  store.updateSelected({showMinimum:false});check(!svg.querySelector('[data-minimum-for]'),`${size}: display can be turned off`);store.undo();check(svg.querySelector('[data-minimum-for]'),`${size}: undo restores only the display`);
+  store.removeSelected();check(!svg.querySelector('[data-minimum-for]')&&!store.getState().points.length,`${size}: deleting the curve leaves no orphan minimum point`);
+ }
+ dispose?.();out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
+}catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};
+</script></html>

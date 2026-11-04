@@ -67,14 +67,14 @@ test('multiple selection and control toggling are UI only and keep a single prim
 test('a multi-delete is one undo/redo and restores all original geometry, selection, dependent sums and surviving relations',()=>{
   const store=createStore(),a=store.addLine(),b=store.addCurve(),sum=store.addSum([a,b]);
   const sketch=store.addSketch({x:0,y:8},{x:8,y:0},{x:3,y:3},{lineId:a});
-  const minimum=store.markMinimum();
+  store.markMinimum();
   const point=store.addPoint({x:9,y:9});
   store.selectObjects([a,b,point]);const before=serializeDocument(store.getState()),curveBefore=store.getState().sketches[0];
   assert.equal(store.removeSelected(),true);
   assert.ok(!objectsOf(store.getState()).some(o=>[a,b,sum,point].includes(o.id)));
   assert.deepEqual(store.getState().selectedIds,[]);assert.equal(store.getState().sketches[0].binding,null);
   assert.deepEqual(store.getState().sketches[0].anchor,curveBefore.anchor);
-  assert.equal(store.getState().points[0].id,minimum);assert.equal(store.getState().points[0].binding.sourceId,sketch);
+  assert.equal(store.getState().points.length,0);assert.equal(store.getState().sketches.find(c=>c.id===sketch).showMinimum,true);
   store.undo();assert.deepEqual(serializeDocument(store.getState()),before);assert.deepEqual(store.getState().selectedIds,[a,b,point]);
   store.redo();assert.deepEqual(store.getState().selectedIds,[]);assert.equal(store.removeSelected(),false);
 });

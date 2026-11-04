@@ -473,7 +473,7 @@
     },
     {
       "id": "diagram-2",
-      "name": "최저점과 통과 직선",
+      "name": "최저점 표시와 일반 점",
       "objectOrder": [
         "group-1",
         "sketch-2",
@@ -513,6 +513,7 @@
           "color": "#4c8e9a",
           "binding": null,
           "parentId": "group-1",
+          "showMinimum": true,
           "geometry": {
             "type": "piecewise-quadratic-bezier",
             "controlPoints": [
@@ -561,18 +562,14 @@
         {
           "id": "point-1",
           "type": "point",
-          "name": "최저점 1",
+          "name": "점 01",
           "color": "#59627a",
-          "parentId": "sketch-2",
+          "parentId": "group-1",
           "anchor": {
-            "x": 4,
-            "y": 2
+            "x": 5,
+            "y": 3
           },
-          "showCoordinates": true,
-          "binding": {
-            "kind": "minimum",
-            "sourceId": "sketch-2"
-          }
+          "showCoordinates": false
         }
       ],
       "dashedLines": [
@@ -621,8 +618,8 @@
           "slope": 1,
           "intercept": -2,
           "anchor": {
-            "x": 4,
-            "y": 2
+            "x": 5,
+            "y": 3
           },
           "binding": {
             "kind": "through-point",

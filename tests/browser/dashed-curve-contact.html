@@ -1,0 +1,60 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>점선·곡선 교점 검증</title>
+<style>@import url('/src/styles.css');@import url('/src/editor.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap;font:12px monospace}</style>
+<button id="run">점선·곡선 검증</button><pre id="result">준비</pre><div id="stage"></div>
+<script type="module">
+import { DASHED_CURVE_CASES } from '/tests/fixtures/dashed-curve-cases.js';
+import { mountGraph } from '/src/graph/canvas.js';
+import { createViewport, toScreen } from '/src/graph/viewport.js';
+import { serializeDocument } from '/src/export.js';
+const stage=document.querySelector('#stage'),out=document.querySelector('#result');
+let store,svg,dispose;
+const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-7;
+const view=()=>createViewport(stage.clientWidth,stage.clientHeight,'first',store.getState());
+function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:92,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x*r.width/v.width,clientY:r.top+s.y*r.height/v.height,...flags}));}
+const move=(p,flags={})=>send('pointermove',p,flags),click=(p,flags={})=>{send('pointerdown',p,flags);send('pointerup',p,flags)};
+document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok,name)=>{if(!ok)throw Error(name);passed.push(name)};try{
+ for(const config of [{width:800,height:540,flip:false},{width:800,height:540,flip:true},{width:312,height:400,flip:false}]){
+  stage.style.width=config.width+'px';stage.style.height=config.height+'px';
+  for(const fixture of DASHED_CURVE_CASES){
+   dispose?.();const f=fixture.setup();store=f.store;store.updateDiagram({flipX:config.flip,flipY:config.flip});
+   dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};
+   const name=`${config.width}${config.flip?' reflected':''} ${fixture.name}`,p=f.point,pointer={x:p.x+0.08,y:p.y+0.06};
+   const marker=()=>svg.querySelector(`.snap-feedback[data-snap-kind="${f.kind}"]`);
+   const original=JSON.stringify([store.getState().curves,store.getState().sketches,store.getState().dashedLines]);
+   store.update({mouseSelected:true,pointSnap:true});move(pointer);
+   check(marker()&&svg.querySelectorAll('.snap-feedback-ring').length===1,`${name}: point hover uses one exact contact marker`);
+   check(svg.querySelector(`[data-snap-source="${f.curve}"]`)&&svg.querySelector(`[data-snap-source="${f.dashed}"]`),`${name}: both finite dashed and curve sources are highlighted`);
+   document.dispatchEvent(new KeyboardEvent('keydown',{key:'Alt',altKey:true,bubbles:true}));check(!marker(),`${name}: Alt clears the shared target`);
+   document.dispatchEvent(new KeyboardEvent('keyup',{key:'Alt',bubbles:true}));check(marker(),`${name}: Alt release recovers the target`);
+   store.update({pointSnap:false});move(pointer);check(!marker(),`${name}: point adjustment OFF bypasses the target`);
+   store.update({pointSnap:true});move(pointer);const before=JSON.stringify(serializeDocument(store.getState()));click(pointer);
+   check(near(store.getState().points.at(-1).anchor,p),`${name}: point creation stores the exact curve/dashed contact`);
+   store.undo();check(JSON.stringify(serializeDocument(store.getState()))===before,`${name}: point creation undoes independently`);
+   store.redo();check(near(store.getState().points.at(-1).anchor,p),`${name}: redo restores the exact point`);store.undo();
+   const pointId=store.addPoint({x:1,y:7});store.update({handSelected:true});
+   send('pointerdown',{x:1,y:7},{},svg.querySelector(`[data-id="${pointId}"][data-action="move"]`));move(pointer);
+   check(marker()&&near(store.getState().points.at(-1).anchor,p),`${name}: point movement consumes the same contact`);send('pointerup',pointer);store.undo();
+   // A different dashed segment must consume the original dashed/curve contact too.
+   store.update({dashedSelected:true});click({x:1,y:p.y},{altKey:true});move({x:p.x+0.08,y:p.y},{shiftKey:true});
+   check(marker(),`${name}: Shift dashed preview consumes the same contact`);
+   click({x:p.x+0.08,y:p.y},{shiftKey:true});check(near(store.getState().dashedLines.at(-1).end,p),`${name}: new dashed endpoint stores the same contact`);
+   store.undo();check(original===JSON.stringify([store.getState().curves,store.getState().sketches,store.getState().dashedLines]),`${name}: consumer tools preserve the original geometry`);
+   if(!fixture.tangent&&fixture.family!=='complements'){
+    store.selectObject(f.dashed);store.removeSelected();
+    for(const axis of [null,'x','y']){
+     store.update({dashedSelected:true});
+     const raw=axis?{...p,[axis]:p[axis]+0.1}:pointer,start=axis==='y'?{x:p.x,y:1}:{x:1,y:p.y},flags={shiftKey:Boolean(axis)};
+     click(start,{altKey:true});move(raw,flags);click(raw,flags);
+     const drawn=store.getState().dashedLines.at(-1),end={...drawn.end},nearEnd={x:end.x+0.06,y:end.y+0.04};
+     check(drawn&&near(drawn.anchor,start),`${name} ${axis??'free'}: draws a finite dashed line onto the curve`);
+     store.update({mouseSelected:true});move(nearEnd);
+     check(svg.querySelector('.snap-feedback[data-snap-kind="intersection"]')&&svg.querySelector(`[data-snap-source="${drawn.id}"]`),`${name} ${axis??'free'}: newly snapped endpoint becomes a shared crossing`);
+     click(nearEnd);check(near(store.getState().points.at(-1).anchor,end),`${name} ${axis??'free'}: point creation recovers the drawn endpoint exactly`);
+     store.undo();store.selectObject(drawn.id);store.removeSelected();
+    }
+   }
+  }
+ }
+ dispose?.();out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
+}catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};
+</script></html>

@@ -100,14 +100,13 @@ test('marked-point magnets capture at 16px, retain to 24px, release and obey Alt
   }
 });
 
-test('points remain usable inside axis gaps, but offscreen and self-derived points are excluded',()=>{
+test('points remain usable inside axis gaps while offscreen points and display-only minima do not become magnets',()=>{
   const store=createStore(),shape=line(store,0,{x:3,y:0.1});target(store,{x:4,y:0});store.update({axisGapEnabled:true,axisGap:0.75});
   assert.ok(snapShapeToPoint(shape,store.getState(),bounds,56));
   assert.equal(snapShapeToPoint(shape,store.getState(),{...bounds,xMax:3},56),null);
   const other=createStore(),curve=cup(other);other.markMinimum();
   assert.equal(snapShapeToPoint(curve,other.getState(),bounds,56),null);
-  const targetLine=other.lineThroughSelectedPoint();
-  assert.equal(snapShapeToPoint(other.getState().lines.find(l=>l.id===targetLine),other.getState(),bounds,56),null);
+  assert.equal(other.lineThroughSelectedPoint(),null);assert.equal(other.getState().points.length,0);
 });
 
 test('explicit closer points take over from a captured origin or tangent rather than getting stuck',()=>{

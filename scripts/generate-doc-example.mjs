@@ -18,16 +18,17 @@ store.addSketch({ x: 1, y: 8 }, { x: 8, y: 2 }, { x: 4, y: 4 }, { lineId: budget
 store.updateSelected({ name: '직선에 접한 자유 곡선' });
 
 store.selectDiagram(second.id);
-store.updateDiagram({ name: '최저점과 통과 직선' });
+store.updateDiagram({ name: '최저점 표시와 일반 점' });
 const group = store.addGroup();
 store.updateSelected({ name: '자유 도식' });
 const cup = store.addSketch({ x: 1, y: 6 }, { x: 7, y: 6 }, { x: 4, y: 2 }, { mode: 'horizontal' });
 store.updateSelected({ name: 'U자 곡선' });
 store.moveObject(cup, group);
-const minimum = store.markMinimum();
-store.moveObject(minimum, cup);
+store.markMinimum();
+const point = store.addPoint({ x: 5, y: 3 });
+store.moveObject(point, group);
 const through = store.lineThroughSelectedPoint({ slope: 1 });
-store.moveObject(through, minimum);
+store.moveObject(through, point);
 store.addDashedLine({ x: 4, y: 0 }, { x: 4, y: 2 });
 store.updateSelected({ name: '독립 점선' });
 for (const family of ['cobb-douglas','substitutes','complements','quasilinear']) store.addIndifference(family);

@@ -234,10 +234,11 @@ export function createStore() {
     },
     addLine() {
       const index = nextId - 1;
+      const box = state.quadrantMode === 'edgeworth' ? state.boxSize : null;
       return add('lines', {
         id: `line-${nextId}`, type: 'line', name: `직선 ${String(nextId++).padStart(2, '0')}`,
-        slope: [1, -1, 0.5, -0.5, 0, 2][index % 6],
-        anchor: { x: state.quadrantMode === 'first' ? 3 : 0, y: (state.quadrantMode === 'all' ? 0 : 3) + (index % 5) * 0.6 }, color: COLORS[index % COLORS.length],
+        slope: [1, -1, 0.5, -0.5, 0, 2][(box ? state.lines.length : index) % 6] * (box ? box.height / box.width : 1),
+        anchor: box ? { x: box.width / 2, y: box.height / 2 } : { x: state.quadrantMode === 'first' ? 3 : 0, y: (state.quadrantMode === 'all' ? 0 : 3) + (index % 5) * 0.6 }, color: COLORS[index % COLORS.length],
       });
     },
     addCurve(placement = {}) {
@@ -285,8 +286,7 @@ export function createStore() {
     markMinimum() {
       const source=state.sketches.find(curve=>curve.id===state.selectedId);
       if (!source) return null;
-      const index=nextPointId++;
-      return add('points',{id:`point-${index}`,type:'point',name:`최저점 ${index}`,color:'#59627a',anchor:{...source.anchor},showCoordinates:true,binding:{kind:'minimum',sourceId:source.id}});
+      source.showMinimum = true; emit(); return source.id;
     },
     lineThroughSelectedPoint({follow=true,slope=1}={}) {
       const point=state.points.find(point=>point.id===state.selectedId);

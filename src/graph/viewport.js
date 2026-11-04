@@ -32,7 +32,11 @@ export function toScreen(point, viewport) {
 }
 
 export function toWorld(point, viewport) {
-  return { x: (point.x - viewport.cx) / (viewport.unit * viewport.xDirection), y: (viewport.cy - point.y) / (viewport.unit * viewport.yDirection) };
+  const world = { x: (point.x - viewport.cx) / (viewport.unit * viewport.xDirection), y: (viewport.cy - point.y) / (viewport.unit * viewport.yDirection) };
+  for (const key of ['x','y']) for (const limit of [viewport.bounds[`${key}Min`],viewport.bounds[`${key}Max`]]) {
+    if (Math.abs(world[key]-limit) < 1e-10) world[key]=limit;
+  }
+  return world;
 }
 
 /** Rebase the visible editing handle along the same line when its anchor is outside the view. */

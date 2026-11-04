@@ -79,6 +79,8 @@ shape는 0.15~20이며 완전보완재의 기하는 shape 대신 꺾임 anchor�
 
 각 그래프와 최상위 사본에 `sketches`를 기록합니다. 각 객체는 id·type='sketch'·name·color·parentId, 내부 좌표 start/end/anchor, 단위 방향 벡터 tangent, leftReach/rightReach, binding, geometry를 포함합니다. geometry.type='piecewise-quadratic-bezier'이고 controlPoints는 두 개의 [시작, 제어, 끝] 배열입니다. 렌더용 픽셀·근사 선분과 생성 도구 옵션은 출력하지 않습니다. 새 문서 형식에서 sketches가 없는 이전 출력은 빈 배열로 처리합니다(불러오기 기능은 아직 없음).
 
+`showMinimum`은 선택적 boolean 표시 필드이며 생략하면 false입니다. true이면 원본 유한 곡선의 최저점 마커를 렌더합니다. 별도 points 항목·파생 좌표·최저점 binding은 만들지 않으며 현재 생성 문서에서 `kind:'minimum'` 관계는 지원하지 않습니다. JSON 버전은 10을 유지합니다.
+
 start/end/anchor는 유한한 수학 좌표이고 서로 다른 점입니다. tangent는 단위 방향 벡터, leftReach/rightReach는 0.05~2입니다. 제어점 거리는 가운데 점부터 해당 끝점까지 거리 × reach이며, 두 구간은 가운데의 접선 방향을 공유합니다. 미분 크기의 일치·단조성·경제적 최적성은 저장 형식의 보장 조건이 아닙니다.
 
 binding은 연결이 없을 때 null 또는 생략하고 다음 종류를 지원합니다. 모든 sourceId는 같은 그래프의 객체를 참조하며 parentId와 독립적이고 순환하지 않습니다.
@@ -91,12 +93,11 @@ binding은 연결이 없을 때 null 또는 생략하고 다음 종류를 지원
 
 ```json
 [
-  {"kind":"minimum","sourceId":"sketch-1"},
   {"kind":"through-point","sourceId":"point-1"}
 ]
 ```
 
-point의 minimum 관계는 원본 자유 곡선의 유한 전체 구간 최저점을 anchor로 사용합니다. line의 through-point 관계는 점의 anchor를 기준점으로 사용하며 slope는 독립적으로 보존합니다. 원본 삭제나 연결 해제는 마지막 좌표·방향을 유지하고 관계만 제거합니다. 내보낸 anchor와 제어점은 관계를 평가한 현재 결과도 포함하므로 연결을 구현하지 않는 소비자도 해당 순간의 그림을 복원할 수 있습니다.
+line의 through-point 관계는 일반 점의 anchor를 기준점으로 사용하며 slope는 독립적으로 보존합니다. 원본 삭제나 연결 해제는 마지막 좌표·방향을 유지하고 관계만 제거합니다. 내보낸 anchor와 제어점은 관계를 평가한 현재 결과도 포함하므로 연결을 구현하지 않는 소비자도 해당 순간의 그림을 복원할 수 있습니다. 최저점은 곡선의 표시 옵션이며 이 관계의 원본 점을 생성하지 않습니다.
 
 ## 수직합·수평합
 
@@ -192,7 +193,7 @@ schemaVersion 5에서 점 보조선 기능과 `guides` 필드를 제거했습니
 
 ## 예시
 
-[두 그래프의 전체 예시](examples/editor-v10.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, U자 곡선→최저점→통과 직선, 폴더와 독립 점선, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다.
+[두 그래프의 전체 예시](examples/editor-v10.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, 최저점을 표시한 U자 곡선과 별도 일반 점의 통과 직선, 폴더와 독립 점선, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다.
 
 버전 9 당시 직렬화 함수로 생성한 점과 점선 문서입니다. 축 간격 기본 설정도 함께 포함합니다.
 

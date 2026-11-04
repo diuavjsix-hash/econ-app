@@ -11,7 +11,7 @@ import { pointCoordinatesLabel } from './point.js';
 import { SnapTargetCache, snapPoint } from './snap.js';
 import { geometryKey } from './snap-context.js';
 import { objectsOf, selectedIdsOf } from '../objects.js';
-import { unitVector, validSketch, distance } from './sketch.js';
+import { unitVector, validSketch, distance, sketchMinimum } from './sketch.js';
 import { drawSketch } from './sketch-view.js';
 import { axisAlignedSnap } from './movement.js';
 import { selectionRectangle, objectsInRectangle } from './selection.js';
@@ -121,7 +121,7 @@ export function mountGraph(container, store) {
     let candidate=null,point=position,coordinates=false;
     if (drag) {
       if (drag.object.type==='dashed') candidate=dashedSnap;
-      else if (['line','curve','sketch'].includes(drag.object.type)&&drag.action==='move') candidate=tangentSnap;
+      else if (['line','curve','sketch'].includes(drag.object.type)&&(drag.action==='move'||drag.object.type==='line'&&drag.action==='rotate')) candidate=tangentSnap;
       else if (drag.object.type==='point'||['sketch-start','sketch-end','sketch-middle'].includes(drag.action)) {candidate=snapTarget;coordinates=true;}
     } else if (inside&&drawingPointer) {
       point??=currentState.sketchSelected&&sketchHover?sketchHover.target?.point??sketchHover.point:draft?.end??snappedPosition(worldPoint(pointer),pointer);
@@ -256,6 +256,14 @@ export function mountGraph(container, store) {
     updateDraft();
     const pointLayer = element('g', { class: 'graph-points' });
     svg.append(pointLayer);
+    for (const sketch of currentState.sketches) if (sketch.showMinimum) {
+      const minimum=sketchMinimum(sketch);
+      if (!isLinePointVisible(minimum,bounds,currentState)) continue;
+      const p=toScreen(minimum), marker=element('g',{'data-minimum-for':sketch.id,'pointer-events':'none','aria-label':`${sketch.name} 최저점`});
+      marker.append(element('circle',{cx:p.x,cy:p.y,r:4.5,fill:sketch.color}),
+        element('text',{x:Math.max(8,Math.min(width-50,p.x+10)),y:Math.max(16,p.y-10),class:'point-name'},'최저점'));
+      pointLayer.append(marker);
+    }
     for (const point of currentState.points) {
       const { x, y } = toScreen(point.anchor);
       if (x < plot.left || x > plot.right || y < plot.top || y > plot.bottom) continue;

@@ -1,4 +1,5 @@
 import { rangeField, numberField, RangeControl, NumberControl } from '/src/ui/controls.js';
+import { createViewport, toScreen } from '/src/graph/viewport.js';
 const passed = [], errors = [];
 const check = (condition, name) => { if (!condition) throw Error(name); passed.push(name); };
 window.addEventListener('error', e => errors.push(e.message));
@@ -53,6 +54,19 @@ async function appSmoke(width, height) {
   for (const id of ['ppc-radius-x', 'ppc-radius-y', 'indifference-shape', 'bend-slider', 'sketch-left', 'sketch-right']) {
     check(doc.querySelector(`label[for="${id}"]`), `${size}: ${id} has an associated label`);
   }
+  doc.getElementById('sketch-tool').click();
+  const svg=doc.querySelector('.graph-svg'),r=svg.getBoundingClientRect(),v=createViewport(r.width,r.height,'edgeworth',{boxSize:{width:10,height:8}});
+  svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};
+  for(const p of [{x:1,y:6},{x:7,y:6},{x:4,y:2}]) {
+    const s=toScreen(p,v);
+    for(const type of ['pointerdown','pointerup'])svg.dispatchEvent(new win.PointerEvent(type,{bubbles:true,cancelable:true,pointerId:94,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x,clientY:r.top+s.y,altKey:true}));
+  }
+  doc.getElementById('finish-tool').click();
+  const minimum=doc.getElementById('sketch-minimum');check(minimum.type==='checkbox'&&!minimum.checked,`${size}: minimum has only a display toggle`);
+  minimum.click();const shown=exported(doc);
+  check(shown.sketches.length===1&&shown.sketches[0].showMinimum&&shown.points.length===0&&doc.querySelectorAll('[data-minimum-for]').length===1,`${size}: minimum toggle stores display without generating point/line objects`);
+  check(doc.getElementById('point-settings').hidden&&doc.getElementById('binding-settings').hidden,`${size}: minimum display exposes no point-following or binding actions`);
+  minimum.click();check(!doc.querySelector('[data-minimum-for]'),`${size}: checkbox turns the display off`);
   el.remove();
 }
 try {
@@ -89,6 +103,18 @@ try {
   check(contractResult.ok,`contact contract fixture: ${contractResult.error ?? 'completed'}`);
   for (const name of contractResult.passed) passed.push(`contact contract: ${name}`);
   contract.remove();
+  const dashed = await frame('./dashed-curve-contact.html', 1000, 900);
+  await wait(() => dashed.contentDocument.querySelector('#run'), 'dashed curve fixture'); dashed.contentDocument.querySelector('#run').click();
+  const dashedResult = await wait(() => { try { return JSON.parse(dashed.contentDocument.querySelector('#result').textContent); } catch { return null; } }, 'dashed curve report');
+  check(dashedResult.ok,`dashed curve fixture: ${dashedResult.error ?? 'completed'}`);
+  for (const name of dashedResult.passed) passed.push(`dashed curve: ${name}`);
+  dashed.remove();
+  const edgeworth = await frame('./edgeworth-minimum.html', 1000, 900);
+  await wait(() => edgeworth.contentDocument.querySelector('#run'), 'edgeworth minimum fixture'); edgeworth.contentDocument.querySelector('#run').click();
+  const edgeworthResult = await wait(() => { try { return JSON.parse(edgeworth.contentDocument.querySelector('#result').textContent); } catch { return null; } }, 'edgeworth minimum report');
+  check(edgeworthResult.ok,`edgeworth minimum fixture: ${edgeworthResult.error ?? 'completed'}`);
+  for (const name of edgeworthResult.passed) passed.push(`edgeworth minimum: ${name}`);
+  edgeworth.remove();
   await appSmoke(1280, 800); await appSmoke(390, 844);
   check(errors.length === 0, `no browser runtime errors: ${errors.join('; ')}`);
 } catch (error) { errors.push(error.stack ?? String(error)); }

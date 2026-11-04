@@ -83,6 +83,7 @@ export class SketchObject extends StrokeObject {
     for (const key of ['start', 'end']) if (validPoint(patch[key])) next[key] = { ...patch[key] };
     if (validPoint(patch.tangent) && !object.binding) next.tangent = unitVector(patch.tangent);
     for (const key of ['leftReach', 'rightReach']) if (Number.isFinite(patch[key])) next[key] = Math.max(0.05, Math.min(2, patch[key]));
+    if (typeof patch.showMinimum === 'boolean') next.showMinimum = patch.showMinimum;
     if (next.binding && validPoint(patch.anchor)) {
       const line = state.lines.find(line => line.id === next.binding.sourceId), projection = projectOnLine(next.anchor, line);
       next.anchor = projection.point; next.binding.parameter = projection.parameter; next.binding.direction = directionOf(line.slope);

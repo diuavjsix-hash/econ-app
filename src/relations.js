@@ -1,6 +1,5 @@
 import { objectsOf } from './objects.js';
 import { directionOf } from './graph/math.js';
-import { sketchMinimum } from './graph/sketch.js';
 
 export const dependencyId = object => object.binding?.sourceId ?? null;
 export const dependencyIds = object => [...new Set([dependencyId(object), ...(object.sourceIds ?? [])].filter(Boolean))];
@@ -54,8 +53,7 @@ export function resolveRelations(state) {
           const sign=direction.x*object.tangent.x+direction.y*object.tangent.y < 0 ? -1:1;
           object.anchor=anchor; object.tangent={x:sign*direction.x || 0,y:sign*direction.y || 0};
         }
-      } else if (object.type==='point' && object.binding.kind==='minimum' && source.type==='sketch') object.anchor=sketchMinimum(source);
-      else if (object.type==='line' && object.binding.kind==='through-point' && source.type==='point') object.anchor={...source.anchor};
+      } else if (object.type==='line' && object.binding.kind==='through-point' && source.type==='point') object.anchor={...source.anchor};
     }
     visiting.delete(object.id); done.add(object.id);
   }

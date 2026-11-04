@@ -8,7 +8,7 @@ export function mountSketchTool(root, store) {
   mode.addEventListener('change',()=>store.update({sketchMode:mode.value}));
   const reachControls={};
   for (const [id,key] of [['sketch-left','leftReach'],['sketch-right','rightReach']]) reachControls[key]=new RangeControl(root,id).bind(value=>store.updateSelected({[key]:value/100}));
-  root.querySelector('#sketch-minimum').addEventListener('click',()=>store.markMinimum());
+  root.querySelector('#sketch-minimum').addEventListener('change',event=>store.updateSelected({showMinimum:event.target.checked}));
   root.querySelector('#point-through-line').addEventListener('click',()=>store.lineThroughSelectedPoint({follow:root.querySelector('#point-line-follow').checked}));
   root.querySelector('#detach-binding').addEventListener('click',()=>store.detachSelected());
   for (const button of root.querySelectorAll('[data-sketch-shape]')) button.addEventListener('click',()=>{
@@ -28,10 +28,11 @@ export function mountSketchTool(root, store) {
     root.querySelector('#binding-settings').hidden=!object?.binding;
     if (object?.binding) {
       const source=objectsOf(state).find(source=>source.id===object.binding.sourceId);
-      const label={tangent:'접점 유지',minimum:'최저점 따라가기','through-point':'점 따라가기'}[object.binding.kind];
+      const label={tangent:'접점 유지','through-point':'점 따라가기'}[object.binding.kind];
       root.querySelector('#binding-description').textContent=`${label} · ${source?.name ?? ''}`;
     }
     if (!curve) return;
+    root.querySelector('#sketch-minimum').checked=Boolean(curve.showMinimum);
     reachControls.leftReach.setValue(Math.round(curve.leftReach*100)); reachControls.rightReach.setValue(Math.round(curve.rightReach*100));
     for (const button of root.querySelectorAll('[data-sketch-shape]')) button.disabled=Boolean(curve.binding);
   });

@@ -86,10 +86,11 @@ test('cached targets refresh after undo, redo, deletion and graph switching', ()
 });
 
 test('moving points and curves never snap to geometry that follows their own movement', () => {
-  const store = createStore(), curve = store.addSketch({ x: 1, y: 6 }, { x: 7, y: 6 }, { x: 4, y: 2 });
-  const point = store.markMinimum(), followed = store.lineThroughSelectedPoint();
+  const store = createStore(), point = store.addPoint({ x: 4, y: 2 }), followed = store.lineThroughSelectedPoint();
+  const curve = store.addSketch({ x: 1, y: 6 }, { x: 7, y: 6 }, { x: 4, y: 2 }, { lineId: followed });
   const independent = store.addLine();
-  for (const excluded of [point, curve]) {
+  for (const excluded of [point, followed]) {
+    assert.ok(!referenced(buildSnapTargets(store.getState(), bounds, excluded), curve));
     assert.ok(!referenced(buildSnapTargets(store.getState(), bounds, excluded), followed));
     assert.ok(buildSnapTargets(store.getState(), bounds, excluded).shapes.some(s => s.id === independent));
     assert.ok(!buildInterceptTargets(store.getState(), bounds, excluded).some(t => t.sourceId === followed));

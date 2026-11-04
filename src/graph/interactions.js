@@ -9,6 +9,8 @@ import { snapMovingCurve } from './point-magnets.js';
 import { snapMovingLine } from './intercepts.js';
 import { snapMovingDashed } from './dashed-magnets.js';
 import { OBJECT_TYPES } from '../models/object-types.js';
+import { coordinateOrigins } from './axes.js';
+import { chooseSnapCandidate } from './snap-policy.js';
 
 const deltaFor = (event, step, v) => ({
   x: (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0) * v.xDirection,
@@ -31,7 +33,8 @@ export class MovableInteraction extends ShapeInteraction {
   canDrag() { return true; }
   snap(object, anchor) { return { patch: { anchor } }; }
   drag(object, action, start, point, event, ctx) {
-    const moved = dragTranslation(object.anchor, start, point, event.shiftKey, ctx.viewport.bounds, this.marginPixels / ctx.viewport.unit);
+    const margin = ctx.state.quadrantMode === 'edgeworth' ? 0 : this.marginPixels / ctx.viewport.unit;
+    const moved = dragTranslation(object.anchor, start, point, event.shiftKey, ctx.viewport.bounds, margin);
     return this.snap(object, moved.anchor, moved.axis, point, event, ctx);
   }
   keyboard(object, action, event, ctx) { return { patch: { anchor: shifted(object.anchor, deltaFor(event, event.shiftKey ? 1 : 0.1, ctx.viewport)) } }; }
@@ -55,9 +58,23 @@ export class LineInteraction extends StrokeInteraction {
   magnet(...args) { return snapMovingLine(...args); }
   drag(object, action, start, point, event, ctx) {
     if (action === 'move') return super.drag(object, action, start, point, event, ctx);
+    if (ctx.state.quadrantMode === 'edgeworth' && !event.altKey) {
+      const candidates = coordinateOrigins(ctx.state, ctx.viewport.bounds).filter(origin => distance(origin.point, object.anchor) > 1e-9)
+        .map(origin => ({ ...origin, key: `rotate-origin:${origin.label}`, priority: 0, kind: 'intercept', axis: 'origin', distance: distance(point, origin.point) * ctx.viewport.unit }));
+      const target = chooseSnapCandidate(candidates, ctx.tangentSnap);
+      if (target) {
+        const direction=directionOf(object.slope);
+        // Preserve an origin already on the line when rotating toward the other.
+        // Its stored/display editing anchor may be elsewhere on that same line.
+        const pivot=coordinateOrigins(ctx.state,ctx.viewport.bounds).find(origin => distance(origin.point,target.point)>1e-9
+          && Math.abs((origin.point.x-object.anchor.x)*direction.y-(origin.point.y-object.anchor.y)*direction.x)<1e-9)?.point ?? object.anchor;
+        const dx=target.point.x-pivot.x,dy=target.point.y-pivot.y;
+        return { patch: { anchor: {...pivot}, slope: dx===0?null:dy/dx }, tangentSnap: target };
+      }
+    }
     const dx = point.x - object.anchor.x, dy = point.y - object.anchor.y;
-    if (Math.hypot(dx, dy) < 0.25) return null;
-    return { patch: { slope: Math.abs(dx * ctx.viewport.unit) < 4 ? null : dy / dx } };
+    if (Math.hypot(dx, dy) < 0.25) return { tangentSnap: null };
+    return { patch: { slope: Math.abs(dx * ctx.viewport.unit) < 4 ? null : dy / dx }, tangentSnap: null };
   }
   keyboard(object, action, event, ctx) {
     if (action !== 'rotate') return super.keyboard(object, action, event, ctx);

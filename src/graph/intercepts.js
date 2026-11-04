@@ -5,10 +5,11 @@ import { snapLineToTangency } from './tangency.js';
 import { snapShapeToPoint, chooseShapeMagnet } from './point-magnets.js';
 import { INTERCEPT_SNAP_POLICY } from './snap-policy.js';
 
-function lineIntercept(line,axis) {
+function lineIntercept(line,axis,origin={x:0,y:0}) {
   const d=directionOf(line.slope);
-  const value=axis==='x'?(d.y===0?null:line.anchor.x-line.anchor.y*(d.x/d.y))
-    :(d.x===0?null:line.anchor.y-line.anchor.x*(d.y/d.x));
+  const x=line.anchor.x-origin.x,y=line.anchor.y-origin.y;
+  const value=axis==='x'?(d.y===0?null:x-y*(d.x/d.y))
+    :(d.x===0?null:y-x*(d.y/d.x));
   return Number.isFinite(value)?value:null;
 }
 
@@ -21,7 +22,7 @@ export function snapLineToIntercept(line,state,bounds,unit,{previous=null,altKey
     if (target.sourceId && (!canAttach(state,line.id,target.sourceId) || state.sums?.some(sum=>sum.id===target.sourceId && sum.sourceIds.includes(line.id)))) continue;
     const own=target.axis==='x'?x:target.axis==='y'?y:null;
     if (target.axis!=='origin' && own===null) continue;
-    const interceptDistance=target.axis==='origin'?Math.min(...[x,y].filter(value=>value!==null).map(Math.abs))
+    const interceptDistance=target.axis==='origin'?Math.min(...['x','y'].map(axis=>lineIntercept(line,axis,target.point)).filter(value=>value!==null).map(Math.abs))
       :Math.abs(own-target.point[target.axis]);
     const offset=(target.point.x-line.anchor.x)*normal.x+(target.point.y-line.anchor.y)*normal.y;
     if (axis && Math.abs(normal[axis])<1e-12 && Math.abs(offset)>1e-9) continue;

@@ -69,34 +69,38 @@ test('minimum is the true finite-curve global minimum, including interior extrem
   store.updateSelected({start:{x:1,y:-5},tangent:{x:1,y:0}});near(sketchMinimum(sketch(store)).y,-5);
 });
 
-test('minimum point and a line follow curve edits in dependency order, with independent line slope',()=>{
-  const store=createStore(), curve=cup(store), point=store.markMinimum(), line=store.lineThroughSelectedPoint();
-  store.selectObject(curve);store.updateSelected({anchor:{x:3,y:1}});
-  let state=store.getState();assert.deepEqual(state.points[0].anchor,{x:3,y:1});assert.deepEqual(state.lines[0].anchor,state.points[0].anchor);
-  store.selectObject(line);store.updateSelected({slope:null});assert.equal(store.getState().lines[0].slope,null);
-  store.selectObject(point);store.detachSelected();
-  store.selectObject(curve);store.updateSelected({anchor:{x:4,y:0}});
-  state=store.getState();assert.deepEqual(state.points[0].anchor,{x:3,y:1});assert.deepEqual(state.lines[0].anchor,{x:3,y:1});
-  store.selectObject(line);store.detachSelected();store.updateSelected({anchor:{x:8,y:8}});assert.deepEqual(store.getState().lines[0].anchor,{x:8,y:8});
+test('minimum is a curve display option without generated points, lines or bindings',()=>{
+  const store=createStore(), curve=cup(store);
+  assert.equal(store.markMinimum(),curve);store.markMinimum();
+  assert.equal(store.getState().selectedId,curve);assert.equal(sketch(store).showMinimum,true);
+  assert.equal(store.getState().points.length,0);assert.equal(store.getState().lines.length,0);
+  assert.equal(store.lineThroughSelectedPoint(),null);assert.equal(store.detachSelected(),false);
+  const before=serializeDocument(store.getState());
+  store.updateSelected({showMinimum:false});assert.equal(sketch(store).showMinimum,false);
+  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);
+  store.updateSelected({anchor:{x:3,y:1}});assert.deepEqual(sketchMinimum(sketch(store)),{x:3,y:1});
 });
 
-test('point-through-line optionally freezes and dependency cycles are rejected without document edits',()=>{
-  const store=createStore(), curve=cup(store), point=store.markMinimum();
+test('ordinary point-through-line optionally freezes while marked curves do not create relation cycles',()=>{
+  const store=createStore(), curve=cup(store);store.markMinimum();const point=store.addPoint({x:4,y:2});
   const frozen=store.lineThroughSelectedPoint({follow:false});
   store.selectObject(point);const following=store.lineThroughSelectedPoint();
-  assert.equal(canAttach(store.getState(),curve,following),false);
+  assert.equal(canAttach(store.getState(),point,following),false);
   store.selectObject(curve);const before=serializeDocument(store.getState());
-  assert.equal(store.attachSelectedToLine(following),false);assert.deepEqual(serializeDocument(store.getState()),before);
+  assert.equal(store.attachSelectedToLine('missing-line'),false);assert.deepEqual(serializeDocument(store.getState()),before);
   assert.equal(store.attachSelectedToLine(frozen),true);
+  store.selectObject(point);store.updateSelected({anchor:{x:5,y:3}});
+  assert.deepEqual(store.getState().lines.find(l=>l.id===following).anchor,{x:5,y:3});
+  assert.deepEqual(store.getState().lines.find(l=>l.id===frozen).anchor,{x:4,y:2});
 });
 
 test('deleting relation sources freezes surviving geometry and undo restores the full relation chain',()=>{
   const store=createStore(), line=addLine(store), curve=store.addSketch({x:1,y:5},{x:7,y:5},{x:4,y:2},{lineId:line});
-  const point=store.markMinimum(), through=store.lineThroughSelectedPoint();
+  store.markMinimum();const point=store.addPoint({x:4,y:2}), through=store.lineThroughSelectedPoint();
   store.selectObject(line);const original=serializeDocument(store.getState());store.removeSelected();
   assert.equal(sketch(store).binding,null);store.undo();assert.deepEqual(serializeDocument(store.getState()),original);
   store.selectObject(curve);const min={...store.getState().points[0].anchor};store.removeSelected();
-  assert.equal(store.getState().points[0].binding,null);assert.deepEqual(store.getState().points[0].anchor,min);
+  assert.equal(store.getState().points[0].binding,undefined);assert.deepEqual(store.getState().points[0].anchor,min);
   store.selectObject(point);store.removeSelected();assert.equal(store.getState().lines.find(l=>l.id===through).binding,null);
 });
 
@@ -144,8 +148,8 @@ test('visible sketch snapping and axis gaps use the same finite geometry, with n
   assert.deepEqual(directionOf(null),{x:0,y:1});
 });
 
-test('one drag transaction restores curve, tracked minimum and through-line together without reusing IDs',()=>{
-  const store=createStore(), id=cup(store);store.markMinimum();store.lineThroughSelectedPoint();store.selectObject(id);
+test('one drag transaction restores the curve and its display option without generating dependent objects',()=>{
+  const store=createStore(), id=cup(store);store.markMinimum();store.selectObject(id);
   const before=serializeDocument(store.getState());
   store.beginHistory();store.updateSelected({anchor:{x:5,y:1}});store.updateSelected({anchor:{x:6,y:0}});store.endHistory();
   const after=serializeDocument(store.getState());

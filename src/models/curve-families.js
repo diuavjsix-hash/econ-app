@@ -42,6 +42,35 @@ export class AnalyticCurveFamily {
   swapped() { return false; }
   includesZero() { return false; }
   pointAt(c, t) { return this.swapped(c) ? { x: this.value(c, t, 'horizontal'), y: t } : { x: t, y: this.value(c, t) }; }
+  /** Refine adaptive display samples on the original curve, shared by point/dashed tools. */
+  nearestPoint(c, point, bounds, pieces = this.clip(c, bounds)) {
+    const range = this.parameterRange(c, bounds);
+    if (!range || !pieces.length) return null;
+    const key = this.swapped(c) ? 'y' : 'x';
+    const parameters = [...new Set([range[0], range[1], ...pieces.flatMap(p => [p[0][key], p.at(-1)[key]])]
+      .map(t => Math.max(range[0], Math.min(range[1], t))))].sort((a, b) => a - b);
+    const score = t => { const p = this.pointAt(c, t); return (p.x - point.x) ** 2 + (p.y - point.y) ** 2; };
+    const scores = parameters.map(score);
+    let best = null, bestScore = Infinity;
+    const consider = t => {
+      const value = score(t);
+      if (value < bestScore) { bestScore = value; best = this.pointAt(c, t); }
+    };
+    consider(range[0]); consider(range[1]);
+    // Bracket every sampled local minimum, including flat/boundary minima.
+    for (let i = 0; i < parameters.length; i++) {
+      if ((i && scores[i] > scores[i - 1]) || (i + 1 < scores.length && scores[i] > scores[i + 1])) continue;
+      let low = parameters[Math.max(0, i - 1)], high = parameters[Math.min(parameters.length - 1, i + 1)];
+      const ratio = (Math.sqrt(5) - 1) / 2;
+      let a = high - ratio * (high - low), b = low + ratio * (high - low), fa = score(a), fb = score(b);
+      for (let step = 0; step < 56; step++) {
+        if (fa <= fb) { high = b; b = a; fb = fa; a = high - ratio * (high - low); fa = score(a); }
+        else { low = a; a = b; fa = fb; b = low + ratio * (high - low); fb = score(b); }
+      }
+      consider(parameters[i]); consider((low + high) / 2);
+    }
+    return best;
+  }
   parameterRange(c, bounds) {
     const swap = this.swapped(c), key = swap ? 'y' : 'x', other = swap ? 'x' : 'y';
     let low = Math.max(0, bounds[`${key}Min`]), high = bounds[`${key}Max`];

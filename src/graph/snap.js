@@ -1,12 +1,13 @@
-import { displayedLineSegments, displayedCurveSegments, isLinePointVisible } from './display.js';
+import { displayedLineSegments, displayedCurveSegments, isLinePointVisible, lineDisplayRegions } from './display.js';
 import { clipSegment } from './ruler.js';
 import { displayedSumSegments } from './sum.js';
 import { displayedSketchSegments, sketchControls } from './sketch.js';
 import { isIndifference, indifferenceLineIntersections } from './indifference.js';
 import { SNAP_CAPTURE_PX, SNAP_RELEASE_PX, chooseSnapCandidate } from './snap-policy.js';
-import { axisSegments } from './axes.js';
+import { axisSegments, coordinateOrigins } from './axes.js';
 import { buildCurveContactTargets } from './curve-contacts.js';
 import { independentSnapState, geometryKey } from './snap-context.js';
+import { curveFamilyOf } from '../models/curve-families.js';
 
 export const SNAP_RADIUS = SNAP_CAPTURE_PX;
 export const INTERSECTION_RADIUS = SNAP_CAPTURE_PX;
@@ -69,6 +70,24 @@ function at(shape, t) {
 
 function straightPiece(id, start, end) {
   return piece(id, [start, { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }, end]);
+}
+
+/** Clip the parameter domain of an original quadratic, preserving its geometry. */
+function clipQuadraticPiece(shape, bounds) {
+  const cuts = [0, 1];
+  for (const axis of ['x', 'y']) for (const limit of [bounds[`${axis}Min`], bounds[`${axis}Max`]]) {
+    cuts.push(...roots([shape.a[axis] - limit, shape.v[axis], shape.q[axis]]));
+  }
+  const sorted = [...new Set(cuts)].sort((a, b) => a - b), result = [];
+  const visible = t => { const p = at(shape, t); return p.x >= bounds.xMin - EPS && p.x <= bounds.xMax + EPS && p.y >= bounds.yMin - EPS && p.y <= bounds.yMax + EPS; };
+  const interval = (low, high) => {
+    const span = high - low;
+    return { id: shape.id, a: at(shape, low), v: { x: span * (shape.v.x + 2 * low * shape.q.x), y: span * (shape.v.y + 2 * low * shape.q.y) },
+      q: { x: span * span * shape.q.x, y: span * span * shape.q.y }, linear: shape.linear };
+  };
+  for (let i = 1; i < sorted.length; i++) if (visible((sorted[i - 1] + sorted[i]) / 2)) result.push(interval(sorted[i - 1], sorted[i]));
+  for (const t of sorted) if (visible(t) && !result.some(s => distance(at(shape, t), nearest(s, at(shape, t))) < 1e-9)) result.push(interval(t, t));
+  return result;
 }
 
 function nearest(shape, point) {
@@ -170,7 +189,7 @@ function interceptTargets(state,bounds) {
     if (targets.some(target=>target.sourceId===id && distance(normalized,target.point)<1e-7)) return;
     targets.push({point:normalized,axis:origin?'origin':axis,sourceId:id,kind:'intercept',label:origin?'원점':`${axis}절편`,ids:id?[id,`axis-${axis}`]:['axis-x','axis-y']});
   };
-  if (axes.length===2) add({x:0,y:0},'origin');
+  for (const origin of coordinateOrigins(state,bounds)) targets.push({ ...origin, sourceId: null, axis: 'origin', kind: 'intercept' });
   const sourcePieces=[];
   for (const line of state.lines) if (displayedLineSegments(line,bounds,state).length) {
     sourcePieces.push(...displayedLineSegments(line,bounds,rawState).map(points=>straightPiece(line.id,...points)));
@@ -199,11 +218,17 @@ function interceptTargets(state,bounds) {
 export function buildSnapTargets(state, bounds, excludeObjectId = null) {
   state = independentSnapState(state, excludeObjectId);
   const shapes = [];
+  const analyticCurves = [];
   for (const line of state.lines) {
     shapes.push(...displayedLineSegments(line, bounds, state).map(points => straightPiece(line.id, ...points)));
   }
   for (const curve of state.curves) {
     shapes.push(...displayedCurveSegments(curve, bounds, state).map((points) => piece(curve.id, points)));
+    const family = curveFamilyOf(curve);
+    if (family?.contactGeometry === 'smooth') {
+      const domains = lineDisplayRegions(bounds, state).map(region => ({ region, pieces: family.clip(curve, region) })).filter(d => d.pieces.length);
+      if (domains.length) analyticCurves.push({ curve, domains });
+    }
   }
   for (const ruler of state.dashedLines ?? []) {
     const segment = clipSegment(ruler.anchor, ruler.end, bounds);
@@ -230,14 +255,27 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
   crossings.push(...buildCurveContactTargets(state, bounds));
   const exactSketches = new Map((state.sketches ?? [])
     .map(sketch=>[sketch.id,sketchControls(sketch).map(points=>piece(sketch.id,points))]));
+  const quadratics = [...exactSketches.values()].flatMap(pieces => pieces.flatMap(shape =>
+    lineDisplayRegions(bounds, state).flatMap(region => clipQuadraticPiece(shape, region))));
   const addCrossing = (point,ids,kind='intersection') => {
     if (!crossings.some(item=>distance(point,item.point)<1e-7)) crossings.push({point,ids,kind});
   };
   const exactIndifferences=new Set(state.curves.filter(isIndifference).map(c=>c.id));
-  const exactLines=new Set(state.lines.map(line=>line.id));
+  // Exact curve/line solvers consume visible finite straight pieces, regardless of
+  // which tool produced them. A dashed segment must not fall back to display chords
+  // (which miss tangencies) or be extended into an infinite supporting line.
+  const exactStraights=shapes.filter(shape=>shape.linear && !exactSketches.has(shape.id) && !exactIndifferences.has(shape.id));
+  const exactStraightIds=new Set(exactStraights.map(shape=>shape.id));
   for (const curve of state.curves.filter(isIndifference)) {
-    for (const line of state.lines) for (const {point,kind} of indifferenceLineIntersections(curve,line,bounds)) {
-      if (isLinePointVisible(point,bounds,state)) addCrossing(point,[curve.id,line.id],kind);
+    for (const segment of exactStraights) {
+      const lengthSquared=dot(segment.v,segment.v);
+      if (!lengthSquared) continue;
+      const line={anchor:segment.a,slope:segment.v.x===0?null:segment.v.y/segment.v.x};
+      for (const {point,kind} of indifferenceLineIntersections(curve,line,bounds)) {
+        if (inside(dot(sub(point,segment.a),segment.v)/lengthSquared) && isLinePointVisible(point,bounds,state)) {
+          addCrossing(point,[curve.id,segment.id],kind);
+        }
+      }
     }
   }
   // A tangent between mesh vertices never crosses the display chords. Solve against
@@ -252,7 +290,7 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
   for (let i = 0; i < shapes.length; i++) {
     for (let j = i + 1; j < shapes.length; j++) {
       if (shapes[i].id === shapes[j].id) continue;
-      if ((exactIndifferences.has(shapes[i].id) && exactLines.has(shapes[j].id)) || (exactIndifferences.has(shapes[j].id) && exactLines.has(shapes[i].id))) continue;
+      if ((exactIndifferences.has(shapes[i].id) && exactStraightIds.has(shapes[j].id)) || (exactIndifferences.has(shapes[j].id) && exactStraightIds.has(shapes[i].id))) continue;
       const aSketch=exactSketches.has(shapes[i].id),bSketch=exactSketches.has(shapes[j].id);
       if ((aSketch && !bSketch && shapes[j].linear) || (bSketch && !aSketch && shapes[i].linear)) continue;
       for (const point of intersections(shapes[i], shapes[j])) {
@@ -260,7 +298,7 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
       }
     }
   }
-  return { shapes, crossings, intercepts };
+  return { shapes, crossings, intercepts, analyticCurves, quadratics };
 }
 
 /** Point/sketch handles and all dashed operations share one cache and source policy. */
@@ -286,7 +324,18 @@ export function guidedSnapCandidates(point, targets, unit, axis = null, radius =
   };
   for (const crossing of targets.crossings) add(crossing,
     `crossing:${crossing.ids.join(',')}:${crossing.point.x}:${crossing.point.y}`, 1);
-  for (const shape of targets.shapes) {
+  const analyticIds = new Set((targets.analyticCurves ?? []).map(({ curve }) => curve.id));
+  for (const { curve, domains } of targets.analyticCurves ?? []) {
+    const family = curveFamilyOf(curve);
+    for (const { region, pieces } of domains) {
+      const line = { anchor: point, slope: axis === 'x' ? 0 : null };
+      const points = axis ? family.lineIntersections(curve, line, region).map(c => c.point)
+        : [family.nearestPoint(curve, point, region, pieces)].filter(Boolean);
+      for (const target of points) add({ point: target, kind: 'shape', ids: [curve.id] }, `shape:${curve.id}`, 2);
+    }
+  }
+  const quadraticIds = new Set((targets.quadratics ?? []).map(shape => shape.id));
+  for (const shape of [...targets.shapes.filter(s => !analyticIds.has(s.id) && !quadraticIds.has(s.id)), ...(targets.quadratics ?? [])]) {
     let points;
     if (!axis) points = [nearest(shape, point)];
     else {

@@ -162,7 +162,7 @@ app.innerHTML = `
         <div class="sketch-shapes" role="group" aria-label="자유 곡선 모양"><button data-sketch-shape="cup">∪</button><button data-sketch-shape="cap">∩</button><button data-sketch-shape="left">⊂</button><button data-sketch-shape="right">⊃</button></div>
         <details class="editor-details"><summary>휘어짐 조절</summary>${rangeField({"id":"sketch-left","label":"시작 쪽 휘어짐","min":5,"max":200,"step":1,"value":50})}
         ${rangeField({"id":"sketch-right","label":"끝 쪽 휘어짐","min":5,"max":200,"step":1,"value":50})}
-        </details><button id="sketch-minimum" class="export-button copy-action">최저점 표시</button>
+        </details><label class="copy-children" for="sketch-minimum"><input id="sketch-minimum" type="checkbox" />최저점 표시</label>
       </section><section id="fill-settings" aria-label="구역 설정" hidden>
         ${fillControls('edit')}<p class="mouse-hint">선과 별도로 이동·삭제할 수 있습니다.</p>
       </section><section id="point-settings" class="point-settings" aria-label="점 설정" hidden>
