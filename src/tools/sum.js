@@ -1,3 +1,4 @@
+import { isTrimmed } from '../graph/line-extent.js';
 import { sumError, sumSources } from '../graph/sum.js';
 import { isIndifference } from '../graph/indifference.js';
 
@@ -9,7 +10,7 @@ export function mountSumTool(root, store) {
   const selectedSettings = root.querySelector('#sum-selected-settings'), selectedNonnegative = root.querySelector('#sum-selected-nonnegative');
   selectedNonnegative.addEventListener('change', () => store.updateSelected({ nonnegative: selectedNonnegative.checked }));
   let diagramId = null, signature = '', selected = new Set();
-  button.addEventListener('click', () => store.update({sumPanel:!store.getState().sumPanel}));
+  button.addEventListener('click', () => store.toggleToolMode('sum'));
   function update() {
     const state = store.getState(), objects = [...state.lines, ...state.curves];
     const error = sumError(objects.filter(object => selected.has(object.id)), direction.value);
@@ -40,7 +41,7 @@ export function mountSumTool(root, store) {
       root.querySelector('#sum-selected-status').textContent = sumError(operands, sum.direction) ?? '원본을 수정하면 자동 갱신됩니다.';
     }
     if (diagramId !== state.activeDiagramId) { diagramId = state.activeDiagramId; selected.clear(); signature = ''; }
-    const objects = [...state.lines, ...state.curves].filter(object=>!isIndifference(object));
+    const objects = [...state.lines, ...state.curves].filter(object=>!isIndifference(object)&&!isTrimmed(object));
     selected = new Set([...selected].filter(id => objects.some(object => object.id === id)));
     const next = JSON.stringify(objects.map(({ id, name }) => [id, name]));
     if (next !== signature) {

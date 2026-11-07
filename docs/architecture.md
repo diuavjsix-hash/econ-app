@@ -1,5 +1,37 @@
 # 구현 구조
 
+## 직선 끝 자르기·점선 스타일 · 2026-11-07
+
+직선은 선택적 `extent:[from,to]`(기준점에서 `directionOf(slope)` 방향 거리, null은 열린 끝)와 `style`을 가집니다. `math.js`의 `clipLineParameters`/`clipLine`이 extent를 반영하므로 `displayedLineSegments`를 쓰는 렌더링·클릭 영역·맞춤 대상·칠하기 경계·절편 대상이 자동으로 잘린 부분만 사용합니다. 계산은 `graph/line-extent.js`(`onLineExtent`, `rebasedExtent`, `rotatedExtent`, `visibleLineEnds`, `lineEndPoints`)에 모았습니다.
+
+- 모델: `LineObject.updateGeometry`는 anchor 변경을 평행이동으로 보고 extent를 유지합니다. extent 없이 기울기만 바뀌면 이전 방향과의 내적으로 끝의 방향을 이어 갑니다(키보드·슬라이더의 수직 경계 통과).
+- 상호작용: `ShapeInteraction.startPatch`가 드래그 시작 편집과 스냅숏을 함께 정합니다. 직선은 같은 직선 위로 기준점을 옮길 때 `rebasedExtent`를 함께 보냅니다. 점을 따라가는 직선은 그 점을 회전 중심으로 유지합니다. 회전은 잡은 손잡이 쪽 반이 포인터를 따라가도록 `rotatedExtent`를 계산합니다. `line-from`/`line-to` 손잡이는 `snapDashedPoint(..., {guide})`를 사용합니다.
+- 기존 직선 자석(`snapLineToIntercept`, `snapLineToTangency`, `snapShapeToPoint`, `snapCurveToTangency`, `snapSketchTangent`)은 `onLineExtent`로 그린 부분 밖의 후보를 버립니다. `sumError`는 끝을 자른 직선을 거절합니다.
+
+검사는 `tests/line-extent.test.js`, `tests/browser/line-extent.html`, `suite.js`의 직선 설정 점선 토글에 있습니다.
+
+## 접점 통과 직선 · 2026-11-07
+
+곡선-곡선 접점 대상(`buildCurveContactTargets`)이 원래 기하에서 구한 공통 접선 방향을 `contactTangent`로 함께 담습니다. `curve-contacts.js`의 `contactTangentsAt(crossings, point)`와 `contactTangentSlope(state, bounds, point)`가 이 값을 읽는 유일한 경로입니다. `tools/sketch.js`의 **이 점을 지나는 직선**은 선택한 점이 접점이면 그 기울기를 `lineThroughSelectedPoint({slope})`에 넘기고, 아니면 기존 기본값을 씁니다. `LineInteraction.rotationCandidates`는 에지워드 원점 후보와 회전 중심에 있는 접점의 접선 후보를 한 목록으로 모아 `chooseSnapCandidate`로 고릅니다. 회전 중 대상은 canvas의 공유 `SnapTargetCache`(`ctx.snapTargets`)에서 받습니다. 직선은 기존 `through-point` 관계로 점만 따라가며 새 관계·객체 종류는 없습니다. 꺾임(`contactGeometry:'kink'`)은 접점 대상이 아니므로 자동으로 제외됩니다. 검사는 `tests/contact-tangent-line.test.js`, `tests/browser/contact-tangent-line.html`, `suite.js`의 실제 버튼 검사에 있습니다.
+
+## 최저점 맞춤 · 2026-11-07
+
+`sketch.js`의 `displayedSketchMinimum(curve, bounds, state)`가 최저점 표시 여부·위치·가시성을 한 번에 판단합니다. canvas의 마커와 `buildSnapTargets`가 같은 함수를 사용하며, 표시 중인 최저점은 꺾임과 같은 방식으로 `crossings`에 `kind:'minimum'`, `label:'최저점 맞춤'` 후보로 등록됩니다. 따라서 점 생성/이동, 점선 생성/끝점/전체 이동, 세 점 곡선의 시작/끝점이 같은 대상·16/24px·Alt·공통 표시를 사용합니다. 곡선 자신을 편집하는 동안에는 `independentSnapState`가 자신의 최저점을 제외하고, `showMinimum`이 곡선 데이터에 있으므로 `geometryKey` 캐시도 표시 전환에 맞춰 갱신됩니다. 점이나 관계를 만들지 않습니다. 검사는 `tests/minimum-snap.test.js`와 `tests/browser/edgeworth-minimum.html`에 있습니다.
+
+## 반대 방향 무차별곡선·생성 도구 등록부 · 2026-11-07
+
+**반대 방향 곡선**: `curve-families.js`의 `OppositeCurveFamily`가 `OPPOSITE_CURVE_FAMILIES`(콥더글라스·완전대체재·완전보완재·준선형)를 감쌉니다. `curveFamilyOf`는 `orientation:'opposite'`와 유효한 `oppositeOrigin`이 있으면 이 래퍼를 돌려주므로 모든 소비 경로(표시·자석·접점·칠하기·이동·복제·JSON)가 같은 계산을 사용합니다. 래퍼는 `AnalyticCurveFamily`의 모든 메서드를 대칭 변환해 위임합니다. 빠진 메서드가 원래 방향 계산으로 조용히 처리되지 않도록 `opposite-curves.test.js`가 메서드 목록을 비교합니다. 반경 이동의 중심은 새 `scaleCenter(c)`로 노출되며 `curve-curve-tangency.js`의 반경 맞춤이 이를 사용합니다. 방향 전환은 `orientCurve`, 반대 원점 이동은 `AnalyticCurveObject.updateGeometry`의 `oppositeOrigin` patch, 상자 총량 변경 시 따라가기는 `axes.js`의 `followBoxOrigin`이 담당합니다. 공통 접점·점선 사례(`curve-contact-cases.js`, `dashed-curve-cases.js`)는 반대 방향 family마다 사례를 요구합니다.
+
+**생성 도구 등록부**: 점·점선·곡선·칠하기의 포인터 처리를 `graph/creation-tools.js`의 `CreationTool` 하위 클래스로 옮겼습니다. 각 도구는 `pointerDown`/`pointerMove`/`pointerEnd`/`clearHover`/`sync`/`draw`/`feedback`을 구현하고, canvas는 도구별 세션 하나와 공통 맞춤 상태·기록·렌더링만 관리합니다. 초안 레이어는 `slot`(fills·sketches·dashed)으로 기존 SVG 순서를 유지합니다. `assertCreationTools`는 `TOOL_MODES`에서 `kind:'creation'`인 모든 모드가 컨트롤러를 등록했는지, 초안 레이어가 있으면 그리기를 구현했는지 검사합니다. 새 생성 도구는 `TOOL_MODES`와 `CREATION_TOOLS`에 한 번씩 등록하면 되며 canvas에 분기를 추가하지 않습니다.
+
+## 도구 모드·도형 컬렉션 등록부 · 2026-11-07
+
+도구 모드(선택·점·점선·곡선·칠하기·복제·합치기)는 `src/tool-modes.js`의 `TOOL_MODES` 하나에 등록합니다. 각 항목은 상태 플래그, 패널 종류(`selection`/`creation`/`operation`), 그리기 포인터 사용 여부, 진입 시 선택 유지 규칙(`keepSelection`), 진입 부수효과(`enter`), 편집 패널 문구(`context`)를 가집니다. store의 `enterToolMode`만 플래그를 쓰며 `setToolMode`/`toggleToolMode`가 공개 API입니다. 기존 `update({ dashedSelected: true })` 같은 플래그 patch는 `requestedToolMode`가 같은 우선순위로 한 모드로 번역합니다. 편집 패널(`editorContext`), 비활성 그래프의 플래그(`diagramState`), canvas의 그리기 포인터·맞춤 초기화가 같은 등록부를 읽습니다. 예전에는 상호 배타 규칙이 store 안 여러 분기에 흩어져 있었고, 비활성 그래프에서 `sumPanel`만 꺼지지 않았습니다.
+
+도형 컬렉션 목록은 `OBJECT_TYPES`에서 파생합니다. store의 문서 키·빈 그래프·기록 스냅샷·전체 삭제·선택 삭제가 `OBJECT_COLLECTIONS`를 사용합니다. 자석 대상과 칠하기 경계가 되는 획 도형은 `strokeGeometry: true`로 선언하며 `geometryKey`가 `STROKE_GEOMETRY_COLLECTIONS`로 캐시 키를 만듭니다. `tests/registry-contract.test.js`는 모든 모드의 배타성·토글·선택 규칙·패널 문구, 모든 컬렉션의 기록/삭제/JSON 포함, 획 모델과 `strokeGeometry` 선언의 일치, 획 도형마다 자석 대상 등록·캐시 무효화를 검사합니다. 새 획 도형은 이 검사의 표본을 추가해야 통과합니다.
+
+남은 분산 지점: `buildSnapTargets`·`interceptTargets`·칠하기 경계(`fill.js`)·canvas 렌더링은 아직 종류별 반복문으로 획을 모읍니다. 위 계약 검사가 누락을 잡지만, 자동으로 연결되지는 않습니다. (생성 도구의 포인터 처리는 같은 날 `creation-tools.js`로 옮겼습니다.)
+
 ## 최저점 표시와 에지워드 원점 조작 보수 · 2026-11-04
 
 자유 곡선의 `showMinimum` boolean은 곡선 문서/기록/JSON에 포함되는 표시 설정입니다. canvas가 `sketchMinimum`으로 실제 최저점을 계산해 입력을 가로채지 않는 마커만 그립니다. points/lines 컬렉션에 파생 객체를 추가하거나 minimum binding을 만들지 않습니다. 원본 곡선 편집·삭제·undo/redo에 따라 표시가 갱신됩니다. 최저점 따라가기 직선/연결 해제 기능은 제거했고 일반 점의 through-point는 유지합니다.
@@ -90,7 +122,10 @@ classDiagram
 
 | 추가/수정 내용 | 확장 지점과 완료 조건 |
 | --- | --- |
-| 새 도형 | 모델/컬렉션·조작 등록, 표시·선택·복제 가능 여부·직렬화·독립 기록을 함께 확인 |
+| 새 도형 | 모델/컬렉션·조작 등록, `strokeGeometry` 선언과 `registry-contract` 표본 추가, 표시·선택·복제 가능 여부·직렬화·독립 기록을 함께 확인 |
+| 새 도구 모드 | `TOOL_MODES`에 플래그·패널 종류·선택 규칙·문구를 등록하고 버튼은 `toggleToolMode` 사용; store/editor/workspace에 배타 분기를 추가하지 않음 |
+| 새 생성 도구 | `CREATION_TOOLS`에 `CreationTool` 하위 클래스를 등록(포인터·초안 레이어·맞춤 피드백); canvas 이벤트 처리기에 분기를 추가하지 않음 |
+| 곡선의 새 방향/좌표 변환 | 래퍼 family로 모든 `AnalyticCurveFamily` 메서드를 변환해 위임하고 메서드 목록 비교 검사와 공통 접점·점선 사례를 추가 |
 | 새 해석 곡선 | 적합한 종류 클래스를 상속하고 contactGeometry/필수 훅 등록 검사·곡선별 연속 사례 추가 |
 | 새 자석 의미 | 공통 원본 기하와 대상 목록에 연결하고 이동→놓기→점/점선 재포착까지 확인 |
 | 새로운 제외/표시 범위 | independentSnapState/geometryKey를 확장해 모든 소비 도구의 제외·캐시 갱신을 확인 |

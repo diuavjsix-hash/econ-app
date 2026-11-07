@@ -27,6 +27,8 @@ export function mountLineTool(root, store) {
     preset.addEventListener('click', () => store.updateSelected({ slope: preset.dataset.slope === 'vertical' ? null : normalizeSlope(preset.dataset.slope) }));
   }
   root.querySelector('#reset-line').addEventListener('click', () => store.updateSelected({ slope: 1 }));
+  const dashed = root.querySelector('#line-dashed');
+  dashed.addEventListener('change', () => store.updateSelected({ style: dashed.checked ? 'dashed' : 'solid' }));
 
   return store.subscribe(({ lines, selectedId }) => {
     const selected = lines.find((line) => line.id === selectedId);
@@ -39,6 +41,7 @@ export function mountLineTool(root, store) {
     if (!editingSlope) slopeInput.value = slope === null ? '' : String(slope);
     slopeInput.placeholder = slope === null ? '수직' : '';
     root.querySelector('#equation-value').textContent = lineEquation(selected);
+    dashed.checked = selected.style === 'dashed';
     for (const preset of presets) preset.setAttribute('aria-pressed', String(preset.dataset.slope === 'vertical' ? slope === null : slope !== null && Number(preset.dataset.slope) === slope));
   });
 }

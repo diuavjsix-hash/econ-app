@@ -1,5 +1,5 @@
 import { directionOf } from './math.js';
-import { lineDisplayRegions } from './display.js';
+import { lineDisplayRegions, isLinePointVisible } from './display.js';
 import { clipSegment, validPoint } from './ruler.js';
 
 export const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -42,6 +42,12 @@ export function sketchMinimum(curve) {
     if (t > 0 && t < 1) candidates.push(quadraticPoint(points,t));
   }
   return candidates.reduce((best, point) => point.y < best.y - 1e-10 ? point : best);
+}
+/** The minimum marker and its magnet share this: shown only when the option is on and visible. */
+export function displayedSketchMinimum(curve, bounds, state) {
+  if (!curve.showMinimum) return null;
+  const point = sketchMinimum(curve);
+  return isLinePointVisible(point, bounds, state) ? point : null;
 }
 export function displayedSketchSegments(curve, bounds, state) {
   const segments = [];

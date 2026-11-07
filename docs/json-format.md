@@ -1,4 +1,4 @@
-# JSON 출력 형식 · schemaVersion 10
+# JSON 출력 형식 · schemaVersion 11
 
 구현 기준은 `src/export.js`의 `serializeDocument(state)`입니다. 현재는 내보내기만 지원하며 JSON 불러오기 API와 UI는 없습니다. 화면에서 가려진 도형도 모두 내보냅니다.
 
@@ -18,7 +18,7 @@
 
 | 필드 | 설명 |
 | --- | --- |
-| `schemaVersion` | 현재 10. 독립된 칠한 구역 fills 추가; 기존 도형 자료 보존 |
+| `schemaVersion` | 현재 11. 직선의 `style`과 끝 자르기 `extent`/`segment` 추가(버전 10: 칠한 구역 fills); 기존 도형 자료 보존 |
 | `activeDiagramId` | 최상위 도형·좌표계 필드가 가리키는 그래프 ID |
 | `layout` | `preset`과 `slots`: `{diagramId, row, column}` 배열. 행·열은 0부터 시작 |
 | `diagrams` | 숨겨진 그래프를 포함한 모든 그래프. 각각 `id`, `name`, 아래의 좌표계·도형 필드를 보유 |
@@ -71,6 +71,8 @@ rings는 유한한 수학 좌표로 된 닫힌 다각형들의 배열이며 각 
 
 무차별곡선은 curves 배열의 type=curve 객체이며 family는 `cobb-douglas`, `substitutes`, `complements`, `quasilinear` 중 하나입니다. 기본 곡선 목록의 직각 쌍곡선도 같은 저장 형식을 공유하며 family는 `rectangular-hyperbola`입니다. 공통 id·name·color·parentId와 내부 좌표 anchor, shape를 저장합니다. 준선형에는 linearAxis(x/y)가 추가됩니다. geometry는 `{type:"indifference",domain:"nonnegative",movement:"이동 방식 표시"}`이며 기본 곡선의 variant/span/slope/bend·이차 제어점·접선 연장을 출력하지 않습니다. movement는 표시용이고 실제 기하는 family와 anchor/shape/linearAxis로 복원합니다.
 
+반대 방향(2026-11-07, schemaVersion 10의 선택 필드): 네 무차별곡선은 `orientation:"opposite"`와 `oppositeOrigin:{x,y}`를 가질 수 있습니다. 곡선은 같은 family의 식을 oppositeOrigin에서 점대칭한 것이며 anchor는 A 기준 수학 좌표에서 곡선 위의 점 그대로입니다. geometry에도 같은 두 필드를 덧붙입니다. 두 필드가 없으면 원래 방향입니다. PPC·직각 쌍곡선은 반대 방향을 저장하지 않습니다.
+
 `rectangular-hyperbola`는 `shape:1`을 유지하고 `x*y=anchor.x*anchor.y`, x,y>0으로 복원합니다. 두 축이 점근선이며 anchor는 곡선 위의 기준점입니다. 크기 조절·몸체 이동·복제는 anchor를 원점 기준으로 확대/축소하고 `shape`를 바꾸지 않습니다. 음수 가지나 점근선 이동은 저장하지 않습니다. JSON 10의 기존 객체 형식을 확장한 family 값이며 별도 컬렉션은 없습니다.
 
 shape는 0.15~20이며 완전보완재의 기하는 shape 대신 꺾임 anchor의 비율을 사용합니다. 콥더글라스·완전보완재 anchor는 양수, 준선형의 비선형 축 anchor는 양수이고 선형 축 anchor는 음수도 가능합니다. 실제 표시 영역은 비음수 좌표입니다. 기하식과 이동·클리핑 명세는 [무차별곡선 설계](indifference-design.md)를 참고하십시오. 표시 근사·픽셀·자석 후보·효용/가격/소득 수치는 저장하지 않습니다.
@@ -79,7 +81,7 @@ shape는 0.15~20이며 완전보완재의 기하는 shape 대신 꺾임 anchor�
 
 각 그래프와 최상위 사본에 `sketches`를 기록합니다. 각 객체는 id·type='sketch'·name·color·parentId, 내부 좌표 start/end/anchor, 단위 방향 벡터 tangent, leftReach/rightReach, binding, geometry를 포함합니다. geometry.type='piecewise-quadratic-bezier'이고 controlPoints는 두 개의 [시작, 제어, 끝] 배열입니다. 렌더용 픽셀·근사 선분과 생성 도구 옵션은 출력하지 않습니다. 새 문서 형식에서 sketches가 없는 이전 출력은 빈 배열로 처리합니다(불러오기 기능은 아직 없음).
 
-`showMinimum`은 선택적 boolean 표시 필드이며 생략하면 false입니다. true이면 원본 유한 곡선의 최저점 마커를 렌더합니다. 별도 points 항목·파생 좌표·최저점 binding은 만들지 않으며 현재 생성 문서에서 `kind:'minimum'` 관계는 지원하지 않습니다. JSON 버전은 10을 유지합니다.
+`showMinimum`은 선택적 boolean 표시 필드이며 생략하면 false입니다. true이면 원본 유한 곡선의 최저점 마커를 렌더합니다. 별도 points 항목·파생 좌표·최저점 binding은 만들지 않으며 현재 생성 문서에서 `kind:'minimum'` 관계는 지원하지 않습니다. 화면의 최저점 맞춤 후보(`kind:'minimum'`)는 저장하지 않습니다. JSON 버전은 10을 유지합니다.
 
 start/end/anchor는 유한한 수학 좌표이고 서로 다른 점입니다. tangent는 단위 방향 벡터, leftReach/rightReach는 0.05~2입니다. 제어점 거리는 가운데 점부터 해당 끝점까지 거리 × reach이며, 두 구간은 가운데의 접선 방향을 공유합니다. 미분 크기의 일치·단조성·경제적 최적성은 저장 형식의 보장 조건이 아닙니다.
 
@@ -122,8 +124,13 @@ direction은 vertical(같은 x에서 y를 더함) 또는 horizontal(같은 y에�
 | `vertical` | 수직선 여부 |
 | `xIntercept` | 수직선의 x값; 일반 직선에서는 null (일반 직선의 실제 x절편을 계산한 필드가 아님) |
 | `implicit` | `{a,b,c}` · `a*x + b*y + c = 0` |
+| `style` | `'solid'` 또는 `'dashed'` (버전 11; 없으면 solid) |
+| `extent` | 끝을 자른 직선만: `[from, to]`. 기준점에서 정규화 방향(`slope`의 방향, 수직선은 +y)으로 잰 거리이며 null은 그 방향으로 경계까지 이어짐 (버전 11) |
+| `segment` | `extent`가 있을 때만: 읽기용 끝점 `{start, end}`; 열린 끝은 null |
 
 축 반전은 화면 투영만 바꾸며 `anchor`, `slope`, 곡선 제어점과 수직선 표현을 변환하지 않습니다. 좌표는 각 그래프의 축 증가 방향을 기준으로 해석합니다.
+
+`extent`가 없으면 끝없는 직선입니다. from<to이며 두 값이 모두 null이면 저장하지 않습니다. 직선을 옮기면 extent는 그대로(함께 이동), 기울기를 바꾸면 기준점에서의 거리를 유지합니다. 끝을 자른 직선은 수직합·수평합의 원본이 될 수 없고, 기존 합의 원본이 잘리면 참조는 유지하며 표시만 중단합니다.
 
 일반 직선은 `y - anchor.y = slope * (x - anchor.x)`이고 수직선은 `x = anchor.x`입니다. `implicit`은 정규화된 방향으로 계산하여 수직선과 매우 큰 유한 기울기도 표현합니다. 계수의 상수배는 동일한 직선을 나타냅니다. null 기울기를 0이나 큰 유한 값으로 바꾸지 마십시오.
 
@@ -177,7 +184,7 @@ schemaVersion 5에서 점 보조선 기능과 `guides` 필드를 제거했습니
 
 ## 점선
 
-`dashedLines`의 각 항목은 `id`, `type: 'dashed'`, `name`, `color`, `parentId`, `anchor`(시작점), `end`(끝점)를 포함합니다. 두 끝점은 내부 좌표이며 유한한 선분입니다. 항상 점선으로 표시하므로 실선 전환용 style 필드나 측정·길이 표시 필드가 없습니다. 좌표 반전·화면 크기 변경은 원본 좌표를 바꾸지 않습니다.
+`dashedLines`의 각 항목은 `id`, `type: 'dashed'`, `name`, `color`, `parentId`, `anchor`(시작점), `end`(끝점)를 포함합니다. 두 끝점은 내부 좌표이며 유한한 선분입니다. 항상 점선으로 표시하므로 실선 전환용 style 필드나 측정·길이 표시 필드가 없습니다. 끝없는 점선·점선 반직선은 `lines`의 `style:'dashed'`와 `extent`로 저장합니다. 좌표 반전·화면 크기 변경은 원본 좌표를 바꾸지 않습니다.
 
 점선 탭 선택·방향 제한·마우스 보정 설정·미완성 미리보기는 출력하지 않습니다. 완성한 점선만 `dashedLines`와 `objectOrder`에 포함합니다. 기존 점과의 스냅은 생성/편집 당시 좌표 보정이며 점을 나중에 옮겨도 자동으로 따라가지 않습니다.
 
@@ -193,7 +200,7 @@ schemaVersion 5에서 점 보조선 기능과 `guides` 필드를 제거했습니
 
 ## 예시
 
-[두 그래프의 전체 예시](examples/editor-v10.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, 최저점을 표시한 U자 곡선과 별도 일반 점의 통과 직선, 폴더와 독립 점선, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다.
+[두 그래프의 전체 예시](examples/editor-v11.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, 최저점을 표시한 U자 곡선과 별도 일반 점의 통과 직선, 폴더와 독립 점선, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다.
 
 버전 9 당시 직렬화 함수로 생성한 점과 점선 문서입니다. 축 간격 기본 설정도 함께 포함합니다.
 

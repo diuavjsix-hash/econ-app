@@ -3,14 +3,16 @@ import assert from 'node:assert/strict';
 import { buildSnapTargets, SnapTargetCache, snapPoint } from '../src/graph/snap.js';
 import { snapDashedPoint, snapMovingDashed } from '../src/graph/dashed-magnets.js';
 import { DASHED_CURVE_CASES } from './fixtures/dashed-curve-cases.js';
-import { CURVE_FAMILIES } from '../src/models/curve-families.js';
+import { CURVE_FAMILIES, OPPOSITE_CURVE_FAMILIES } from '../src/models/curve-families.js';
 
 const bounds = { xMin: 0, xMax: 10, yMin: 0, yMax: 10 }, unit = 56;
 const close = (a, b) => assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 1e-7, `${JSON.stringify(a)} != ${JSON.stringify(b)}`);
 const pair = (targets, fixture) => targets.crossings.filter(c => c.ids.includes(fixture.curve) && c.ids.includes(fixture.dashed));
 
 test('every registered analytic curve has a dashed crossing fixture', () => {
-  assert.deepEqual(DASHED_CURVE_CASES.filter(f => !f.tangent && CURVE_FAMILIES[f.family]).map(f => f.family).sort(), Object.keys(CURVE_FAMILIES).sort());
+  assert.deepEqual(DASHED_CURVE_CASES.filter(f => !f.tangent && !f.opposite && CURVE_FAMILIES[f.family]).map(f => f.family).sort(), Object.keys(CURVE_FAMILIES).sort());
+  assert.deepEqual(DASHED_CURVE_CASES.filter(f => !f.tangent && f.opposite).map(f => f.family).sort(), [...OPPOSITE_CURVE_FAMILIES].sort(),
+    'every family offered in the opposite direction needs its own dashed crossing case');
 });
 
 test('a dashed endpoint snapped onto a curve remains an exact point target after drawing finishes', () => {

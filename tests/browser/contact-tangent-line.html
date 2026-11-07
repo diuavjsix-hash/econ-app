@@ -1,0 +1,59 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>접점 통과 직선 검증</title>
+<style>@import url('/src/styles.css');@import url('/src/editor.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap}</style>
+<button id="run">검증</button><pre id="result">준비</pre><div id="stage"></div>
+<script type="module">
+import { mountGraph } from '/src/graph/canvas.js';
+import { createViewport,toScreen,toWorld } from '/src/graph/viewport.js';
+import { snapMovingCurve } from '/src/graph/point-magnets.js';
+import { contactTangentSlope } from '/src/graph/curve-contacts.js';
+import { serializeDocument } from '/src/export.js';
+import { CURVE_CONTACT_CASES } from '/tests/fixtures/curve-contact-cases.js';
+const stage=document.querySelector('#stage'),out=document.querySelector('#result');let store,svg,dispose;
+const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-7;
+const sameSlope=(a,b)=>a===null||b===null?a===b:Math.abs(Math.atan(a)-Math.atan(b))<1e-6;
+const view=()=>createViewport(stage.clientWidth,stage.clientHeight,store.getState().quadrantMode,store.getState());
+function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:95,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x*r.width/v.width,clientY:r.top+s.y*r.height/v.height,...flags}));}
+const click=p=>{send('pointerdown',p);send('pointerup',p)};
+function mount(){dispose?.();dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};}
+// A world point `along` px down the tangent from the contact and `across` px off it.
+function pointerAt(p,slope,along,across){const u=view().unit,n=slope===null?1:Math.hypot(1,slope),d=slope===null?{x:0,y:1}:{x:1/n,y:slope/n};return{x:p.x+(d.x*along-d.y*across)/u,y:p.y+(d.y*along+d.x*across)/u};}
+const feedback=()=>svg.querySelector('.snap-feedback[data-snap-kind="tangent"]');
+const fixtures=CURVE_CONTACT_CASES.filter(c=>['free oblique interior','free vertical interior','opposite cobb-douglas and cobb-douglas'].includes(c.name));
+document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok,name)=>{if(!ok)throw Error(name);passed.push(name)};try{
+ for(const size of [800,312])for(const flipX of [false,true])for(const flipY of [false,true])for(const fixture of fixtures){
+  stage.style.width=size+'px';const setup=fixture.setup();store=setup.store;store.updateDiagram({flipX,flipY});mount();
+  const name=`${size} ${flipX}/${flipY} ${fixture.name}`,state=store.getState(),moving=[...state.curves,...state.sketches].find(c=>c.id===setup.moving);
+  const contact=snapMovingCurve(moving,state,view().bounds,view().unit,{axis:fixture.axis});
+  store.selectObject(setup.moving);store.updateSelected({anchor:contact.anchor,translate:true});
+  const found=contactTangentSlope(store.getState(),view().bounds,contact.point);check(found,`${name}: contact reports its shared tangent`);
+  // Existing flow: point magnet on the contact, then the through-point line.
+  store.setToolMode('point');const off=pointerAt(contact.point,found.slope,4,5);send('pointermove',off);
+  check(feedback()?.querySelector('.snap-feedback-label')?.textContent.includes('접점 맞춤'),`${name}: point hover shows the contact`);
+  click(off);const point=store.getState().points.at(-1);check(near(point.anchor,contact.point),`${name}: point stores the exact contact`);
+  const lineId=store.lineThroughSelectedPoint({slope:contactTangentSlope(store.getState(),view().bounds,point.anchor).slope});
+  let line=store.getState().lines.find(l=>l.id===lineId);
+  check(sameSlope(line.slope,found.slope)&&near(line.anchor,contact.point)&&line.binding?.sourceId===point.id,`${name}: new line starts on the common tangent and follows the point`);
+  // Rotate it away, then drag the rotation handle back onto the tangent.
+  store.updateSelected({slope:found.slope===null?1:found.slope===0?-3:-1/found.slope});const before=JSON.stringify(serializeDocument(store.getState()));
+  const handle=svg.querySelector(`[data-id="${lineId}"][data-action="rotate"]`);
+  send('pointerdown',toWorld({x:Number(handle.getAttribute('cx')),y:Number(handle.getAttribute('cy'))},view()),{},handle);
+  send('pointermove',pointerAt(contact.point,found.slope,90,40));check(!feedback(),`${name}: far rotation is free`);
+  send('pointermove',pointerAt(contact.point,found.slope,90,12));line=store.getState().lines.find(l=>l.id===lineId);
+  check(sameSlope(line.slope,found.slope)&&near(line.anchor,contact.point),`${name}: 16px rotation captures the tangent and keeps the contact`);
+  check(feedback()?.querySelector('.snap-feedback-label')?.textContent.includes('접선 맞춤')&&getComputedStyle(feedback()).pointerEvents==='none',`${name}: rotation uses common tangent feedback`);
+  check(new Set([...svg.querySelectorAll('[data-snap-source]')].map(n=>n.dataset.snapSource)).size===2,`${name}: both touching curves are highlighted`);
+  send('pointermove',pointerAt(contact.point,found.slope,90,20));check(sameSlope(store.getState().lines.find(l=>l.id===lineId).slope,found.slope),`${name}: held inside 24px`);
+  send('pointermove',pointerAt(contact.point,found.slope,90,8),{altKey:true});
+  check(!feedback()&&!sameSlope(store.getState().lines.find(l=>l.id===lineId).slope,found.slope),`${name}: Alt bypasses the tangent magnet`);
+  const end=pointerAt(contact.point,found.slope,90,6);send('pointermove',end);send('pointerup',end);
+  check(sameSlope(store.getState().lines.find(l=>l.id===lineId).slope,found.slope)&&!feedback(),`${name}: release stores the tangent slope and clears feedback`);
+  store.undo();check(JSON.stringify(serializeDocument(store.getState()))===before,`${name}: one undo restores the rotation`);
+  store.redo();
+  // The contact is still a shared target for other tools after the gesture.
+  store.setToolMode('dashed');click(pointerAt(contact.point,found.slope,-3,4));
+  const far=pointerAt(contact.point,found.slope,-120,-60);send('pointermove',far);click(far);
+  check(near(store.getState().dashedLines.at(-1)?.anchor??{x:NaN,y:NaN},contact.point),`${name}: dashed start still snaps to the contact`);
+ }
+ dispose?.();out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
+}catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};
+</script></html>

@@ -12,7 +12,7 @@ export function snapFeedbackModel(candidate,{coordinates=false}={}) {
   if (!candidate?.point) return null;
   const kind=candidate.kind??'tangent';
   const ids=[...new Set([...(candidate.ids??[]),...(candidate.sourceId?[candidate.sourceId]:[])])];
-  const label=candidate.label??(kind==='free'?'':kind==='tangent'?'접점 맞춤':kind==='kink'?'꺾임 맞춤':kind==='point'?'점 맞춤':kind==='intersection'?'교점 맞춤'
+  const label=candidate.label??(kind==='free'?'':kind==='tangent'?'접점 맞춤':kind==='kink'?'꺾임 맞춤':kind==='minimum'?'최저점 맞춤':kind==='endpoint'?'끝점 맞춤':kind==='point'?'점 맞춤':kind==='intersection'?'교점 맞춤'
     :kind==='intercept'?(candidate.axis==='origin'?'원점':['x','y'].includes(candidate.axis)?`${candidate.axis}절편`:'절편 맞춤'):ids.some(id=>id.startsWith('axis-'))?'축 맞춤':'선 맞춤');
   return {point:candidate.point,kind,ids,label,text:[label,coordinates?pointCoordinatesLabel(candidate.point):''].filter(Boolean).join(' ')};
 }

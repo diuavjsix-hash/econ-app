@@ -1,0 +1,834 @@
+{
+  "schemaVersion": 11,
+  "objectOrder": [
+    "line-1",
+    "fill-1",
+    "curve-1",
+    "sum-1",
+    "sketch-1"
+  ],
+  "fills": [
+    {
+      "id": "fill-1",
+      "type": "fill",
+      "name": "칠한 구역",
+      "label": "A",
+      "color": "#6068e8",
+      "opacity": 0.24,
+      "parentId": null,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "rings": [
+        [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 8
+          }
+        ]
+      ]
+    }
+  ],
+  "sketches": [
+    {
+      "start": {
+        "x": 1,
+        "y": 8
+      },
+      "end": {
+        "x": 8,
+        "y": 2
+      },
+      "anchor": {
+        "x": 3.999999999999999,
+        "y": 4.000000000000001
+      },
+      "tangent": {
+        "x": 0.7071067811865475,
+        "y": -0.7071067811865475
+      },
+      "leftReach": 0.5,
+      "rightReach": 0.5,
+      "id": "sketch-1",
+      "type": "sketch",
+      "name": "직선에 접한 자유 곡선",
+      "color": "#4c8e9a",
+      "binding": {
+        "kind": "tangent",
+        "sourceId": "line-1",
+        "parameter": 5.65685424949238,
+        "direction": {
+          "x": 0.7071067811865475,
+          "y": -0.7071067811865475
+        }
+      },
+      "parentId": null,
+      "geometry": {
+        "type": "piecewise-quadratic-bezier",
+        "controlPoints": [
+          [
+            {
+              "x": 1,
+              "y": 8
+            },
+            {
+              "x": 2.2322330470336307,
+              "y": 5.767766952966369
+            },
+            {
+              "x": 3.999999999999999,
+              "y": 4.000000000000001
+            }
+          ],
+          [
+            {
+              "x": 3.999999999999999,
+              "y": 4.000000000000001
+            },
+            {
+              "x": 5.581138830084189,
+              "y": 2.418861169915811
+            },
+            {
+              "x": 8,
+              "y": 2
+            }
+          ]
+        ]
+      }
+    }
+  ],
+  "sums": [
+    {
+      "id": "sum-1",
+      "type": "sum",
+      "name": "수평합 01",
+      "color": "#b67836",
+      "parentId": null,
+      "direction": "horizontal",
+      "nonnegative": true,
+      "sourceIds": [
+        "line-1",
+        "curve-1"
+      ]
+    }
+  ],
+  "groups": [],
+  "points": [],
+  "dashedLines": [],
+  "rulers": [],
+  "coordinateSystem": {
+    "origin": "bottom-right",
+    "quadrants": [
+      1
+    ],
+    "xPositive": "left",
+    "yPositive": "up",
+    "axesVisible": true,
+    "axisNames": {
+      "x": "x",
+      "y": "y"
+    },
+    "lineAxisGap": {
+      "enabled": false,
+      "distance": 0.75
+    }
+  },
+  "showGrid": true,
+  "lines": [
+    {
+      "id": "line-1",
+      "type": "line",
+      "name": "예산선",
+      "color": "#6068e8",
+      "parentId": null,
+      "slope": -1,
+      "intercept": 8,
+      "anchor": {
+        "x": 0,
+        "y": 8
+      },
+      "style": "solid",
+      "vertical": false,
+      "xIntercept": null,
+      "implicit": {
+        "a": 0.7071067811865475,
+        "b": 0.7071067811865475,
+        "c": -5.65685424949238
+      }
+    }
+  ],
+  "curves": [
+    {
+      "id": "curve-1",
+      "type": "curve",
+      "name": "기본 곡선",
+      "color": "#6068e8",
+      "variant": "descending",
+      "parentId": null,
+      "anchor": {
+        "x": 4,
+        "y": 4
+      },
+      "span": 3,
+      "slope": -0.75,
+      "bend": 0.25,
+      "geometry": {
+        "type": "quadratic-bezier",
+        "controlPoints": [
+          {
+            "x": 1,
+            "y": 7
+          },
+          {
+            "x": 4,
+            "y": 3.25
+          },
+          {
+            "x": 7,
+            "y": 2.5
+          }
+        ],
+        "extensions": {
+          "type": "tangent-rays",
+          "rays": [
+            {
+              "anchor": {
+                "x": 1,
+                "y": 7
+              },
+              "direction": {
+                "x": -1,
+                "y": 1.25
+              }
+            },
+            {
+              "anchor": {
+                "x": 7,
+                "y": 2.5
+              },
+              "direction": {
+                "x": 1,
+                "y": -0.25
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "activeDiagramId": "diagram-1",
+  "layout": {
+    "preset": "face2",
+    "slots": [
+      {
+        "diagramId": "diagram-1",
+        "row": 0,
+        "column": 0
+      },
+      {
+        "diagramId": "diagram-2",
+        "row": 0,
+        "column": 1
+      }
+    ]
+  },
+  "diagrams": [
+    {
+      "id": "diagram-1",
+      "name": "합산과 접점",
+      "objectOrder": [
+        "line-1",
+        "fill-1",
+        "curve-1",
+        "sum-1",
+        "sketch-1"
+      ],
+      "fills": [
+        {
+          "id": "fill-1",
+          "type": "fill",
+          "name": "칠한 구역",
+          "label": "A",
+          "color": "#6068e8",
+          "opacity": 0.24,
+          "parentId": null,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "rings": [
+            [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 8,
+                "y": 0
+              },
+              {
+                "x": 0,
+                "y": 8
+              }
+            ]
+          ]
+        }
+      ],
+      "sketches": [
+        {
+          "start": {
+            "x": 1,
+            "y": 8
+          },
+          "end": {
+            "x": 8,
+            "y": 2
+          },
+          "anchor": {
+            "x": 3.999999999999999,
+            "y": 4.000000000000001
+          },
+          "tangent": {
+            "x": 0.7071067811865475,
+            "y": -0.7071067811865475
+          },
+          "leftReach": 0.5,
+          "rightReach": 0.5,
+          "id": "sketch-1",
+          "type": "sketch",
+          "name": "직선에 접한 자유 곡선",
+          "color": "#4c8e9a",
+          "binding": {
+            "kind": "tangent",
+            "sourceId": "line-1",
+            "parameter": 5.65685424949238,
+            "direction": {
+              "x": 0.7071067811865475,
+              "y": -0.7071067811865475
+            }
+          },
+          "parentId": null,
+          "geometry": {
+            "type": "piecewise-quadratic-bezier",
+            "controlPoints": [
+              [
+                {
+                  "x": 1,
+                  "y": 8
+                },
+                {
+                  "x": 2.2322330470336307,
+                  "y": 5.767766952966369
+                },
+                {
+                  "x": 3.999999999999999,
+                  "y": 4.000000000000001
+                }
+              ],
+              [
+                {
+                  "x": 3.999999999999999,
+                  "y": 4.000000000000001
+                },
+                {
+                  "x": 5.581138830084189,
+                  "y": 2.418861169915811
+                },
+                {
+                  "x": 8,
+                  "y": 2
+                }
+              ]
+            ]
+          }
+        }
+      ],
+      "sums": [
+        {
+          "id": "sum-1",
+          "type": "sum",
+          "name": "수평합 01",
+          "color": "#b67836",
+          "parentId": null,
+          "direction": "horizontal",
+          "nonnegative": true,
+          "sourceIds": [
+            "line-1",
+            "curve-1"
+          ]
+        }
+      ],
+      "groups": [],
+      "points": [],
+      "dashedLines": [],
+      "rulers": [],
+      "coordinateSystem": {
+        "origin": "bottom-right",
+        "quadrants": [
+          1
+        ],
+        "xPositive": "left",
+        "yPositive": "up",
+        "axesVisible": true,
+        "axisNames": {
+          "x": "x",
+          "y": "y"
+        },
+        "lineAxisGap": {
+          "enabled": false,
+          "distance": 0.75
+        }
+      },
+      "showGrid": true,
+      "lines": [
+        {
+          "id": "line-1",
+          "type": "line",
+          "name": "예산선",
+          "color": "#6068e8",
+          "parentId": null,
+          "slope": -1,
+          "intercept": 8,
+          "anchor": {
+            "x": 0,
+            "y": 8
+          },
+          "style": "solid",
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": 0.7071067811865475,
+            "b": 0.7071067811865475,
+            "c": -5.65685424949238
+          }
+        }
+      ],
+      "curves": [
+        {
+          "id": "curve-1",
+          "type": "curve",
+          "name": "기본 곡선",
+          "color": "#6068e8",
+          "variant": "descending",
+          "parentId": null,
+          "anchor": {
+            "x": 4,
+            "y": 4
+          },
+          "span": 3,
+          "slope": -0.75,
+          "bend": 0.25,
+          "geometry": {
+            "type": "quadratic-bezier",
+            "controlPoints": [
+              {
+                "x": 1,
+                "y": 7
+              },
+              {
+                "x": 4,
+                "y": 3.25
+              },
+              {
+                "x": 7,
+                "y": 2.5
+              }
+            ],
+            "extensions": {
+              "type": "tangent-rays",
+              "rays": [
+                {
+                  "anchor": {
+                    "x": 1,
+                    "y": 7
+                  },
+                  "direction": {
+                    "x": -1,
+                    "y": 1.25
+                  }
+                },
+                {
+                  "anchor": {
+                    "x": 7,
+                    "y": 2.5
+                  },
+                  "direction": {
+                    "x": 1,
+                    "y": -0.25
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "diagram-2",
+      "name": "최저점 표시와 일반 점",
+      "objectOrder": [
+        "group-1",
+        "sketch-2",
+        "point-1",
+        "line-2",
+        "dashed-1",
+        "curve-2",
+        "curve-3",
+        "curve-4",
+        "curve-5",
+        "curve-6",
+        "line-3",
+        "line-4",
+        "line-5"
+      ],
+      "fills": [],
+      "sketches": [
+        {
+          "start": {
+            "x": 1,
+            "y": 6
+          },
+          "end": {
+            "x": 7,
+            "y": 6
+          },
+          "anchor": {
+            "x": 4,
+            "y": 2
+          },
+          "tangent": {
+            "x": 1,
+            "y": 0
+          },
+          "leftReach": 0.5,
+          "rightReach": 0.5,
+          "id": "sketch-2",
+          "type": "sketch",
+          "name": "U자 곡선",
+          "color": "#4c8e9a",
+          "binding": null,
+          "parentId": "group-1",
+          "showMinimum": true,
+          "geometry": {
+            "type": "piecewise-quadratic-bezier",
+            "controlPoints": [
+              [
+                {
+                  "x": 1,
+                  "y": 6
+                },
+                {
+                  "x": 1.5,
+                  "y": 2
+                },
+                {
+                  "x": 4,
+                  "y": 2
+                }
+              ],
+              [
+                {
+                  "x": 4,
+                  "y": 2
+                },
+                {
+                  "x": 6.5,
+                  "y": 2
+                },
+                {
+                  "x": 7,
+                  "y": 6
+                }
+              ]
+            ]
+          }
+        }
+      ],
+      "sums": [],
+      "groups": [
+        {
+          "id": "group-1",
+          "type": "group",
+          "name": "자유 도식",
+          "parentId": null
+        }
+      ],
+      "points": [
+        {
+          "id": "point-1",
+          "type": "point",
+          "name": "점 01",
+          "color": "#59627a",
+          "parentId": "group-1",
+          "anchor": {
+            "x": 5,
+            "y": 3
+          },
+          "showCoordinates": false
+        }
+      ],
+      "dashedLines": [
+        {
+          "id": "dashed-1",
+          "type": "dashed",
+          "name": "독립 점선",
+          "color": "#7b879c",
+          "parentId": null,
+          "anchor": {
+            "x": 4,
+            "y": 0
+          },
+          "end": {
+            "x": 4,
+            "y": 2
+          }
+        }
+      ],
+      "rulers": [],
+      "coordinateSystem": {
+        "origin": "bottom-left",
+        "quadrants": [
+          1
+        ],
+        "xPositive": "right",
+        "yPositive": "up",
+        "axesVisible": true,
+        "axisNames": {
+          "x": "x",
+          "y": "y"
+        },
+        "lineAxisGap": {
+          "enabled": false,
+          "distance": 0.75
+        }
+      },
+      "showGrid": true,
+      "lines": [
+        {
+          "id": "line-2",
+          "type": "line",
+          "name": "통과 직선 2",
+          "color": "#e69451",
+          "parentId": "point-1",
+          "slope": 1,
+          "intercept": -2,
+          "anchor": {
+            "x": 5,
+            "y": 3
+          },
+          "style": "solid",
+          "binding": {
+            "kind": "through-point",
+            "sourceId": "point-1"
+          },
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": -0.7071067811865475,
+            "b": 0.7071067811865475,
+            "c": 1.414213562373095
+          }
+        },
+        {
+          "id": "line-3",
+          "type": "line",
+          "name": "꺾인 선 (왼쪽)",
+          "color": "#43a999",
+          "parentId": null,
+          "slope": -2,
+          "intercept": 8,
+          "anchor": {
+            "x": 2,
+            "y": 4
+          },
+          "style": "solid",
+          "extent": [
+            null,
+            0
+          ],
+          "segment": {
+            "start": null,
+            "end": {
+              "x": 2,
+              "y": 4
+            }
+          },
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": 0.8944271909999159,
+            "b": 0.4472135954999579,
+            "c": -3.5777087639996634
+          }
+        },
+        {
+          "id": "line-4",
+          "type": "line",
+          "name": "꺾인 선 (오른쪽)",
+          "color": "#cf7299",
+          "parentId": null,
+          "slope": -0.5,
+          "intercept": 5,
+          "anchor": {
+            "x": 2,
+            "y": 4
+          },
+          "style": "solid",
+          "extent": [
+            0,
+            null
+          ],
+          "segment": {
+            "start": {
+              "x": 2,
+              "y": 4
+            },
+            "end": null
+          },
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": 0.4472135954999579,
+            "b": 0.8944271909999159,
+            "c": -4.47213595499958
+          }
+        },
+        {
+          "id": "line-5",
+          "type": "line",
+          "name": "점선 반직선",
+          "color": "#849353",
+          "parentId": null,
+          "slope": 0,
+          "intercept": 4,
+          "anchor": {
+            "x": 2,
+            "y": 4
+          },
+          "style": "dashed",
+          "extent": [
+            0,
+            null
+          ],
+          "segment": {
+            "start": {
+              "x": 2,
+              "y": 4
+            },
+            "end": null
+          },
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": 0,
+            "b": 1,
+            "c": -4
+          }
+        }
+      ],
+      "curves": [
+        {
+          "id": "curve-2",
+          "type": "curve",
+          "name": "콥더글라스 02",
+          "color": "#6068e8",
+          "parentId": null,
+          "family": "cobb-douglas",
+          "anchor": {
+            "x": 3,
+            "y": 3
+          },
+          "shape": 1,
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "원점 기준 확대·축소"
+          }
+        },
+        {
+          "id": "curve-3",
+          "type": "curve",
+          "name": "완전대체재 03",
+          "color": "#43a999",
+          "parentId": null,
+          "family": "substitutes",
+          "anchor": {
+            "x": 3,
+            "y": 3
+          },
+          "shape": 1,
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "기울기 유지 · 평행이동"
+          }
+        },
+        {
+          "id": "curve-4",
+          "type": "curve",
+          "name": "완전보완재 04",
+          "color": "#b67836",
+          "parentId": null,
+          "family": "complements",
+          "anchor": {
+            "x": 3,
+            "y": 3
+          },
+          "shape": 1,
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "원점 기준 · 꺾임 이동"
+          }
+        },
+        {
+          "id": "curve-5",
+          "type": "curve",
+          "name": "준선형효용 05",
+          "color": "#ad5265",
+          "parentId": null,
+          "family": "quasilinear",
+          "anchor": {
+            "x": 3,
+            "y": 3
+          },
+          "shape": 2.0999999999999996,
+          "linearAxis": "y",
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "y축으로 평행이동"
+          }
+        },
+        {
+          "id": "curve-6",
+          "type": "curve",
+          "name": "직각 쌍곡선 06",
+          "color": "#6068e8",
+          "parentId": null,
+          "family": "rectangular-hyperbola",
+          "anchor": {
+            "x": 3,
+            "y": 4
+          },
+          "shape": 1,
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "축을 점근선으로 유지 · 크기 조절"
+          }
+        }
+      ]
+    }
+  ]
+}

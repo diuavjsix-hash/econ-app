@@ -1,5 +1,6 @@
 import { objectModel } from './models/objects.js';
-import { OBJECT_TYPES } from './models/object-types.js';
+import { OBJECT_TYPES, OBJECT_COLLECTIONS } from './models/object-types.js';
+import { TOOL_MODES, toolModeFlags, toolModeOf, requestedToolMode, isOperationMode } from './tool-modes.js';
 import { DEFAULT_AXIS_GAP, MIN_AXIS_GAP, MAX_AXIS_GAP } from './graph/display.js';
 import { prepareDuplicate, DUPLICATABLE, placeCopiesNearby } from './duplicate.js';
 import { validPoint, rulerMetrics } from './graph/ruler.js';
@@ -12,6 +13,8 @@ import { sumError } from './graph/sum.js';
 import { validSketch, unitVector, projectOnLine } from './graph/sketch.js';
 import { resolveRelations, canAttach, dependencyId } from './relations.js';
 import { INDIFFERENCE_FAMILIES } from './graph/indifference.js';
+import { orientCurve, supportsOpposite } from './models/curve-families.js';
+import { followBoxOrigin, defaultOppositeOrigin } from './graph/axes.js';
 import { validFill, fillKey } from './graph/fill.js';
 import { nextFillColor, nextFillLabel } from './graph/fill-style.js';
 
@@ -21,9 +24,9 @@ const COLORS = ['#6068e8', '#e69451', '#43a999', '#cf7299', '#849353', '#699bd1'
 export function createStore() {
   const state = {
     selectedIds: [],
-    lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], fills: [], rulers: [], groups: [], objectOrder: [],
-    fillSelected: false, fillColor: '#6068e8', fillAutoColor: true, fillOpacity: 0.24,
-    selectedId: null, handSelected: true, duplicatePanel: false, sumPanel: false, sketchSelected: false, sketchMode: 'auto', activeTool: 'point', mouseSelected: false, rulerSelected: false, dashedSelected: false, dashedMode: 'free', dashedSnap: true, pointSnap: true, pointCoordinates: false, showGrid: true,
+    ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [],
+    ...toolModeFlags('hand'), fillColor: '#6068e8', fillAutoColor: true, fillOpacity: 0.24,
+    selectedId: null, indifferenceOpposite: false, sketchMode: 'auto', activeTool: 'point', rulerSelected: false, dashedMode: 'free', dashedSnap: true, pointSnap: true, pointCoordinates: false, showGrid: true,
     quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
   let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1, nextDashedId = 1;
@@ -36,8 +39,16 @@ export function createStore() {
     state.selectedIds=objectsOf(state).filter(object=>requested.has(object.id)).map(object=>object.id);
     state.selectedId=state.selectedIds.length===1?state.selectedIds[0]:null;
   };
-  const documentKeys = ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups', 'objectOrder', 'quadrantMode', 'axisNames', 'boxSize', 'boxAxisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
-  const emptyDocument = () => ({ lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], fills: [], rulers: [], groups: [], objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
+  // The only writer of tool-mode flags; each mode's selection rule lives in TOOL_MODES.
+  const enterToolMode = mode => {
+    const spec = TOOL_MODES[mode], selected = new Set(state.selectedIds);
+    Object.assign(state, toolModeFlags(mode));
+    spec.enter?.(state);
+    if (spec.keepSelection && !spec.keepSelection(objectsOf(state).filter(object => selected.has(object.id)))) setSelection([]);
+  };
+  // Each registered collection is part of a diagram document, its history and deletion.
+  const documentKeys = [...OBJECT_COLLECTIONS, 'objectOrder', 'quadrantMode', 'axisNames', 'boxSize', 'boxAxisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
+  const emptyDocument = () => ({ ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
   let layout = { preset: 'single', slots: structuredClone(LAYOUTS.single.slots) };
@@ -53,7 +64,7 @@ export function createStore() {
     return {
       document: structuredClone({ layout, diagrams: diagrams.map(diagram => ({
         ...diagram,
-        ...Object.fromEntries(['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups'].map(key => [key, diagram[key].map(({ collapsed, ...object }) => object)])),
+        ...Object.fromEntries(OBJECT_COLLECTIONS.map(key => [key, diagram[key].map(({ collapsed, ...object }) => object)])),
       })) }),
       activeDiagramId, selectedId: state.selectedId, selectedIds: [...state.selectedIds],
     };
@@ -108,7 +119,7 @@ export function createStore() {
     state[collection].push(object);
     state.objectOrder.push(object.id);
     setSelection([object.id]);
-    if (['line', 'curve', 'sketch', 'sum'].includes(object.type)) { state.fillSelected = false; state.mouseSelected = false; state.rulerSelected = false; state.dashedSelected = false; state.handSelected = true; state.duplicatePanel = false; state.sketchSelected = false; state.sumPanel=false; }
+    if (['line', 'curve', 'sketch', 'sum'].includes(object.type)) enterToolMode('hand');
     emit();
     return object.id;
   };
@@ -116,7 +127,7 @@ export function createStore() {
     getState: snapshot,
     selectDiagram(id) {
       if (id === activeDiagramId || !diagrams.slice(0, layout.slots.length).some(d => d.id === id)) return;
-      if (state.sumPanel || state.duplicatePanel) {state.sumPanel=false;state.duplicatePanel=false;state.handSelected=true;}
+      if (isOperationMode(state)) enterToolMode('hand');
       endHistory(); syncDiagram(); activeDiagramId = id; loadDiagram(); historyRevision++; emit();
     },
     configureLayout(preset, customSlots, quadrantMode, { allQuadrants = true, preserveDirections = false, boxSize = null } = {}) {
@@ -133,7 +144,9 @@ export function createStore() {
         if (!preserveDirections) { diagrams[index].flipX = slot.flipX; diagrams[index].flipY = slot.flipY; }
         if ((allQuadrants || diagrams[index].id === activeDiagramId) && Object.hasOwn(QUADRANT_MODES, quadrantMode)) diagrams[index].quadrantMode = quadrantMode;
         if (quadrantMode==='edgeworth' && (allQuadrants || diagrams[index].id===activeDiagramId)) {
+          const previous={...diagrams[index].boxSize};
           for (const key of ['width','height']) if (Number.isFinite(boxSize?.[key]) && boxSize[key]>=1 && boxSize[key]<=100) diagrams[index].boxSize[key]=boxSize[key];
+          followBoxOrigin(diagrams[index],previous);
         }
       });
       loadDiagram(); historyRevision++; emit();
@@ -164,63 +177,25 @@ export function createStore() {
     clearAll() {
       endHistory();
       if (!state.objectOrder.length) return false;
-      for (const key of ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups', 'objectOrder']) state[key] = [];
+      for (const key of [...OBJECT_COLLECTIONS, 'objectOrder']) state[key] = [];
       setSelection([]);
       historyRevision++;
       emit();
       return true;
     },
     update(patch) {
-      if (patch.handSelected || patch.mouseSelected || patch.dashedSelected || patch.duplicatePanel || patch.sketchSelected || patch.sumPanel) state.fillSelected = false;
-      if (typeof patch.fillSelected === 'boolean') {
-        state.fillSelected = patch.fillSelected;
-        if (patch.fillSelected) {
-          state.fillAutoColor = true;
-          state.handSelected=false; state.mouseSelected=false; state.dashedSelected=false; state.duplicatePanel=false; state.sketchSelected=false; state.sumPanel=false;
-          setSelection([]);
-        }
-      }
+      const mode = requestedToolMode(patch, toolModeOf(state));
+      if (mode) enterToolMode(mode);
       if (typeof patch.fillColor === 'string' && /^#[0-9a-f]{6}$/i.test(patch.fillColor)) { state.fillColor = patch.fillColor; state.fillAutoColor = false; }
       if (Number.isFinite(patch.fillOpacity)) state.fillOpacity = Math.max(0.1, Math.min(0.6, patch.fillOpacity));
-      if (state.selectedIds.length>1 && (patch.mouseSelected || patch.dashedSelected || patch.sketchSelected || patch.duplicatePanel || patch.sumPanel)) setSelection([]);
-      if (patch.handSelected || patch.mouseSelected || patch.dashedSelected || patch.duplicatePanel || patch.sketchSelected) state.sumPanel=false;
       if (['auto','horizontal','vertical'].includes(patch.sketchMode)) state.sketchMode=patch.sketchMode;
       if (typeof patch.axisGapEnabled === 'boolean') state.axisGapEnabled = patch.axisGapEnabled;
       if (Number.isFinite(patch.axisGap)) state.axisGap = Math.max(MIN_AXIS_GAP, Math.min(MAX_AXIS_GAP, patch.axisGap));
       if (typeof patch.showGrid === 'boolean') state.showGrid = patch.showGrid;
       if (typeof patch.pointSnap === 'boolean') state.pointSnap = patch.pointSnap;
       if (typeof patch.pointCoordinates === 'boolean') state.pointCoordinates = patch.pointCoordinates;
-      if (typeof patch.mouseSelected === 'boolean') {
-        state.mouseSelected = patch.mouseSelected;
-        // Switching to the point tool ends the previous line/curve selection.
-        if (patch.mouseSelected) { state.rulerSelected = false; state.dashedSelected = false; state.handSelected = false; state.duplicatePanel = false; state.sketchSelected = false; }
-        if (patch.mouseSelected && [...state.lines, ...state.curves, ...state.sketches, ...state.sums, ...state.dashedLines, ...state.rulers].some(object => object.id === state.selectedId)) setSelection([]);
-      }
       // The ruler tool is intentionally disabled until its behavior is redesigned.
       state.rulerSelected = false;
-      if (typeof patch.dashedSelected === 'boolean') {
-        state.dashedSelected = patch.dashedSelected;
-        if (patch.dashedSelected) {
-          state.mouseSelected = false; state.handSelected = false; state.duplicatePanel = false; state.sketchSelected = false;
-          if (!state.dashedLines.some(line => line.id === state.selectedId)) setSelection([]);
-        }
-      }
-      if (typeof patch.duplicatePanel === 'boolean') {
-        state.duplicatePanel = patch.duplicatePanel;
-        if (patch.duplicatePanel) { state.mouseSelected = false; state.dashedSelected = false; state.handSelected = false; state.sketchSelected = false; }
-      }
-      if (typeof patch.sketchSelected === 'boolean') {
-        state.sketchSelected=patch.sketchSelected;
-        if (patch.sketchSelected) { state.handSelected=false; state.mouseSelected=false; state.dashedSelected=false; state.duplicatePanel=false; setSelection([]); }
-      }
-      if (typeof patch.sumPanel==='boolean') {
-        state.sumPanel=patch.sumPanel;
-        if (patch.sumPanel) {state.handSelected=false;state.mouseSelected=false;state.dashedSelected=false;state.duplicatePanel=false;state.sketchSelected=false;}
-      }
-      if (patch.handSelected === true) {
-        state.handSelected = true; state.mouseSelected = false; state.dashedSelected = false; state.duplicatePanel = false; state.sketchSelected = false;
-      }
-      if (!state.mouseSelected && !state.dashedSelected && !state.duplicatePanel && !state.sketchSelected && !state.sumPanel && !state.fillSelected) state.handSelected = true;
       if (typeof patch.dashedSnap === 'boolean') state.dashedSnap = patch.dashedSnap;
       if (['free', 'horizontal', 'vertical'].includes(patch.dashedMode)) state.dashedMode = patch.dashedMode;
       if (Object.hasOwn(QUADRANT_MODES, patch.quadrantMode)) state.quadrantMode = patch.quadrantMode;
@@ -229,8 +204,19 @@ export function createStore() {
         if (typeof patch.axisNames?.[axis] === 'string') state.axisNames[axis] = patch.axisNames[axis].slice(0, 80);
         if (typeof patch.boxAxisNames?.[axis] === 'string') state.boxAxisNames[axis] = patch.boxAxisNames[axis].slice(0, 80);
       }
+      const previousBox={...state.boxSize};
       for (const key of ['width','height']) if (Number.isFinite(patch.boxSize?.[key]) && patch.boxSize[key]>=1 && patch.boxSize[key]<=100) state.boxSize[key]=patch.boxSize[key];
+      followBoxOrigin(state,previousBox);
+      if (typeof patch.indifferenceOpposite === 'boolean') state.indifferenceOpposite = patch.indifferenceOpposite;
       emit();
+    },
+    setToolMode(mode) {
+      if (!Object.hasOwn(TOOL_MODES, mode)) return false;
+      enterToolMode(mode); emit(); return true;
+    },
+    /** Tool buttons toggle their mode; leaving any mode returns to selection. */
+    toggleToolMode(mode) {
+      return this.setToolMode(toolModeOf(state) === mode ? 'hand' : mode);
     },
     addLine() {
       const index = nextId - 1;
@@ -257,8 +243,12 @@ export function createStore() {
       if (!Object.hasOwn(INDIFFERENCE_FAMILIES,family)) return null;
       const index=nextCurveId++,preset=INDIFFERENCE_FAMILIES[family];
       const anchor=validPoint(placement.anchor)?{x:Math.max(0.1,placement.anchor.x),y:Math.max(0.1,placement.anchor.y)}:{x:3,y:3};
-      return add('curves',{id:`curve-${index}`,type:'curve',family,name:`${preset.label} ${String(index).padStart(2,'0')}`,
-        color:preset.color,anchor,shape:family==='quasilinear'?Math.max(0.2,Math.min(20,anchor.x*0.7)):1,linearAxis:'y'});
+      const curve={id:`curve-${index}`,type:'curve',family,name:`${preset.label} ${String(index).padStart(2,'0')}`,color:preset.color,anchor,shape:1,linearAxis:'y'};
+      // A mirrored curve is drawn from the opposite origin; its own coordinates set the default shape.
+      const opposite=Boolean(placement.opposite)&&supportsOpposite(curve)&&orientCurve(curve,true,validPoint(placement.oppositeOrigin)?placement.oppositeOrigin:defaultOppositeOrigin(state,anchor));
+      const ownX=opposite?curve.oppositeOrigin.x-anchor.x:anchor.x;
+      if (family==='quasilinear') curve.shape=Math.max(0.2,Math.min(20,ownX*0.7));
+      return add('curves',curve);
     },
     addSketch(start, end, anchor, { lineId=null, tangent=null, mode=state.sketchMode } = {}) {
       if (![start,end,anchor].every(validPoint)) return null;
@@ -350,14 +340,14 @@ export function createStore() {
     selectObjects(ids) {
       if (!Array.isArray(ids)) return false;
       setSelection(ids);
-      if (state.selectedIds.length && !state.duplicatePanel) {state.fillSelected=false;state.handSelected=true;state.mouseSelected=false;state.dashedSelected=false;state.sketchSelected=false;state.sumPanel=false;}
+      if (state.selectedIds.length && !state.duplicatePanel) enterToolMode('hand');
       emit();
       return true;
     },
     selectObject(id,{toggle=false}={}) {
       const object = objectsOf(state).find(item => item.id === id);
       if (id === null || object) {
-        if (object && !state.duplicatePanel) { state.fillSelected=false; state.handSelected = true; state.mouseSelected = false; state.dashedSelected = false; state.sketchSelected=false; state.sumPanel=false; }
+        if (object && !state.duplicatePanel) enterToolMode('hand');
         setSelection(id===null?[]:toggle?(state.selectedIds.includes(id)?state.selectedIds.filter(selected=>selected!==id):[...state.selectedIds,id]):[id]);
         emit();
       }
@@ -442,7 +432,7 @@ export function createStore() {
         return id;
       };
       for (const object of byId.values()) object.parentId = survivingParent(object.parentId);
-      for (const collection of ['lines', 'curves', 'sketches', 'sums', 'points', 'dashedLines', 'fills', 'rulers', 'groups']) state[collection] = state[collection].filter((item) => !deleted.has(item.id));
+      for (const collection of OBJECT_COLLECTIONS) state[collection] = state[collection].filter((item) => !deleted.has(item.id));
       state.objectOrder = state.objectOrder.filter((id) => !deleted.has(id));
       const next=removed.length===1?(survivingParent(removed[0].parentId) ?? state.objectOrder.at(-1) ?? null):null;
       setSelection(next?[next]:[]);

@@ -34,6 +34,9 @@ async function appSmoke(width, height) {
   const line = exported(doc).lines[0]; check(line.slope === -1, `${size}: line numeric edit uses its existing schema`);
   input(doc, 'slope-input', ''); check(exported(doc).lines[0].slope === -1, `${size}: shared numeric validation rejects an empty slope without changing geometry`);
   input(doc, 'slope-input', 0); check(exported(doc).lines[0].slope === 0, `${size}: shared numeric validation accepts a zero slope`);
+  const lineDashed = doc.getElementById('line-dashed'); lineDashed.click();
+  check(exported(doc).lines[0].style === 'dashed' && doc.querySelector('.graph-line.is-dashed'), `${size}: the line inspector switches the same line to dashed`);
+  lineDashed.click(); check(exported(doc).lines[0].style === 'solid' && !doc.querySelector('.graph-line.is-dashed'), `${size}: and back to solid`);
   doc.getElementById('sketch-tool').click(); doc.querySelector('[data-add-indifference="ppc"]').click();
   check(doc.querySelector('#ppc-radii:not([hidden])'), `${size}: PPC inspector renders shared fields`);
   input(doc, 'object-name', '공통 편집'); input(doc, 'ppc-radius-x', 6);
@@ -67,6 +70,21 @@ async function appSmoke(width, height) {
   check(shown.sketches.length===1&&shown.sketches[0].showMinimum&&shown.points.length===0&&doc.querySelectorAll('[data-minimum-for]').length===1,`${size}: minimum toggle stores display without generating point/line objects`);
   check(doc.getElementById('point-settings').hidden&&doc.getElementById('binding-settings').hidden,`${size}: minimum display exposes no point-following or binding actions`);
   minimum.click();check(!doc.querySelector('[data-minimum-for]'),`${size}: checkbox turns the display off`);
+  // A cap touching the cup's bottom at (4,2): the real button starts the line on the shared tangent.
+  // The inspector can resize the graph on narrow screens: map taps with the current box.
+  const pointer=(p,flags={},type='pointerdown')=>{const r=svg.getBoundingClientRect(),v=createViewport(r.width,r.height,'edgeworth',{boxSize:{width:10,height:8}}),s=toScreen(p,v);svg.dispatchEvent(new win.PointerEvent(type,{bubbles:true,cancelable:true,pointerId:94,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x,clientY:r.top+s.y,...flags}));};
+  const tap=(p,flags)=>{pointer(p,flags,'pointerdown');pointer(p,flags,'pointerup');};
+  doc.getElementById('sketch-tool').click();const mode=doc.getElementById('sketch-mode');mode.value='horizontal';mode.dispatchEvent(new win.Event('change',{bubbles:true}));
+  for(const p of [{x:1,y:0.5},{x:7,y:0.5},{x:4,y:2}]) tap(p,{altKey:true});
+  doc.getElementById('finish-tool').click();doc.getElementById('mouse-tool').click();tap({x:4.08,y:2.06});
+  // Taps round to pixels, so the contact is the shared anchor of both drawn curves.
+  const touching=exported(doc),contactPoint=touching.points.at(-1),[cup,cap]=touching.sketches.map(k=>k.anchor);
+  const at=(p,q)=>p&&q&&Math.hypot(p.x-q.x,p.y-q.y)<1e-6;
+  check(touching.sketches.length===2&&at(cup,cap)&&Math.hypot(cup.x-4,cup.y-2)<0.01&&at(contactPoint?.anchor,cup),`${size}: point snaps to the cup/cap contact`);
+  check(!doc.getElementById('point-settings').hidden,`${size}: the contact point shows its through-line action`);
+  doc.getElementById('point-through-line').click();const through=exported(doc).lines.at(-1);
+  check(through&&Math.abs(through.slope)<1e-6&&at(through.anchor,cup),`${size}: through-line button starts on the common tangent`);
+  doc.getElementById('undo-action').click();check(exported(doc).lines.length===touching.lines.length,`${size}: one undo removes the tangent line`);
   el.remove();
 }
 try {
@@ -115,6 +133,18 @@ try {
   check(edgeworthResult.ok,`edgeworth minimum fixture: ${edgeworthResult.error ?? 'completed'}`);
   for (const name of edgeworthResult.passed) passed.push(`edgeworth minimum: ${name}`);
   edgeworth.remove();
+  const extentFrame = await frame('./line-extent.html', 1000, 900);
+  await wait(() => extentFrame.contentDocument.querySelector('#run'), 'line extent fixture'); extentFrame.contentDocument.querySelector('#run').click();
+  const extentResult = await wait(() => { try { return JSON.parse(extentFrame.contentDocument.querySelector('#result').textContent); } catch { return null; } }, 'line extent report');
+  check(extentResult.ok,`line extent fixture: ${extentResult.error ?? 'completed'}`);
+  for (const name of extentResult.passed) passed.push(`line extent: ${name}`);
+  extentFrame.remove();
+  const tangentLine = await frame('./contact-tangent-line.html', 1000, 900);
+  await wait(() => tangentLine.contentDocument.querySelector('#run'), 'contact tangent line fixture'); tangentLine.contentDocument.querySelector('#run').click();
+  const tangentResult = await wait(() => { try { return JSON.parse(tangentLine.contentDocument.querySelector('#result').textContent); } catch { return null; } }, 'contact tangent line report');
+  check(tangentResult.ok,`contact tangent line fixture: ${tangentResult.error ?? 'completed'}`);
+  for (const name of tangentResult.passed) passed.push(`contact tangent line: ${name}`);
+  tangentLine.remove();
   await appSmoke(1280, 800); await appSmoke(390, 844);
   check(errors.length === 0, `no browser runtime errors: ${errors.join('; ')}`);
 } catch (error) { errors.push(error.stack ?? String(error)); }

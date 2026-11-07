@@ -45,6 +45,15 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   store.updateSelected({anchor:{x:3,y:1}});const minimum=toScreen(sketchMinimum(store.getState().sketches[0]),view()),dot=svg.querySelector('[data-minimum-for] circle');
   check(near({x:Number(dot.getAttribute('cx')),y:Number(dot.getAttribute('cy'))},minimum),`${size}: display follows the actual finite minimum`);
   store.updateSelected({showMinimum:false});check(!svg.querySelector('[data-minimum-for]'),`${size}: display can be turned off`);store.undo();check(svg.querySelector('[data-minimum-for]'),`${size}: undo restores only the display`);
+  const low=sketchMinimum(store.getState().sketches[0]),off={x:low.x+0.12,y:low.y+0.08},minimumMarker=()=>svg.querySelector('.snap-feedback[data-snap-kind="minimum"]');
+  store.update({mouseSelected:true,pointSnap:true});send('pointermove',off);
+  check(minimumMarker()&&svg.querySelector('.snap-feedback-label')?.textContent.includes('최저점 맞춤'),`${size}: point hover snaps to the displayed minimum`);
+  click(off);check(near(store.getState().points.at(-1).anchor,low)&&!store.getState().lines.length&&!store.getState().points.at(-1).binding,`${size}: point creation stores the exact minimum without a relation`);
+  store.undo();store.update({dashedSelected:true});click({x:low.x-2,y:low.y+3});send('pointermove',off);
+  check(minimumMarker(),`${size}: dashed preview endpoint snaps to the minimum`);click(off);
+  check(near(store.getState().dashedLines.at(-1).end,low),`${size}: dashed endpoint stores the exact minimum`);store.undo();
+  store.selectObject(id);store.updateSelected({showMinimum:false});store.update({mouseSelected:true});send('pointermove',off);
+  check(!minimumMarker(),`${size}: a hidden minimum is not a magnet`);store.undo();store.update({handSelected:true});store.selectObject(id);
   store.removeSelected();check(!svg.querySelector('[data-minimum-for]')&&!store.getState().points.length,`${size}: deleting the curve leaves no orphan minimum point`);
  }
  dispose?.();out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);

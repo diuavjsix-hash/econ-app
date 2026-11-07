@@ -1,3 +1,4 @@
+import { isTrimmed } from './line-extent.js';
 import { curvePoint } from './curve.js';
 import { lineDisplayRegions } from './display.js';
 import { clipSegment } from './ruler.js';
@@ -12,6 +13,7 @@ export function sumSources(sum, state) {
 
 export function sumError(sources, direction) {
   if (sources.some(isIndifference)) return '무차별곡선은 합산 대상이 아닙니다.';
+  if (sources.some(source => source?.type === 'line' && isTrimmed(source))) return '끝을 자른 직선은 합산 대상이 아닙니다.';
   if (!['vertical', 'horizontal'].includes(direction)) return '합 방향을 선택해 주세요.';
   if (sources.length < 2 || sources.some(source => !source || !['line', 'curve'].includes(source.type))) return '직선·곡선을 두 개 이상 선택해 주세요.';
   if (direction === 'vertical' && sources.some(source => source.type === 'line' && source.slope === null)) return '수직선은 수직합에 사용할 수 없습니다. 수평합을 선택해 주세요.';

@@ -7,7 +7,7 @@ export function mountPointTool(root, store) {
   const mouseButton = root.querySelector('#mouse-tool');
   const mouseSettings = root.querySelector('#mouse-settings');
   mouseButton.addEventListener('click', () => {
-    store.update({ mouseSelected: !store.getState().mouseSelected });
+    store.toggleToolMode('point');
   });
   snapToggle.addEventListener('change', () => store.update({ pointSnap: snapToggle.checked }));
   coordinatesToggle.addEventListener('change', () => store.update({ pointCoordinates: coordinatesToggle.checked }));

@@ -3,7 +3,9 @@ import { toScreen } from './viewport.js';
 import { displayedLineSegments, lineEditingGeometry, isLinePointVisible } from './display.js';
 import { curvePoint } from './curve.js';
 import { drawSketch } from './sketch-view.js';
-import { curveFamilyOf } from '../models/curve-families.js';
+import { curveFamilyOf, isOppositeCurve } from '../models/curve-families.js';
+import { oppositeOriginEditable } from './axes.js';
+import { LINE_END_ACTIONS, LINE_EDGE_PX, linePointAt, visibleLineEnds } from './line-extent.js';
 
 const node = (...args) => SVG_RENDERER.element(...args);
 const circle = (object, point, action, radius, className, label, title, viewport) => {
@@ -18,6 +20,9 @@ function curveHandles(object, viewport, state) {
   if (isLinePointVisible(shapePoint, bounds, state)) group.append(circle(object, shapePoint, family ? 'ic-shape' : 'bend', 7, 'rotate-handle bend-handle', shapeLabel,
     family ? `드래그하여 ${shapeLabel}` : '위아래로 드래그하여 휘어짐 조절', viewport));
   if (isLinePointVisible(object.anchor, bounds, state)) group.append(circle(object, object.anchor, 'move', 5, 'move-handle', null, '드래그하여 이동', viewport));
+  if (isOppositeCurve(object) && oppositeOriginEditable(object, state) && isLinePointVisible(object.oppositeOrigin, bounds, state)) {
+    group.append(circle(object, object.oppositeOrigin, 'ic-origin', 6, 'rotate-handle opposite-origin-handle', '반대 원점', '드래그하여 반대 원점과 곡선 이동', viewport));
+  }
   for (const handle of family?.endpointHandles(object) ?? []) {
     const p = handle.point;
     if (p.x >= bounds.xMin && p.x <= bounds.xMax && p.y >= bounds.yMin && p.y <= bounds.yMax) group.append(circle(object, p, handle.action, 7, 'rotate-handle', handle.label, `드래그하여 ${handle.label} 조절`, viewport));
@@ -33,6 +38,16 @@ function lineHandles(object, viewport, state) {
     const fraction = distance === 0 ? 0 : Math.min(90, distance * 0.7) / distance;
     const point = { x: editing.anchor.x + (endpoint.x - editing.anchor.x) * fraction, y: editing.anchor.y + (endpoint.y - editing.anchor.y) * fraction };
     group.append(circle(object, point, 'rotate', 7, 'rotate-handle', `기울기 조절 ${index + 1}`, '드래그하여 기울기 조절', viewport));
+  }
+  // End handles: a drawn end sits on its point; an open end sits just inside the edge.
+  const ends = visibleLineEnds(object, viewport.bounds, state), inset = LINE_EDGE_PX * 0.6 / viewport.unit;
+  for (const [index, action] of Object.keys(LINE_END_ACTIONS).entries()) {
+    const end = ends?.ends[index];
+    if (!end) continue;
+    const t = end.open ? end.t + (index ? -inset : inset) : end.t;
+    if (end.open && ends.ends[1].t - ends.ends[0].t < 2 * inset) continue; // Too short to hold an inset handle.
+    const label = `끝 조절 ${index + 1}`;
+    group.append(circle(object, linePointAt(object, t), action, 5, `rotate-handle end-handle${end.open ? ' is-open' : ''}`, label, '드래그하여 길이 조절 · 가장자리로 끌면 다시 이어짐', viewport));
   }
   group.append(circle(object, editing.anchor, 'move', 5, 'move-handle', null, '드래그하여 이동', viewport));
   return group;

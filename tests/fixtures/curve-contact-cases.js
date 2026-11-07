@@ -57,5 +57,17 @@ export const CURVE_CONTACT_CASES = [
       return { store, target, moving };
     },
   })),
+  // The Edgeworth case: a curve drawn from the opposite origin touches an origin-side curve.
+  ...['cobb-douglas', 'substitutes', 'quasilinear'].map(family => ({
+    name: `opposite ${family} and cobb-douglas`, families: [], opposite: family, expected: { x: 3, y: 3 },
+    setup() {
+      const store = createStore(), origin = { x: 8, y: 8 };
+      const target = store.addIndifference('cobb-douglas', { anchor: { x: 3, y: 3 } });
+      const moving = store.addIndifference(family, family === 'quasilinear' ? { anchor: { x: 3, y: 2.95 }, opposite: true, oppositeOrigin: origin }
+        : { anchor: { x: 3.05, y: 3.05 }, opposite: true, oppositeOrigin: origin });
+      if (family === 'quasilinear') store.updateSelected({ shape: 5 });
+      return { store, target, moving, expected: this.expected };
+    },
+  })),
 ];
 export const NON_SMOOTH_CONTACT_FAMILIES = ['complements'];

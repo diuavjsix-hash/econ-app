@@ -48,10 +48,11 @@ export function lineEquation(line) {
 }
 
 /** Parametric rectangle clipping avoids slope division and handles true vertical lines. */
-export function clipLine(line, bounds) {
+/** Visible parameter interval along directionOf(slope) from the anchor, honoring a trimmed extent. */
+export function clipLineParameters(line, bounds) {
   const direction = directionOf(line.slope);
-  let start = -Infinity;
-  let end = Infinity;
+  let start = line.extent?.[0] ?? -Infinity;
+  let end = line.extent?.[1] ?? Infinity;
   for (const [axis, min, max] of [['x', bounds.xMin, bounds.xMax], ['y', bounds.yMin, bounds.yMax]]) {
     if (direction[axis] === 0) {
       if (line.anchor[axis] < min || line.anchor[axis] > max) return null;
@@ -63,7 +64,14 @@ export function clipLine(line, bounds) {
     end = Math.min(end, Math.max(t1, t2));
     if (start > end) return null;
   }
-  return [start, end].map((t) => ({
+  return [start, end];
+}
+
+export function clipLine(line, bounds) {
+  const range = clipLineParameters(line, bounds);
+  if (!range) return null;
+  const direction = directionOf(line.slope);
+  return range.map((t) => ({
     x: Math.max(bounds.xMin, Math.min(bounds.xMax, line.anchor.x + t * direction.x)),
     y: Math.max(bounds.yMin, Math.min(bounds.yMax, line.anchor.y + t * direction.y)),
   }));

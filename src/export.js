@@ -25,7 +25,7 @@ function serializeDiagram(state) {
 
 export function serializeDocument(state) {
   return {
-    schemaVersion: 10,
+    schemaVersion: 11,
     // Retain the active diagram's fields for consumers of the earlier format.
     ...serializeDiagram(state),
     activeDiagramId: state.activeDiagramId,

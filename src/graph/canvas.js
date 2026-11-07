@@ -2,23 +2,23 @@ import { interactionFor } from './interactions.js';
 import { renderEditingHandles } from './editing-handles.js';
 import { SVG_RENDERER, STROKE_RENDERER } from './svg-renderer.js';
 import { objectModel } from '../models/objects.js';
-import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions, isLinePointVisible } from './display.js';
+import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions } from './display.js';
 import { drawDashedLine } from './dashed-view.js';
-import { constrainRuler } from './ruler.js';
-import { directionOf } from './math.js';
 import { createViewport, toScreen as projectPoint, toWorld } from './viewport.js';
 import { pointCoordinatesLabel } from './point.js';
 import { SnapTargetCache, snapPoint } from './snap.js';
+import { LINE_END_ACTIONS } from './line-extent.js';
 import { geometryKey } from './snap-context.js';
 import { objectsOf, selectedIdsOf } from '../objects.js';
-import { unitVector, validSketch, distance, sketchMinimum } from './sketch.js';
+import { distance, displayedSketchMinimum } from './sketch.js';
 import { drawSketch } from './sketch-view.js';
 import { axisAlignedSnap } from './movement.js';
 import { selectionRectangle, objectsInRectangle } from './selection.js';
 import { snapDashedPoint } from './dashed-magnets.js';
-import { buildFillRegions, findFillRegion, fillKey, fillLabelPosition } from './fill.js';
+import { buildFillRegions, fillLabelPosition } from './fill.js';
 import { renderSnapFeedback } from './snap-feedback.js';
-import { snapSketchTangent } from './sketch-magnets.js';
+import { CREATION_TOOLS } from './creation-tools.js';
+import { toolModeOf, usesDrawingPointer } from '../tool-modes.js';
 
 let nextCanvasId = 1;
 const element = (...args) => SVG_RENDERER.element(...args);
@@ -32,15 +32,15 @@ export function mountGraph(container, store) {
   let viewport;
   let drag = null;
   let marquee = null;
-  let draft = null;
-  let sketchDraft = [];
-  let sketchHover = null;
   let snapTarget = null;
   let tangentSnap = null;
   let dashedSnap = null;
   let pointer = null;
   const snapCache = new SnapTargetCache();
-  let fillCache = { signature: '', regions: [] }, fillHover = null, fillMessage = '';
+  let fillCache = { signature: '', regions: [] };
+  // One plain session per creation tool; CREATION_TOOLS owns their pointer behavior.
+  const creationSessions = Object.fromEntries(Object.entries(CREATION_TOOLS).map(([mode, tool]) => [mode, tool.createSession()]));
+  const activeCreation = () => { const mode = toolModeOf(currentState); return CREATION_TOOLS[mode] ? { tool: CREATION_TOOLS[mode], session: creationSessions[mode] } : null; };
   const fillLabelCache = new Map();
 
   function fillRegions() {
@@ -67,22 +67,6 @@ export function mountGraph(container, store) {
     layer.append(element('text', { x: point.x, y: point.y, 'font-size': size, 'text-anchor': 'middle', 'dominant-baseline': 'central',
       class: 'fill-label', 'data-fill-label': cacheId, 'aria-hidden': 'true' }, fill.label));
   }
-  function updateFillPreview() {
-    const layer = svg.querySelector('.fill-preview-layer');
-    if (!layer) return;
-    layer.replaceChildren();
-    if (!currentState.fillSelected) return;
-    if (fillHover) {
-      const existing = currentState.fills?.find(fill => fillKey(fill) === fillHover.key);
-      const color = existing && currentState.fillAutoColor ? existing.color : currentState.fillColor;
-      const painted = existing?.color === color && existing.opacity === currentState.fillOpacity;
-      layer.append(element('path', { d: fillPath(fillHover), 'fill-rule': 'evenodd', fill: color,
-        'fill-opacity': painted ? 0 : currentState.fillOpacity, stroke: color, 'stroke-width': 1.5, 'stroke-dasharray': '4 3', class: 'fill-hover' }));
-      if (!existing) appendFillLabel(layer, { ...fillHover, label: currentState.fillNextLabel }, 'preview');
-    }
-    if (fillMessage) layer.append(element('text', { x: viewport.plot.left + 12, y: viewport.plot.top + 24, class: 'fill-message', role: 'status' }, fillMessage));
-  }
-
   function dashedTargets() {
     return snapCache.get(currentState, viewport.bounds, drag?.object.id ?? null);
   }
@@ -111,7 +95,7 @@ export function mountGraph(container, store) {
   function updateSnapFeedback(position) {
     const layer = svg.querySelector('.snap-feedback-layer');
     if (!layer) return;
-    const drawingPointer=currentState.mouseSelected || currentState.dashedSelected || currentState.sketchSelected;
+    const drawingPointer=usesDrawingPointer(currentState);
     svg.classList.toggle('is-mouse-adjusting',drawingPointer);
     const rect = svg.getBoundingClientRect();
     const inside = pointer && pointer.clientX >= rect.left && pointer.clientX <= rect.right
@@ -121,11 +105,13 @@ export function mountGraph(container, store) {
     let candidate=null,point=position,coordinates=false;
     if (drag) {
       if (drag.object.type==='dashed') candidate=dashedSnap;
+      else if (drag.object.type==='line'&&Object.hasOwn(LINE_END_ACTIONS,drag.action)) {candidate=tangentSnap;coordinates=true;}
       else if (['line','curve','sketch'].includes(drag.object.type)&&(drag.action==='move'||drag.object.type==='line'&&drag.action==='rotate')) candidate=tangentSnap;
       else if (drag.object.type==='point'||['sketch-start','sketch-end','sketch-middle'].includes(drag.action)) {candidate=snapTarget;coordinates=true;}
     } else if (inside&&drawingPointer) {
-      point??=currentState.sketchSelected&&sketchHover?sketchHover.target?.point??sketchHover.point:draft?.end??snappedPosition(worldPoint(pointer),pointer);
-      candidate=currentState.sketchSelected&&sketchHover?.target?sketchHover.target:currentState.dashedSelected?dashedSnap:snapTarget;
+      const creation=activeCreation(),hover=creation?.tool.feedback(creation.session,creationContext,point);
+      point=hover?hover.point:point??snappedPosition(worldPoint(pointer),pointer);
+      candidate=hover?hover.candidate:snapTarget;
       coordinates=true;
     }
     if (candidate&&drag) {
@@ -151,7 +137,7 @@ export function mountGraph(container, store) {
     const selectedIds=new Set(selectedIdsOf(currentState));
     const fillIds = new Set((currentState.fills ?? []).map(fill => fill.id));
     for (const id of fillLabelCache.keys()) if (id !== 'preview' && !fillIds.has(id)) fillLabelCache.delete(id);
-    svg.classList.toggle('is-filling', Boolean(currentState.fillSelected));
+    for (const [mode, tool] of Object.entries(CREATION_TOOLS)) if (tool.svgClass) svg.classList.toggle(tool.svgClass, toolModeOf(currentState) === mode);
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     svg.replaceChildren();
     svg.append(element('title', {}, '빈 공간은 드래그 선택, 도형은 드래그 이동, 흰색 점은 모양 조절입니다.'));
@@ -179,9 +165,8 @@ export function mountGraph(container, store) {
         tabindex: currentState.handSelected ? 0 : -1, role: 'button', 'aria-label': `${fill.name} 이동`, 'aria-pressed': selected });
       path.append(element('title', {}, `${fill.name} · 선택하여 색 변경·이동·삭제`)); fillLayer.append(path);
     }
-    svg.append(fillLayer, element('g', { class: 'fill-preview-layer', 'clip-path': `url(#${clipId})`, 'pointer-events': 'none' }));
-    if (currentState.fillSelected && pointer) fillHover = findFillRegion(fillRegions(), worldPoint(pointer));
-    updateFillPreview();
+    svg.append(fillLayer);
+    appendCreationLayers('fills');
     const axes = element('g', { class: 'graph-axes', 'aria-label': '좌표축' });
     const xEnd = xDirection === 1 ? plot.right : plot.left;
     const yEnd = yDirection === 1 ? plot.top : plot.bottom;
@@ -237,14 +222,13 @@ export function mountGraph(container, store) {
       const model=objectModel(line),pieces=model.visiblePieces(bounds,currentState);
       if (!pieces.length) continue;
       shapes.append(STROKE_RENDERER.render(line,pieces,viewport,{
-        quadratic:model.quadratic,connect:model.quadratic,groupClass:line.type==='curve'?'graph-curve':'graph-line',
+        quadratic:model.quadratic,connect:model.quadratic,groupClass:line.type==='curve'?'graph-curve':`graph-line${line.style==='dashed'?' is-dashed':''}`,
         selected:selectedIds.has(line.id),clipId:lineClipId,title:`${line.name} · 드래그하여 이동`,
       }));
     }
 
     for (const sketch of currentState.sketches) shapes.append(drawSketch(sketch,viewport,currentState,{selected:selectedIds.has(sketch.id),clipId:lineClipId}));
-    svg.append(element('g',{class:'sketch-draft-layer','pointer-events':'none'}));
-    updateSketchDraft();
+    appendCreationLayers('sketches');
     for (const sum of currentState.sums) {
       const pieces=objectModel(sum).visiblePieces(bounds,currentState);
       if (pieces.length) shapes.append(STROKE_RENDERER.render(sum,pieces,viewport,{
@@ -252,13 +236,12 @@ export function mountGraph(container, store) {
       }));
     }
     for (const ruler of currentState.dashedLines) svg.append(drawDashedLine(ruler, viewport, { selected: selectedIds.has(ruler.id), editable: currentState.handSelected && selectedIds.size===1, clipId }));
-    svg.append(element('g', { class: 'dashed-draft-layer', 'pointer-events': 'none' }));
-    updateDraft();
+    appendCreationLayers('dashed');
     const pointLayer = element('g', { class: 'graph-points' });
     svg.append(pointLayer);
-    for (const sketch of currentState.sketches) if (sketch.showMinimum) {
-      const minimum=sketchMinimum(sketch);
-      if (!isLinePointVisible(minimum,bounds,currentState)) continue;
+    for (const sketch of currentState.sketches) {
+      const minimum=displayedSketchMinimum(sketch,bounds,currentState);
+      if (!minimum) continue;
       const p=toScreen(minimum), marker=element('g',{'data-minimum-for':sketch.id,'pointer-events':'none','aria-label':`${sketch.name} 최저점`});
       marker.append(element('circle',{cx:p.x,cy:p.y,r:4.5,fill:sketch.color}),
         element('text',{x:Math.max(8,Math.min(width-50,p.x+10)),y:Math.max(16,p.y-10),class:'point-name'},'최저점'));
@@ -313,66 +296,33 @@ export function mountGraph(container, store) {
     if (handles) svg.append(handles);
   }
 
-  function tangentTarget(point, event) {
-    return snapSketchTangent(point,currentState,viewport.bounds,viewport.unit,{previous:sketchHover?.target,
-      altKey:event.altKey,enabled:currentState.pointSnap,directId:event.target?.closest?.('[data-id]')?.dataset.id});
-  }
-  function updateSketchDraft() {
-    const layer=svg.querySelector('.sketch-draft-layer');
-    if (!layer) return;
+  // Draft layers keep their place in the SVG order; only the active tool draws into one.
+  function drawCreation(tool, layer, options) {
     layer.replaceChildren();
-    if (currentState.sketchSelected) {
-      const status=document.querySelector('#sketch-step');
-      if (status) status.textContent=['시작점을 찍으세요.','끝점을 찍으세요.','지나는 점을 찍으세요. 직선 위에서는 접합니다.'][sketchDraft.length];
-    }
-    const points=[...sketchDraft];
-    if (sketchHover && sketchDraft.length===2) {
-      const {point, target}=sketchHover;
-      const tangent=target ? directionOf(target.line.slope) : currentState.sketchMode==='horizontal' ? {x:1,y:0} : currentState.sketchMode==='vertical' ? {x:0,y:1} : unitVector({x:points[1].x-points[0].x,y:points[1].y-points[0].y});
-      if (target && tangent.x*(points[1].x-points[0].x)+tangent.y*(points[1].y-points[0].y)<0) {tangent.x*=-1;tangent.y*=-1;}
-      const curve={start:points[0],end:points[1],anchor:target?.point??point,tangent,leftReach:0.5,rightReach:0.5};
-      if (validSketch(curve)) layer.append(drawSketch(curve,viewport,currentState,{preview:true}));
-    } else if (sketchHover && sketchDraft.length===1) {
-      const a=projectPoint(sketchDraft[0],viewport),b=projectPoint(sketchHover.point,viewport);
-      layer.append(element('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,class:'sketch-guide',stroke:'#4c8e9a'}));
-    }
-    points.forEach((point,index)=>{
-      const p=projectPoint(point,viewport);
-      layer.append(element('circle',{cx:p.x,cy:p.y,r:5,fill:'#4c8e9a'}));
-      layer.append(element('text',{x:p.x+9,y:p.y-9,class:'sketch-step-label'},index===0?'시작':'끝'));
-    });
-    if (currentState.sketchSelected) {
-      const stage=sketchDraft.length,name=['시작점','끝점','지나는 점'][stage];
-      const x=viewport.plot.left+8,y=viewport.plot.top+8,width=Math.min(264,viewport.plot.right-x-8);
-      const banner=element('g',{class:'sketch-stage-banner','data-sketch-step':stage+1,role:'status','aria-live':'polite'});
-      banner.append(element('rect',{x,y,width,height:54,rx:8}),
-        element('text',{x:x+12,y:y+21,class:'sketch-stage-title'},`곡선 · ${stage+1}/3 ${name}`),
-        element('text',{x:x+12,y:y+41,class:'sketch-stage-hint'},sketchHover?.target?'접점에 맞춤 · 좌클릭으로 완성':`좌클릭으로 ${name} 지정 · Esc 취소`));
-      layer.append(banner);
+    const creation = activeCreation();
+    if (creation?.tool === tool) tool.draw(creation.session, layer, creationContext, options);
+  }
+  function appendCreationLayers(slot) {
+    for (const [mode, tool] of Object.entries(CREATION_TOOLS)) if (tool.slot === slot) {
+      const layer = element('g', { ...tool.layerAttributes(creationContext), 'data-creation-layer': mode });
+      svg.append(layer); drawCreation(tool, layer, { rendering: true });
     }
   }
-  function updateDraft() {
-    const layer = svg.querySelector('.dashed-draft-layer');
-    if (!layer) return;
-    layer.replaceChildren();
-    if (draft) layer.append(drawDashedLine(draft, viewport, { preview: true }));
-    updateSnapFeedback(draft?.end);
-  }
-  function segmentPosition(event, anchor) {
-    const point = worldPoint(event), { bounds } = viewport;
-    const clamped = { x: Math.max(bounds.xMin, Math.min(bounds.xMax, point.x)), y: Math.max(bounds.yMin, Math.min(bounds.yMax, point.y)) };
-    const constrained = anchor ? constrainRuler(anchor, clamped, currentState.dashedMode, event.shiftKey) : clamped;
-    const axis = !anchor ? null : currentState.dashedMode === 'horizontal' ? 'x' : currentState.dashedMode === 'vertical' ? 'y'
-      : event.shiftKey ? (Math.abs(clamped.x - anchor.x) >= Math.abs(clamped.y - anchor.y) ? 'x' : 'y') : null;
-    return dashedPosition(constrained, event, axis);
-  }
-  function finishSegment() {
-    const completed = draft; draft = null;
-    dashedSnap = null;
-    if (completed?.pointerId != null && svg.hasPointerCapture(completed.pointerId)) svg.releasePointerCapture(completed.pointerId);
-    if (completed) store.addDashedLine(completed.anchor, completed.end);
-    updateDraft();
-  }
+  const creationContext = {
+    get state() { return currentState; }, get viewport() { return viewport; }, get pointer() { return pointer; },
+    get snapTarget() { return snapTarget; }, get dashedSnap() { return dashedSnap; }, store, clipId,
+    setDashedSnap(value) { dashedSnap = value; },
+    worldPoint: event => worldPoint(event), snappedPosition: (...args) => snappedPosition(...args), dashedPosition: (...args) => dashedPosition(...args),
+    inside: point => point.x >= viewport.bounds.xMin && point.x <= viewport.bounds.xMax && point.y >= viewport.bounds.yMin && point.y <= viewport.bounds.yMax,
+    capturePointer: id => svg.setPointerCapture(id),
+    releasePointer: id => { if (id != null && svg.hasPointerCapture(id)) svg.releasePointerCapture(id); },
+    redraw(tool) {
+      const mode = Object.keys(CREATION_TOOLS).find(key => CREATION_TOOLS[key] === tool), layer = svg.querySelector(`[data-creation-layer="${mode}"]`);
+      if (layer) drawCreation(tool, layer);
+    },
+    updateSnapFeedback: point => updateSnapFeedback(point),
+    fillRegions: () => fillRegions(), fillPath: fill => fillPath(fill), appendFillLabel: (...args) => appendFillLabel(...args),
+  };
 
   function snappedMove(anchor,event,axis) {
     const candidate=snappedPosition(anchor,event,axis),aligned=axisAlignedSnap(anchor,candidate,axis);
@@ -380,7 +330,7 @@ export function mountGraph(container, store) {
     return aligned;
   }
   function interactionContext() {
-    return {state:currentState,viewport,snappedMove,dashedPosition,dashedTargets,dashedOptions,tangentSnap};
+    return {state:currentState,viewport,snappedMove,dashedPosition,dashedTargets,snapTargets:dashedTargets,dashedOptions,tangentSnap};
   }
   function applyInteraction(result) {
     if (!result) return;
@@ -417,51 +367,13 @@ export function mountGraph(container, store) {
     // preceding inspector input before starting a separate drawing/drag history step.
     if (event.button===0 && document.activeElement?.matches('input,textarea,[contenteditable="true"]')) document.activeElement.blur();
     pointer = event;
-    if (event.button === 0 && currentState.fillSelected) {
-      event.preventDefault();
-      fillHover = findFillRegion(fillRegions(), worldPoint(event));
-      fillMessage = fillHover ? '' : '닫힌 구역이 없습니다.';
-      if (fillHover) store.addFill(fillHover);
-      else updateFillPreview();
-      return;
-    }
-    if (event.button === 0 && currentState.mouseSelected && currentState.activeTool === 'point') {
-      const point = worldPoint(event);
-      const { bounds } = viewport;
-      if (point.x >= bounds.xMin && point.x <= bounds.xMax && point.y >= bounds.yMin && point.y <= bounds.yMax) store.addPoint(snappedPosition(point, event));
-      event.preventDefault();
-      return;
-    }
     if (event.button !== 0) return;
-    if (currentState.sketchSelected) {
-      event.preventDefault();
-      const raw=worldPoint(event),{bounds}=viewport;
-      if (raw.x<bounds.xMin || raw.x>bounds.xMax || raw.y<bounds.yMin || raw.y>bounds.yMax) return;
-      const point=snappedPosition(raw,event);
-      if (sketchDraft.length<2) {
-        if (sketchDraft.length && distance(sketchDraft[0],point)<1e-6) return;
-        sketchDraft.push(point); sketchHover=null; updateSketchDraft(); return;
-      }
-      const target=tangentTarget(raw,event);
-      const id=store.addSketch(sketchDraft[0],sketchDraft[1],target?.point??point,{lineId:target?.line.id});
-      if (id) {sketchDraft=[];sketchHover=null;updateSketchDraft();}
-      return;
-    }
+    const creation = activeCreation();
+    if (creation?.tool.pointerDown(creation.session, event, creationContext)) return;
     if (currentState.duplicatePanel) {
       event.preventDefault();
       store.selectObject(event.target.closest('[data-id]')?.dataset.id ?? null);
       return;
-    }
-    const rulerTarget = event.target.closest('[data-id]');
-    const editingRuler = currentState.dashedLines.some(r => r.id === rulerTarget?.dataset.id);
-    if (currentState.dashedSelected && (draft || !editingRuler)) {
-      event.preventDefault();
-      if (draft) { draft.end = segmentPosition(event, draft.anchor); finishSegment(); return; }
-      const point = worldPoint(event), { bounds } = viewport;
-      if (point.x < bounds.xMin || point.x > bounds.xMax || point.y < bounds.yMin || point.y > bounds.yMax) return;
-      const anchor = segmentPosition(event);
-      draft = { anchor, end: { ...anchor }, pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY };
-      store.selectObject(null); svg.setPointerCapture(event.pointerId); updateDraft(); return;
     }
     const target = event.target.closest('[data-id]');
     if (!target) {
@@ -481,7 +393,8 @@ export function mountGraph(container, store) {
     if (!controller.canDrag(object,target.dataset.action)) {event.preventDefault();store.selectObject(object.id);return;}
     const anchor=controller.start(object,interactionContext());
     if (!anchor) return;
-    drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), object: { ...structuredClone(object), anchor } };
+    const startPatch=controller.startPatch(object,anchor);
+    drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), object: { ...structuredClone(object), ...startPatch } };
     dashedSnap = null;
     snapTarget = null; tangentSnap = null;
     store.beginHistory();
@@ -489,22 +402,13 @@ export function mountGraph(container, store) {
     svg.setPointerCapture(event.pointerId);
     svg.classList.add('is-dragging');
     store.selectObject(object.id);
-    store.updateSelected({ anchor });
+    store.updateSelected(startPatch);
   });
   const movePointer = (event) => {
     pointer = event;
     if (marquee) {updateMarquee(event);return;}
-    if (currentState.fillSelected && !drag) {
-      fillMessage = ''; fillHover = findFillRegion(fillRegions(), worldPoint(event)); updateFillPreview(); return;
-    }
-    if (currentState.sketchSelected) {
-      const raw=worldPoint(event);
-      sketchHover={point:snappedPosition(raw,event),target:sketchDraft.length===2?tangentTarget(raw,event):null};
-      updateSketchDraft();updateSnapFeedback(sketchHover.target?.point??sketchHover.point);return;
-    }
-    if (draft && currentState.dashedSelected) {
-      draft.end = segmentPosition(event, draft.anchor); updateDraft(); updateSnapFeedback(draft.end); return;
-    }
+    const creation = activeCreation();
+    if (!drag && creation?.tool.pointerMove(creation.session, event, creationContext)) return;
     if (!drag) {
       updateSnapFeedback();
       return;
@@ -517,16 +421,17 @@ export function mountGraph(container, store) {
   const refreshModifiers = event => {
     if (!['Alt','Shift'].includes(event.key)||!pointer||document.querySelector('dialog[open]')
       ||event.target?.closest?.('input,textarea,select,[contenteditable="true"]')) return;
-    if (!drag&&!currentState.mouseSelected&&!currentState.dashedSelected&&!currentState.sketchSelected) return;
+    if (!drag&&!usesDrawingPointer(currentState)) return;
     movePointer({pointerId:pointer.pointerId,pointerType:pointer.pointerType,clientX:pointer.clientX,clientY:pointer.clientY,
       button:pointer.button,buttons:pointer.buttons,target:pointer.target,altKey:event.altKey,shiftKey:event.shiftKey,ctrlKey:event.ctrlKey,metaKey:event.metaKey});
   };
   document.addEventListener('keydown',refreshModifiers);
   document.addEventListener('keyup',refreshModifiers);
   const stopDrag = (event) => {
+    const creation = activeCreation();
     if (event.type==='pointercancel'&&!drag) {
-      pointer=null;snapTarget=null;dashedSnap=null;sketchHover=null;
-      updateSketchDraft();updateSnapFeedback();
+      pointer=null;snapTarget=null;dashedSnap=null;
+      creation?.tool.clearHover(creation.session,creationContext);updateSnapFeedback();
     }
     if (marquee?.pointerId===event.pointerId) {
       if (event.type==='pointerup') {
@@ -538,14 +443,7 @@ export function mountGraph(container, store) {
       } else cancelMarquee();
       return;
     }
-    if (draft?.pointerId === event.pointerId) {
-      if (event.type === 'pointercancel') { draft = null; dashedSnap = null; updateDraft(); }
-      else if (event.type === 'pointerup') {
-        const moved = Math.hypot(event.clientX - draft.clientX, event.clientY - draft.clientY) >= 4;
-        if (moved) { draft.end = segmentPosition(event, draft.anchor); finishSegment(); }
-        else { draft.pointerId = null; if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId); }
-      }
-    }
+    if (!drag) creation?.tool.pointerEnd(creation.session, event, creationContext);
     if (!drag || event.pointerId !== drag.pointerId) return;
     drag = null;
     snapTarget = null;
@@ -558,7 +456,11 @@ export function mountGraph(container, store) {
   };
   svg.addEventListener('pointerenter', (event) => { pointer = event; updateSnapFeedback(); });
   svg.addEventListener('pointerleave', () => {
-    if (!drag && !marquee) { pointer = null; dashedSnap=null; snapTarget=null; fillHover=null; fillMessage=''; updateFillPreview(); sketchHover=null; updateSketchDraft(); updateSnapFeedback(); }
+    if (drag || marquee) return;
+    pointer = null; dashedSnap=null; snapTarget=null;
+    const creation = activeCreation();
+    creation?.tool.clearHover(creation.session, creationContext);
+    updateSnapFeedback();
   });
   svg.addEventListener('pointerup', stopDrag);
   svg.addEventListener('pointercancel', stopDrag);
@@ -587,19 +489,14 @@ export function mountGraph(container, store) {
   observer.observe(container);
   const unsubscribe = store.subscribe((state) => {
     if (state.historyRevision!==currentState.historyRevision || state.activeDiagramId!==currentState.activeDiagramId
-      ||['mouseSelected','dashedSelected','sketchSelected','handSelected','fillSelected','duplicatePanel','sumPanel','pointSnap'].some(key=>state[key]!==currentState[key])) {
-      snapTarget=null;tangentSnap=null;dashedSnap=null;sketchHover=null;
+      ||toolModeOf(state)!==toolModeOf(currentState)||state.pointSnap!==currentState.pointSnap) {
+      snapTarget=null;tangentSnap=null;dashedSnap=null;
     }
-    if (state.fillSelected !== currentState.fillSelected || state.historyRevision !== currentState.historyRevision) { fillHover=null; fillMessage=''; }
     if (state.historyRevision !== currentState.historyRevision || state.activeDiagramId !== currentState.activeDiagramId
       || state.dashedMode !== currentState.dashedMode || state.dashedSelected !== currentState.dashedSelected || !state.dashedSnap) dashedSnap = null;
     if (marquee && (!state.handSelected || state.historyRevision!==currentState.historyRevision)) cancelMarquee(false);
-    if ((!state.sketchSelected || state.historyRevision!==currentState.historyRevision) && sketchDraft.length) {sketchDraft=[];sketchHover=null;}
-    if (draft && (!state.dashedSelected || state.historyRevision !== currentState.historyRevision)) {
-      const id = draft.pointerId; draft = null;
-      if (id != null && svg.hasPointerCapture(id)) svg.releasePointerCapture(id);
-    }
-    if (draft && state.dashedMode !== currentState.dashedMode) draft.end = constrainRuler(draft.anchor, draft.end, state.dashedMode);
+    // Every tool drops its own stale draft, including tools that were just switched off.
+    for (const [mode, tool] of Object.entries(CREATION_TOOLS)) tool.sync(creationSessions[mode], state, currentState, creationContext);
 
     if (state.historyRevision !== currentState.historyRevision && drag) {
       const pointerId = drag.pointerId;

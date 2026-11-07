@@ -3,11 +3,11 @@ export function mountDashedTool(root, store) {
   const options = root.querySelector('#dashed-options');
   const mode = root.querySelector('#dashed-mode');
   const snap = root.querySelector('#dashed-snap-toggle');
-  button.addEventListener('click', () => store.update({ dashedSelected: !store.getState().dashedSelected }));
+  button.addEventListener('click', () => store.toggleToolMode('dashed'));
   mode.addEventListener('change', () => store.update({ dashedMode: mode.value }));
   snap.addEventListener('change', () => store.update({ dashedSnap: snap.checked }));
   root.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && store.getState().dashedSelected) store.update({ dashedSelected: false });
+    if (event.key === 'Escape' && store.getState().dashedSelected) store.setToolMode('hand');
   });
   return store.subscribe(({ dashedSelected, dashedMode, dashedSnap }) => {
     button.setAttribute('aria-pressed', String(dashedSelected));

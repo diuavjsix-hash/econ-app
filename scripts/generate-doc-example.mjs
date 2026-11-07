@@ -33,9 +33,16 @@ store.addDashedLine({ x: 4, y: 0 }, { x: 4, y: 2 });
 store.updateSelected({ name: '독립 점선' });
 for (const family of ['cobb-douglas','substitutes','complements','quasilinear']) store.addIndifference(family);
 store.addIndifference('rectangular-hyperbola', { anchor: { x: 3, y: 4 } });
+// A kinked line: two lines that each stop at the shared kink, plus a dashed ray.
+store.addLine();
+store.updateSelected({ name: '꺾인 선 (왼쪽)', slope: -2, anchor: { x: 2, y: 4 }, extent: [null, 0] });
+store.addLine();
+store.updateSelected({ name: '꺾인 선 (오른쪽)', slope: -0.5, anchor: { x: 2, y: 4 }, extent: [0, null] });
+store.addLine();
+store.updateSelected({ name: '점선 반직선', slope: 0, anchor: { x: 2, y: 4 }, extent: [0, null], style: 'dashed' });
 store.selectDiagram(first.id);
 
-const output = new URL('../docs/examples/editor-v10.json', import.meta.url);
+const output = new URL('../docs/examples/editor-v11.json', import.meta.url);
 await mkdir(new URL('../docs/examples/', import.meta.url), { recursive: true });
 await writeFile(output, `${JSON.stringify(serializeDocument(store.getState()), null, 2)}\n`);
-console.log('Generated docs/examples/editor-v10.json');
+console.log('Generated docs/examples/editor-v11.json');

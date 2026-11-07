@@ -65,7 +65,7 @@ test('hyperbola size, copies, undo, graph isolation and JSON keep the exact curv
   assert.deepEqual(curves[0],original);assert.notDeepEqual(curves[1].anchor,curves[2].anchor);
   for (const c of curves) {assert.equal(c.family,'rectangular-hyperbola');assert.equal(c.shape,1);close(indifferenceValue(c,2)*2,c.anchor.x*c.anchor.y);}
   const json=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(json.schemaVersion,10);assert.equal(json.curves.length,3);
+  assert.equal(json.schemaVersion,11);assert.equal(json.curves.length,3);
   assert.equal(json.curves[0].geometry.domain,'nonnegative');
   assert.equal(json.curves[0].family,'rectangular-hyperbola');
   store.configureLayout('horizontal2');store.selectDiagram(store.getState().diagrams[1].id);

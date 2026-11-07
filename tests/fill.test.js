@@ -157,7 +157,7 @@ test('fills participate in object lists, hierarchy, area selection, clear and gr
 test('JSON 10 exports independent deep-copied mathematical rings including holes', () => {
   const store = createStore(), fill = { rings: [...triangle.rings, polygon([[1, 1], [2, 1], [1, 2]]).rings[0]] };
   const id = store.addFill(fill), doc = serializeDocument(store.getState());
-  assert.equal(doc.schemaVersion, 10); assert.deepEqual(doc.fills, doc.diagrams[0].fills);
+  assert.equal(doc.schemaVersion, 11); assert.deepEqual(doc.fills, doc.diagrams[0].fills);
   assert.equal(doc.fills[0].id, id); assert.deepEqual(doc.fills[0].rings, fill.rings);
   assert.equal('fillSelected' in doc, false); assert.equal('collapsed' in doc.fills[0], false);
   doc.fills[0].rings[0][0].x = 123; assert.equal(store.getState().fills[0].rings[0][0].x, 0);

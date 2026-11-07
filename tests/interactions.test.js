@@ -7,7 +7,7 @@ import { CURVE_FAMILIES } from '../src/models/curve-families.js';
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 const viewport = createViewport(800, 600, 'first');
 const ctx = { viewport, state: { lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], axisGapEnabled: false },
-  tangentSnap: null, snappedMove: anchor => anchor, dashedPosition: anchor => anchor, dashedTargets: () => ({ shapes: [], crossings: [] }), dashedOptions: () => ({ altKey: true }) };
+  tangentSnap: null, snappedMove: anchor => anchor, dashedPosition: anchor => anchor, dashedTargets: () => ({ shapes: [], crossings: [] }), snapTargets: () => ({ shapes: [], crossings: [] }), dashedOptions: () => ({ altKey: true }) };
 const point = { id: 'point-1', type: 'point', anchor: { x: 2, y: 3 } };
 
 test('new tool registrations fail early when an object or keyboard implementation is missing', () => {

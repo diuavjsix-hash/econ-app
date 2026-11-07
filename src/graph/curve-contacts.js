@@ -165,7 +165,7 @@ export function curvePairContacts(a, b) {
     for (const theta of searchContactDirections(residual, ...range, false)) {
       const pair = contactsAtDirection(a, b, theta);
       if (!pair || distance(pair.m.point, pair.t.point) > 1e-7 || !isolatedContact(a, b, theta, range)) continue;
-      if (!found.some(point => distance(point, pair.t.point) < 1e-7)) found.push(pair.t.point);
+      if (!found.some(contact => distance(contact.point, pair.t.point) < 1e-7)) found.push({ point: pair.t.point, tangent: pair.t.tangent });
     }
   }
   return found;
@@ -197,13 +197,24 @@ export function buildCurveContactTargets(state, bounds, excludeObjectId = null) 
   const branches = curves.map(c => contactBranches(c, bounds)), targets = [];
   for (let i = 0; i < curves.length; i++) for (let j = i + 1; j < curves.length; j++) {
     if (coincidentCurves(curves[i], curves[j])) continue;
-    for (const a of branches[i]) for (const b of branches[j]) for (const point of curvePairContacts(a, b)) {
+    for (const a of branches[i]) for (const b of branches[j]) for (const { point, tangent } of curvePairContacts(a, b)) {
       if (!isLinePointVisible(point, bounds, state)) continue;
       const ids = [curves[i].id, curves[j].id];
       if (!targets.some(t => t.ids[0] === ids[0] && t.ids[1] === ids[1] && distance(t.point, point) < 1e-7)) {
-        targets.push({ point, ids, kind: 'tangent' });
+        targets.push({ point, ids, kind: 'tangent', contactTangent: tangent });
       }
     }
   }
   return targets;
+}
+
+export const slopeOfDirection = d => Math.abs(d.x) < 1e-12 ? null : d.y / d.x;
+/** Existing curve-curve contacts at this point, with their shared tangent. A kink has none. */
+export function contactTangentsAt(crossings, point, tolerance = 1e-6) {
+  return crossings.filter(target => target.kind === 'tangent' && target.contactTangent && distance(target.point, point) < tolerance);
+}
+/** Slope of the common tangent when a point sits on a curve-curve contact, else null. */
+export function contactTangentSlope(state, bounds, point) {
+  const [contact] = contactTangentsAt(buildCurveContactTargets(state, bounds), point);
+  return contact ? { slope: slopeOfDirection(contact.contactTangent), ids: contact.ids } : null;
 }

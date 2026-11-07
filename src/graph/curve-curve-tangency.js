@@ -16,15 +16,19 @@ const inside = (p, b) => validPoint(p) && p.x >= b.xMin - 1e-9 && p.x <= b.xMax 
 
 function movement(curve, axis) {
   const family = curveFamilyOf(curve);
-  return { family, radial: family?.radial, axis: family?.translationAxis ? family.translationAxis(curve) : family ? null : axis };
+  // Radial families scale about their own center: the origin, or an opposite curve's origin.
+  return { family, radial: family?.radial, center: family?.radial ? family.scaleCenter(curve) : null,
+    axis: family?.translationAxis ? family.translationAxis(curve) : family ? null : axis };
 }
+const scaled = (p, center, scale) => ({ x: center.x + (p.x - center.x) * scale, y: center.y + (p.y - center.y) * scale });
 function fit(curve, a, b, mode) {
   const delta = sub(b.point, a.point);
   if (mode.radial) {
-    const scale = dot(b.point, a.point) / dot(a.point, a.point);
-    if (!(scale > 0) || !Number.isFinite(scale) || Math.min(curve.anchor.x, curve.anchor.y) * scale < 0.02) return null;
-    if (distance({ x: a.point.x * scale, y: a.point.y * scale }, b.point) > 1e-7) return null;
-    return { anchor: { x: curve.anchor.x * scale, y: curve.anchor.y * scale }, scale };
+    const from = sub(a.point, mode.center), to = sub(b.point, mode.center), anchor = sub(curve.anchor, mode.center);
+    const scale = dot(to, from) / dot(from, from);
+    if (!(scale > 0) || !Number.isFinite(scale) || Math.min(Math.abs(anchor.x), Math.abs(anchor.y)) * scale < 0.02) return null;
+    if (distance(scaled(a.point, mode.center, scale), b.point) > 1e-7) return null;
+    return { anchor: scaled(curve.anchor, mode.center, scale), scale };
   }
   if (mode.axis && Math.abs(delta[mode.axis === 'x' ? 'y' : 'x']) > 1e-7) return null;
   const anchor = mode.family ? mode.family.throughPoint(curve, b.point) : { x: curve.anchor.x + (mode.axis === 'y' ? 0 : delta.x), y: curve.anchor.y + (mode.axis === 'x' ? 0 : delta.y) };
@@ -46,8 +50,8 @@ function pairCandidates(curve, target, a, b, mode, bounds, state, unit, referenc
       if (a.straight || b.straight) {
         const line = a.straight ? a : b, fixed = a.straight ? t.point : m.point;
         if (mode.radial && b.straight) {
-          const scale = cross(line.a, line.vector) / cross(fixed, line.vector);
-          const p = { x: fixed.x * scale, y: fixed.y * scale };
+          const scale = cross(sub(line.a, mode.center), line.vector) / cross(sub(fixed, mode.center), line.vector);
+          const p = scaled(fixed, mode.center, scale);
           if (!validPoint(p) || !line.contains(p)) return null;
           t = { ...t, point: p };
         } else if (mode.axis) {
@@ -64,7 +68,7 @@ function pairCandidates(curve, target, a, b, mode, bounds, state, unit, referenc
     const residual = theta => {
       const pair = contacts(theta); if (!pair) return NaN;
       const { m, t } = pair;
-      if (mode.radial) return cross(m.point, t.point) / Math.max(1e-12, length(m.point));
+      if (mode.radial) { const m0 = sub(m.point, mode.center); return cross(m0, sub(t.point, mode.center)) / Math.max(1e-12, length(m0)); }
       if (mode.axis) return t.point[mode.axis === 'x' ? 'y' : 'x'] - m.point[mode.axis === 'x' ? 'y' : 'x'];
       if (!inside(m.point, expanded) || !isLinePointVisible(t.point, bounds, state)) return Infinity;
       return distance(m.point, t.point) ** 2;
@@ -76,7 +80,7 @@ function pairCandidates(curve, target, a, b, mode, bounds, state, unit, referenc
       if (!pose || !validPoint(pose.anchor) || !inside(pair.m.point, expanded) || !isLinePointVisible(pair.t.point, bounds, state)) return;
       const pixels = (mode.family ? mode.family.moveDistance(curve, pose.anchor) : distance(curve.anchor, pose.anchor)) * unit;
       if (!Number.isFinite(pixels) || pixels > SNAP_RELEASE_PX || !isolatedContact(a, b, theta, range, p => pose.scale !== 1
-        ? { x: p.x * pose.scale, y: p.y * pose.scale }
+        ? scaled(p, mode.center, pose.scale)
         : { x: p.x + pose.anchor.x - curve.anchor.x, y: p.y + pose.anchor.y - curve.anchor.y }) || coincidentPose(curve, target, pose.anchor)) return;
       candidates.push({ key: `curve-tangent:${target.id}:${a.key}:${b.key}:${index}`, kind: 'tangent', label: '접점 맞춤', sourceId: target.id, ids: [curve.id, target.id],
         point: pair.t.point, anchor: pose.anchor, distance: Math.round(pixels * 1e9) / 1e9, pointerDistance: distance(pair.t.point, reference) * unit,

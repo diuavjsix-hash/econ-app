@@ -110,7 +110,7 @@ test('sketches copy independently, preserve hierarchy and export full internal g
   assert.equal(copy,'sketch-2');assert.equal(state.sketches[1].binding,null);
   for(const key of ['start','anchor','end']) near(state.sketches[1][key].x,state.sketches[0][key].x+1);
   const group=store.addGroup();store.moveObject(id,group);
-  const exportedState=store.getState(), doc=serializeDocument(exportedState);assert.equal(doc.schemaVersion,10);assert.deepEqual(doc.sketches,doc.diagrams[0].sketches);
+  const exportedState=store.getState(), doc=serializeDocument(exportedState);assert.equal(doc.schemaVersion,11);assert.deepEqual(doc.sketches,doc.diagrams[0].sketches);
   assert.equal(doc.sketches[0].parentId,group);assert.equal(doc.sketches[0].binding.sourceId,source);
   assert.equal(doc.sketches[0].geometry.type,'piecewise-quadratic-bezier');assert.ok(!('collapsed' in doc.sketches[0]));
   doc.sketches[0].start.x=999;assert.equal(sketch(store).start.x,1);

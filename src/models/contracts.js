@@ -14,7 +14,7 @@ export function assertRegistryContract(models, types) {
   const expected = Object.keys(types).sort(), actual = Object.keys(models).sort();
   if (JSON.stringify(expected) !== JSON.stringify(actual)) throw new TypeError('Object model and collection registrations must match');
   for (const [type, Model] of Object.entries(models)) {
-    if (typeof types[type].collection !== 'string' || typeof types[type].duplicatable !== 'boolean') throw new TypeError(`Invalid object capabilities: ${type}`);
+    if (typeof types[type].collection !== 'string' || typeof types[type].duplicatable !== 'boolean' || typeof types[type].strokeGeometry !== 'boolean') throw new TypeError(`Invalid object capabilities: ${type}`);
     assertModelContract(Model);
   }
   return Object.freeze(models);

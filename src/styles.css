@@ -213,11 +213,14 @@ input[type=range]:focus-visible { outline: 2px solid #a8afff; outline-offset: 8p
 .graph-svg { touch-action:none; user-select:none; }
 .plotted-line { stroke:var(--line-color); stroke-width:2; stroke-linecap:round; pointer-events:none; opacity:.78; }
 .plotted-line.is-selected { stroke-width:2.7; opacity:1; }
+.graph-line.is-dashed .plotted-line { stroke-dasharray:7 5; stroke-linecap:butt; }
 .line-hit { stroke:transparent; stroke-width:20; pointer-events:stroke; cursor:move; }
 .line-hit:focus-visible { outline:none; stroke:var(--line-color); stroke-opacity:.14; }
 .rotate-handle { fill:#fff; stroke:var(--line-color); stroke-width:2; cursor:crosshair; }
 .rotate-handle:hover, .rotate-handle:focus-visible { fill:var(--line-color); outline:none; }
 .move-handle { fill:var(--line-color); stroke:#fff; stroke-width:2; cursor:move; }
+.end-handle { cursor:grab; }
+.end-handle.is-open { fill:var(--line-color); fill-opacity:.18; }
 .is-dragging, .is-dragging * { cursor:grabbing!important; }
 .json-dialog { width:min(640px, calc(100vw - 32px)); padding:22px; border:1px solid var(--border); border-radius:16px; color:#303241; box-shadow:0 24px 80px #25294026; }
 .json-dialog::backdrop { background:#22283b40; backdrop-filter:blur(4px); }

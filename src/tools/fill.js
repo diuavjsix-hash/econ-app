@@ -9,7 +9,7 @@ export function fillControls(mode) {
 
 export function mountFillTool(root, store) {
   const button = root.querySelector('#fill-tool'), options = root.querySelector('#fill-options'), settings = root.querySelector('#fill-settings');
-  button.addEventListener('click', () => store.update({ fillSelected: !store.getState().fillSelected }));
+  button.addEventListener('click', () => store.toggleToolMode('fill'));
   for (const swatch of root.querySelectorAll('[data-fill-color]')) swatch.addEventListener('click', () => {
     const color = swatch.dataset.fillColor;
     if (swatch.dataset.fillMode === 'paint') store.update({ fillColor: color });

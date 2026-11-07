@@ -5,7 +5,7 @@ import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
 import { snapMovingCurve } from '../src/graph/point-magnets.js';
 import { snapDashedPoint, snapMovingDashed } from '../src/graph/dashed-magnets.js';
 import { CURVE_CONTACT_CASES, NON_SMOOTH_CONTACT_FAMILIES } from './fixtures/curve-contact-cases.js';
-import { CURVE_FAMILIES } from '../src/models/curve-families.js';
+import { CURVE_FAMILIES, OPPOSITE_CURVE_FAMILIES } from '../src/models/curve-families.js';
 import { serializeDocument } from '../src/export.js';
 import { snapFeedbackTargets } from '../src/graph/snap-feedback.js';
 import { createViewport } from '../src/graph/viewport.js';
@@ -36,6 +36,8 @@ test('every registered curve family explicitly participates in the cross-tool co
   const covered = new Set([...CURVE_CONTACT_CASES.flatMap(c => c.families), ...NON_SMOOTH_CONTACT_FAMILIES]);
   assert.deepEqual([...covered].sort(), Object.keys(CURVE_FAMILIES).sort(),
     'A new curve family needs movement → point/dashed coverage or an explicit nonsmooth exclusion');
+  const opposite = new Set([...CURVE_CONTACT_CASES.map(c => c.opposite).filter(Boolean), ...NON_SMOOTH_CONTACT_FAMILIES.filter(f => OPPOSITE_CURVE_FAMILIES.includes(f))]);
+  assert.deepEqual([...opposite].sort(), [...OPPOSITE_CURVE_FAMILIES].sort(), 'every opposite-direction family needs a contact round trip');
 });
 
 for (const fixture of CURVE_CONTACT_CASES) test(`contact round trip: ${fixture.name}`, () => {

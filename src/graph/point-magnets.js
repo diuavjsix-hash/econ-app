@@ -1,3 +1,4 @@
+import { onLineExtent } from './line-extent.js';
 import { directionOf } from './math.js';
 import { displayedCurveSegments } from './display.js';
 import { sketchControls } from './sketch.js';
@@ -24,6 +25,7 @@ export function snapShapeToPoint(shape,state,bounds,unit,{previous=null,referenc
       const anchor={x:shape.anchor.x+delta.x,y:shape.anchor.y+delta.y};
       const distance=(isIndifference(shape)?indifferenceMoveDistance(shape,anchor):Math.hypot(delta.x,delta.y))*unit;
       if (!validPoint(anchor) || !Number.isFinite(distance) || distance>TANGENT_RELEASE_PX) return;
+      if (shape.type==='line' && !onLineExtent({...shape,anchor},point,1e-7)) return; // Only the drawn part meets the point.
       candidates.push({key:`point:${target.id}:${key}`,kind:'point',label:'점 맞춤',sourceId:target.id,point:{...point},anchor,distance,
         pointerDistance:Math.hypot(point.x-reference.x,point.y-reference.y)*unit});
     };

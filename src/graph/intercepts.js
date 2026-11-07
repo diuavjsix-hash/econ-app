@@ -1,3 +1,4 @@
+import { onLineExtent } from './line-extent.js';
 import { buildInterceptTargets } from './snap.js';
 import { directionOf } from './math.js';
 import { canAttach } from '../relations.js';
@@ -30,6 +31,7 @@ export function snapLineToIntercept(line,state,bounds,unit,{previous=null,altKey
     const anchor=axis?{...line.anchor,[axis]:line.anchor[axis]+correction}
       :{x:line.anchor.x+offset*normal.x,y:line.anchor.y+offset*normal.y};
     if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) continue;
+    if (!onLineExtent({...line,anchor},target.point,1e-7)) continue; // A trimmed line meets the intercept on its drawn part.
     candidates.push({...target,key:`intercept:${target.sourceId??'axes'}:${target.axis}:${target.point.x}:${target.point.y}`,anchor,
       distance:Math.max(interceptDistance,Math.abs(correction))*unit,kind:'intercept'});
   }

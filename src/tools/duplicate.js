@@ -32,7 +32,7 @@ export function mountDuplicateTool(root, store) {
       else if (source.slope === 0) preview.textContent += ' · 수평선 유지';
     } else preview.textContent = `${source.name || OBJECT_LABELS[source.type]} → ${prepared.object.name}${isIndifference(source)?` · ${indifferenceMovement(source)}`:''}`;
   }
-  button.addEventListener('click', () => store.update({ duplicatePanel: !store.getState().duplicatePanel }));
+  button.addEventListener('click', () => store.toggleToolMode('duplicate'));
   target.addEventListener('change', () => { status.textContent = ''; store.selectObject(target.value || null); });
   for (const choice of factors) choice.addEventListener('click', () => { factor = Number(choice.dataset.copyFactor); refresh(); });
   children.addEventListener('change', refresh);

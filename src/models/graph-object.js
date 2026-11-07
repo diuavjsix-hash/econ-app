@@ -37,11 +37,11 @@ export class GraphObject {
   sameGeometry(other) {
     const a = this.data, b = other;
     if (a.type !== b.type || !a.anchor || !b.anchor) return false;
-    for (const key of ['anchor', 'start', 'end', 'tangent']) {
+    for (const key of ['anchor', 'start', 'end', 'tangent', 'oppositeOrigin']) {
       if (Boolean(a[key]) !== Boolean(b[key])) return false;
       if (a[key] && Math.hypot(a[key].x - b[key].x, a[key].y - b[key].y) > 1e-8) return false;
     }
-    return ['slope', 'span', 'bend', 'leftReach', 'rightReach', 'family', 'shape', 'linearAxis'].every(key => a[key] === b[key]);
+    return ['slope', 'span', 'bend', 'leftReach', 'rightReach', 'family', 'shape', 'linearAxis', 'orientation'].every(key => a[key] === b[key]);
   }
 }
 

@@ -82,7 +82,8 @@ app.innerHTML = `
         <label class="setting-row" for="sketch-mode">가운데 방향<select id="sketch-mode"><option value="auto">자동</option><option value="horizontal">수평 · ∪ ∩</option><option value="vertical">수직 · 옆으로</option></select></label>
         <p id="sketch-step" class="mouse-hint" role="status">시작점 → 끝점 → 지나는 점</p>
         <p class="mouse-hint">세 번째 점을 직선 위에 찍으면 접합니다. Alt: 자유 배치 · Esc: 취소</p>
-        <div class="curve-quick-add" role="group" aria-label="무차별곡선 모음"><h3>무차별곡선</h3><div class="quick-curve-buttons indifference-library">
+        <div class="curve-quick-add" role="group" aria-label="무차별곡선 모음"><h3>무차별곡선</h3>
+        <label class="copy-children" for="indifference-opposite-new"><input id="indifference-opposite-new" type="checkbox" />반대 방향</label><div class="quick-curve-buttons indifference-library">
           <button data-add-indifference="cobb-douglas"><svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M7 3C8 20 17 24 43 26"/></svg><span>콥더글라스</span><span class="quick-curve-plus" aria-hidden="true">+</span></button>
           <button data-add-indifference="substitutes"><svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M6 4L43 27"/></svg><span>완전대체재</span><span class="quick-curve-plus" aria-hidden="true">+</span></button>
           <button data-add-indifference="complements"><svg viewBox="0 0 48 32" fill="none" aria-hidden="true"><path d="M12 3V24H44"/></svg><span>완전보완재</span><span class="quick-curve-plus" aria-hidden="true">+</span></button>
@@ -144,6 +145,7 @@ app.innerHTML = `
         <input id="slope-slider" type="range" min="-90" max="90" step="0.01" value="45" />
         <div class="range-labels" aria-hidden="true"><span>−∞</span><span>0</span><span>+∞</span></div>
         <div class="slope-presets"><button data-slope="-1" aria-label="기울기 −1" title="기울기 −1" aria-pressed="false"><span class="preset-line negative"></span><strong>−1</strong></button><button data-slope="0" aria-label="기울기 0" title="기울기 0" aria-pressed="false"><span class="preset-line horizontal"></span><strong>0</strong></button><button data-slope="1" aria-label="기울기 1" title="기울기 1" aria-pressed="true"><span class="preset-line positive"></span><strong>1</strong></button><button data-slope="vertical" aria-label="수직선" title="수직선" aria-pressed="false"><span class="preset-line vertical"></span><strong>수직</strong></button></div>
+        <label class="copy-children" for="line-dashed"><input id="line-dashed" type="checkbox" />점선</label>
       </section><section id="curve-settings" aria-label="곡선 설정" hidden>
         <div class="equation-row"><div id="curve-title" class="curve-title">우하향</div><div class="line-actions"><button id="reset-curve" class="icon-button reset-button" aria-label="휘어짐 초기화" title="휘어짐 초기화">${icon('reset')}</button></div></div>
         <div class="curve-presets"><button data-curve-variant="ascending" aria-pressed="false">우상향</button><button data-curve-variant="descending" aria-pressed="true">우하향</button></div>
@@ -152,6 +154,7 @@ app.innerHTML = `
       </section><section id="indifference-settings" aria-label="곡선 설정" hidden>
         <div id="indifference-title" class="curve-title"></div>
         <p id="indifference-movement" class="mouse-hint"></p>
+        <label id="indifference-opposite-row" class="copy-children" for="indifference-opposite"><input id="indifference-opposite" type="checkbox" />반대 방향</label>
         <label id="indifference-axis-row" class="setting-row" for="indifference-axis">선형 축<select id="indifference-axis"><option value="y">y축 · 세로 이동</option><option value="x">x축 · 가로 이동</option></select></label>
         <div id="indifference-shape-row">${rangeField({"id":"indifference-shape","label":"휘어짐","labelId":"indifference-shape-label","min":0,"max":100,"step":0.1,"value":50})}</div>
         <div id="ppc-radii" hidden>

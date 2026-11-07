@@ -1,3 +1,4 @@
+import { onLineExtent } from './line-extent.js';
 import { projectOnLine, distance } from './sketch.js';
 import { isLinePointVisible } from './display.js';
 import { chooseSnapCandidate } from './snap-policy.js';
@@ -9,6 +10,6 @@ export function snapSketchTangent(point, state, bounds, unit, { previous=null, a
     const projected = projectOnLine(point,line);
     return { ...projected, line, kind:'tangent', key:`sketch-tangent:${line.id}`, ids:[line.id],
       distance:distance(projected.point,point)*unit };
-  }).filter(candidate => isLinePointVisible(candidate.point,bounds,state));
+  }).filter(candidate => isLinePointVisible(candidate.point,bounds,state) && onLineExtent(candidate.line,candidate.point,1e-7));
   return chooseSnapCandidate(candidates,previous);
 }

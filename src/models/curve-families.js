@@ -23,6 +23,8 @@ export class AnalyticCurveFamily {
   contact() { throw new TypeError('A curve family must implement contact()'); }
   tangentVector() { return null; } // A kink has no single smooth tangent.
   get translationAxis() { return null; }
+  /** Radial movement scales about this point. */
+  scaleCenter() { return { x: 0, y: 0 }; }
   moveAnchor() { throw new TypeError('A curve family must implement moveAnchor()'); }
   fitPoint() { throw new TypeError('A curve family must implement fitPoint()'); }
   fitLine() { throw new TypeError('A curve family must implement fitLine()'); }
@@ -340,4 +342,97 @@ export const CURVE_FAMILIES = registerCurveFamilies({
   complements: new ComplementsFamily({ label: '완전보완재', movement: '원점 기준 · 꺾임 이동', shape: '꺾임 비율', color: '#b67836' }),
   quasilinear: new QuasilinearFamily({ label: '준선형효용', movement: '선형 축으로 평행이동', shape: '휘어짐', color: '#ad5265' }),
 });
-export const curveFamilyOf = c => c && Object.hasOwn(CURVE_FAMILIES, c.family) ? CURVE_FAMILIES[c.family] : null;
+/** Families whose mirrored drawing is offered in the indifference library. */
+export const OPPOSITE_CURVE_FAMILIES = Object.freeze(['cobb-douglas', 'substitutes', 'complements', 'quasilinear']);
+export const supportsOpposite = c => OPPOSITE_CURVE_FAMILIES.includes(c?.family);
+export const isOppositeCurve = c => c?.orientation === 'opposite' && supportsOpposite(c) && validPoint(c.oppositeOrigin);
+
+const reflectPoint = (origin, p) => validPoint(p) ? { x: origin.x - p.x, y: origin.y - p.y } : p;
+const reflectBounds = (origin, b) => b && { xMin: origin.x - b.xMax, xMax: origin.x - b.xMin, yMin: origin.y - b.yMax, yMax: origin.y - b.yMin };
+const negate = v => v && { x: -v.x, y: -v.y };
+
+/**
+ * A family drawn from the opposite origin (the B origin of an Edgeworth box, or a
+ * chosen corner on a plain graph). Every call reflects through that origin, runs the
+ * registered family in its own coordinates and reflects the result back, so contacts,
+ * intersections, magnets and movement stay one implementation. Point reflection keeps
+ * every line slope, so slopes pass through unchanged. Stored anchors remain
+ * A-coordinate points on the drawn curve.
+ */
+export class OppositeCurveFamily {
+  constructor(base) { this.base = base; Object.freeze(this); }
+  get metadata() { return this.base.metadata; }
+  get radial() { return this.base.radial; }
+  get reshapesAnchor() { return this.base.reshapesAnchor; }
+  get editableShape() { return this.base.editableShape; }
+  get contactGeometry() { return this.base.contactGeometry; }
+  get translationAxis() { return this.base.translationAxis; }
+  /** Radial movement scales about this point; the A families use the origin. */
+  scaleCenter(c) { return { ...c.oppositeOrigin }; }
+  local(c) { const { orientation, oppositeOrigin, ...rest } = c; return { ...rest, anchor: reflectPoint(c.oppositeOrigin, c.anchor) }; }
+  point(c, p) { return reflectPoint(c.oppositeOrigin, p); }
+  line(c, line) { return { ...line, anchor: this.point(c, line.anchor) }; }
+  bounds(c, b) { return reflectBounds(c.oppositeOrigin, b); }
+  piece(c, piece) { return piece.map(p => this.point(c, p)); }
+  patch(c, patch) { return patch && validPoint(patch.anchor) ? { ...patch, anchor: this.point(c, patch.anchor) } : patch; }
+  movement(c) { return this.base.movement(this.local(c)).replace('원점', '반대 원점'); }
+  value(c, input, direction = 'vertical') {
+    const o = c.oppositeOrigin;
+    return direction === 'horizontal' ? o.x - this.base.value(this.local(c), o.y - input, 'horizontal') : o.y - this.base.value(this.local(c), o.x - input, 'vertical');
+  }
+  contact(c, slope, reference = c.anchor) { return this.point(c, this.base.contact(this.local(c), slope, this.point(c, reference))); }
+  tangentVector(c, p) { return negate(this.base.tangentVector(this.local(c), this.point(c, p))); }
+  moveAnchor(c, start, point, axis = null) { return this.point(c, this.base.moveAnchor(this.local(c), this.point(c, start), this.point(c, point), axis)); }
+  fitPoint(c, p) { return this.point(c, this.base.fitPoint(this.local(c), this.point(c, p))); }
+  fitLine(c, line, contact) { return this.point(c, this.base.fitLine(this.local(c), this.line(c, line), this.point(c, contact))); }
+  move(c, start, point, axis = null) { return this.point(c, this.base.move(this.local(c), this.point(c, start), this.point(c, point), axis)); }
+  moveDistance(c, anchor) { return this.base.moveDistance(this.local(c), this.point(c, anchor)); }
+  throughPoint(c, p) { return this.point(c, this.base.throughPoint(this.local(c), this.point(c, p))); }
+  onLine(c, line, reference = c.anchor) {
+    const fit = this.base.onLine(this.local(c), this.line(c, line), this.point(c, reference));
+    return fit && { anchor: this.point(c, fit.anchor), point: this.point(c, fit.point) };
+  }
+  swapped(c) { return this.base.swapped(this.local(c)); }
+  includesZero() { return this.base.includesZero(); }
+  pointAt(c, t) { return this.point(c, this.base.pointAt(this.local(c), t)); }
+  nearestPoint(c, point, bounds, pieces) {
+    return this.point(c, this.base.nearestPoint(this.local(c), this.point(c, point), this.bounds(c, bounds), pieces?.map(piece => this.piece(c, piece))));
+  }
+  parameterRange(c, bounds) { return this.base.parameterRange(this.local(c), this.bounds(c, bounds)); }
+  clip(c, bounds) { return this.base.clip(this.local(c), this.bounds(c, bounds)).map(piece => this.piece(c, piece)); }
+  clipPositive(c, bounds) { return this.base.clipPositive(this.local(c), this.bounds(c, bounds)).map(piece => this.piece(c, piece)); }
+  criticalParameter(c, line) { return this.base.criticalParameter(this.local(c), this.line(c, line)); }
+  coincident(c, line) { return this.base.coincident(this.local(c), this.line(c, line)); }
+  lineIntersections(c, line, bounds) {
+    return this.base.lineIntersections(this.local(c), this.line(c, line), this.bounds(c, bounds)).map(found => ({ ...found, point: this.point(c, found.point) }));
+  }
+  shapeHandle(c, bounds = null) { return this.point(c, this.base.shapeHandle(this.local(c), bounds && this.bounds(c, bounds))); }
+  shapeValue(c) { return this.base.shapeValue(this.local(c)); }
+  isEndpointAction(action) { return this.base.isEndpointAction(action); }
+  endpointHandles(c) { return this.base.endpointHandles(this.local(c)).map(handle => ({ ...handle, point: this.point(c, handle.point) })); }
+  endpointPatch(c, key, value) { return this.patch(c, this.base.endpointPatch(this.local(c), key, value)); }
+  shapeKeyPatch(c, positive, step) { return this.patch(c, this.base.shapeKeyPatch(this.local(c), positive, step)); }
+  reshapeKeyPatch(c, positive, step) { return this.patch(c, this.base.reshapeKeyPatch(this.local(c), positive, step)); }
+  shapeFromValue(c, value) { return this.patch(c, this.base.shapeFromValue(this.local(c), value)); }
+  shapeFromPoint(c, p) { return this.patch(c, this.base.shapeFromPoint(this.local(c), this.point(c, p))); }
+  nearbyOffset(c) { return negate(this.base.nearbyOffset(this.local(c))); }
+  geometry(c) { return { ...this.base.geometry(this.local(c)), orientation: 'opposite', oppositeOrigin: { ...c.oppositeOrigin } }; }
+  applyPatch(c, patch) {
+    const local = this.local(c);
+    this.base.applyPatch(local, this.patch(c, patch));
+    c.anchor = this.point(c, local.anchor); c.shape = local.shape;
+    if (local.linearAxis) c.linearAxis = local.linearAxis;
+  }
+}
+const OPPOSITE_VARIANTS = Object.freeze(Object.fromEntries(OPPOSITE_CURVE_FAMILIES.map(id => [id, new OppositeCurveFamily(CURVE_FAMILIES[id])])));
+
+export const curveFamilyOf = c => !c || !Object.hasOwn(CURVE_FAMILIES, c.family) ? null : isOppositeCurve(c) ? OPPOSITE_VARIANTS[c.family] : CURVE_FAMILIES[c.family];
+
+/** Switch the drawing direction; the anchor stays the same point on the drawn curve. */
+export function orientCurve(c, opposite, origin) {
+  if (!supportsOpposite(c)) return false;
+  if (!opposite) { delete c.orientation; delete c.oppositeOrigin; return true; }
+  if (!validPoint(origin) || origin.x - c.anchor.x < 0.02 || origin.y - c.anchor.y < 0.02) return false;
+  c.orientation = 'opposite'; c.oppositeOrigin = { x: origin.x, y: origin.y };
+  return true;
+}

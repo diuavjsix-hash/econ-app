@@ -21,6 +21,7 @@
 .quick-curve-buttons button { display:flex; align-items:center; justify-content:center; gap:6px; margin:0; padding:10px 6px; border:1px solid var(--border); border-radius:7px; color:#596779; background:transparent; font-size:12px; }
 .quick-curve-buttons button:hover { background:#f2f4f8; border-color:#cdd4df; }
 .quick-curve-buttons svg { width:31px; height:23px; stroke:currentColor; stroke-width:2; }
+.indifference-library.is-opposite svg { transform:rotate(180deg); }
 .quick-curve-plus { color:#8a96a6; font-size:15px; }
 .indifference-library { grid-template-columns:1fr; }
 .indifference-library button { justify-content:flex-start; padding:8px 10px; }

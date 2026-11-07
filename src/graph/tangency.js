@@ -1,3 +1,4 @@
+import { onLineExtent } from './line-extent.js';
 import { directionOf } from './math.js';
 import { displayedCurveSegments, isLinePointVisible, lineDisplayRegions } from './display.js';
 import { sketchControls, quadraticPoint } from './sketch.js';
@@ -70,7 +71,7 @@ export function snapLineToTangency(line, state, bounds, unit, { previous = null,
       if (!point || !isLinePointVisible(point,bounds,state)) continue;
       const offset=(point.x-line.anchor.x)*normal.x+(point.y-line.anchor.y)*normal.y;
       const movement=normalTranslation(offset,normal,axis);
-      if (!movement) continue;
+      if (!movement || !onLineExtent({...line,anchor:{x:line.anchor.x+movement.delta.x,y:line.anchor.y+movement.delta.y}},point,1e-7)) continue;
       candidates.push({key:`${curve.id}:indifference`,sourceId:curve.id,point,
         anchor:{x:line.anchor.x+movement.delta.x,y:line.anchor.y+movement.delta.y},
         distance:movement.distance*unit,pointerDistance:Math.hypot(point.x-reference.x,point.y-reference.y)*unit,
@@ -84,7 +85,7 @@ export function snapLineToTangency(line, state, bounds, unit, { previous = null,
         const movement=normalTranslation(offset,normal,axis);
         if (!movement) return;
         const anchor = {x:line.anchor.x+movement.delta.x,y:line.anchor.y+movement.delta.y};
-        if (!validPoint(anchor)) return;
+        if (!validPoint(anchor) || !onLineExtent({...line,anchor},point,1e-7)) return;
         candidates.push({key:`${curve.id}:${index}:${contactIndex}`,sourceId:curve.id,point,anchor,
           distance:movement.distance*unit, pointerDistance:Math.hypot(point.x-reference.x,point.y-reference.y)*unit});
       });
@@ -103,7 +104,7 @@ export function snapCurveToTangency(curve,state,bounds,unit,{previous=null,refer
     for (const line of state.lines) {
       if (!canAttach(state,curve.id,line.id)) continue;
       const candidate=indifferenceOnLine(curve,line,reference);
-      if (!candidate || !isLinePointVisible(candidate.point,bounds,state)) continue;
+      if (!candidate || !isLinePointVisible(candidate.point,bounds,state) || !onLineExtent(line,candidate.point,1e-7)) continue;
       candidates.push({...candidate,key:`${line.id}:indifference`,sourceId:line.id,
         distance:indifferenceMoveDistance(curve,candidate.anchor)*unit,
         pointerDistance:Math.hypot(candidate.point.x-reference.x,candidate.point.y-reference.y)*unit,
@@ -127,6 +128,7 @@ export function snapCurveToTangency(curve,state,bounds,unit,{previous=null,refer
         const shifted=points.map(point=>({x:point.x+delta.x,y:point.y+delta.y}));
         // Clip after translation; a hidden raw contact can become visible after correction.
         contacts(shifted,direction,reference,bounds,state).forEach((point,contactIndex)=>{
+          if (!onLineExtent(line,point,1e-7)) return;
           candidates.push({key:`${line.id}:${index}:${contactIndex}`,sourceId:line.id,point,anchor,
             distance:movement.distance*unit,pointerDistance:Math.hypot(point.x-reference.x,point.y-reference.y)*unit});
         });

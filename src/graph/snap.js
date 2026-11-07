@@ -1,13 +1,15 @@
 import { displayedLineSegments, displayedCurveSegments, isLinePointVisible, lineDisplayRegions } from './display.js';
 import { clipSegment } from './ruler.js';
 import { displayedSumSegments } from './sum.js';
-import { displayedSketchSegments, sketchControls } from './sketch.js';
+import { displayedSketchSegments, displayedSketchMinimum, sketchControls } from './sketch.js';
 import { isIndifference, indifferenceLineIntersections } from './indifference.js';
 import { SNAP_CAPTURE_PX, SNAP_RELEASE_PX, chooseSnapCandidate } from './snap-policy.js';
 import { axisSegments, coordinateOrigins } from './axes.js';
 import { buildCurveContactTargets } from './curve-contacts.js';
 import { independentSnapState, geometryKey } from './snap-context.js';
 import { curveFamilyOf } from '../models/curve-families.js';
+import { directionOf } from './math.js';
+import { lineEndPoints } from './line-extent.js';
 
 export const SNAP_RADIUS = SNAP_CAPTURE_PX;
 export const INTERSECTION_RADIUS = SNAP_CAPTURE_PX;
@@ -250,6 +252,15 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
     && isLinePointVisible(curve.anchor,bounds,state)) {
     crossings.push({ point:{...curve.anchor}, ids:[curve.id], sourceId:curve.id, kind:'kink', label:'꺾임 맞춤' });
   }
+  // A displayed minimum is a point target like a kink. It creates no object or relation.
+  for (const sketch of state.sketches ?? []) {
+    const minimum = displayedSketchMinimum(sketch, bounds, state);
+    if (minimum) crossings.push({ point:{...minimum}, ids:[sketch.id], sourceId:sketch.id, kind:'minimum', label:'최저점 맞춤' });
+  }
+  // A trimmed line end is a point target, so another line or point can meet it exactly.
+  for (const line of state.lines) for (const end of lineEndPoints(line)) {
+    if (end && isLinePointVisible(end, bounds, state)) crossings.push({ point:end, ids:[line.id], sourceId:line.id, kind:'endpoint', label:'끝점 맞춤' });
+  }
   // Reconstruct contacts from document geometry, not a previous drag's transient UI state.
   // Every point/endpoint consumer receives them through this one registry.
   crossings.push(...buildCurveContactTargets(state, bounds));
@@ -314,7 +325,8 @@ export class SnapTargetCache {
 }
 
 /** Candidates on the allowed movement axis, before magnet priority/hysteresis. */
-export function guidedSnapCandidates(point, targets, unit, axis = null, radius = SNAP_RELEASE_PX) {
+export function guidedSnapCandidates(point, targets, unit, axis = null, radius = SNAP_RELEASE_PX, guide = null) {
+  if (guide) return guideSnapCandidates(point, targets, unit, guide, radius);
   const locked = axis === 'x' ? 'y' : 'x', candidates = [];
   const add = (candidate, key, priority) => {
     if (axis && Math.abs(candidate.point[locked] - point[locked]) > EPS) return;
@@ -344,6 +356,34 @@ export function guidedSnapCandidates(point, targets, unit, axis = null, radius =
         ? [nearest(shape, point)] : quadraticRoots(coefficients).map(t => at(shape, t));
     }
     for (const target of points) add({ point: target, kind: 'shape', ids: [shape.id] }, `shape:${shape.id}`, 2);
+  }
+  return candidates;
+}
+
+/**
+ * Discrete targets on an arbitrary guide line, such as the line whose end is being dragged.
+ * Its crossings with other strokes and axes are points, so they share crossing priority.
+ */
+function guideSnapCandidates(point, targets, unit, guide, radius) {
+  const d = directionOf(guide.slope), n = { x: -d.y, y: d.x }, line = { anchor: guide.anchor, slope: guide.slope };
+  const offset = p => (p.x - guide.anchor.x) * n.x + (p.y - guide.anchor.y) * n.y, candidates = [];
+  const add = (candidate, key) => {
+    const pixels = distance(point, candidate.point) * unit;
+    if (pixels <= radius) candidates.push({ ...candidate, key, priority: 1, distance: pixels });
+  };
+  const crossingOf = (id, target) => ['axis-x', 'axis-y'].includes(id)
+    ? { point: target, kind: 'intercept', axis: id.slice(-1), ids: [id] } : { point: target, kind: 'intersection', ids: [id] };
+  for (const crossing of targets.crossings) if (Math.abs(offset(crossing.point)) <= EPS)
+    add(crossing, `crossing:${crossing.ids.join(',')}:${crossing.point.x}:${crossing.point.y}`);
+  const analyticIds = new Set((targets.analyticCurves ?? []).map(({ curve }) => curve.id));
+  for (const { curve, domains } of targets.analyticCurves ?? []) for (const { region } of domains) {
+    for (const { point: target } of curveFamilyOf(curve).lineIntersections(curve, line, region)) add(crossingOf(curve.id, target), `guide:${curve.id}:${target.x}:${target.y}`);
+  }
+  const quadraticIds = new Set((targets.quadratics ?? []).map(shape => shape.id));
+  for (const shape of [...targets.shapes.filter(s => !analyticIds.has(s.id) && !quadraticIds.has(s.id)), ...(targets.quadratics ?? [])]) {
+    const coefficients = [offset(shape.a), dot(n, shape.v), dot(n, shape.q)];
+    if (coefficients.every(value => Math.abs(value) <= 1e-12)) continue; // A collinear stroke has no single crossing.
+    for (const target of quadraticRoots(coefficients).map(t => at(shape, t))) add(crossingOf(shape.id, target), `guide:${shape.id}:${target.x}:${target.y}`);
   }
   return candidates;
 }

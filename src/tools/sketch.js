@@ -4,12 +4,18 @@ import { distance } from '../graph/sketch.js';
 export function mountSketchTool(root, store) {
   const button=root.querySelector('#sketch-tool'), options=root.querySelector('#sketch-options'), settings=root.querySelector('#sketch-settings');
   const mode=root.querySelector('#sketch-mode');
-  button.addEventListener('click',()=>store.update({sketchSelected:!store.getState().sketchSelected}));
+  button.addEventListener('click',()=>store.toggleToolMode('sketch'));
   mode.addEventListener('change',()=>store.update({sketchMode:mode.value}));
   const reachControls={};
   for (const [id,key] of [['sketch-left','leftReach'],['sketch-right','rightReach']]) reachControls[key]=new RangeControl(root,id).bind(value=>store.updateSelected({[key]:value/100}));
   root.querySelector('#sketch-minimum').addEventListener('change',event=>store.updateSelected({showMinimum:event.target.checked}));
-  root.querySelector('#point-through-line').addEventListener('click',()=>store.lineThroughSelectedPoint({follow:root.querySelector('#point-line-follow').checked}));
+  root.querySelector('#point-through-line').addEventListener('click',()=>{
+    const state=store.getState(),point=state.points.find(point=>point.id===state.selectedId);
+    const graph=root.querySelector('.diagram-card.is-active .graph-container');
+    // On a curve-curve contact the new line starts along the shared tangent.
+    const contact=point&&graph&&contactTangentSlope(state,createViewport(graph.clientWidth,graph.clientHeight,state.quadrantMode,state).bounds,point.anchor);
+    store.lineThroughSelectedPoint({follow:root.querySelector('#point-line-follow').checked,...(contact?{slope:contact.slope}:{})});
+  });
   root.querySelector('#detach-binding').addEventListener('click',()=>store.detachSelected());
   for (const button of root.querySelectorAll('[data-sketch-shape]')) button.addEventListener('click',()=>{
     const state=store.getState(), curve=state.sketches.find(curve=>curve.id===state.selectedId);
@@ -38,3 +44,5 @@ export function mountSketchTool(root, store) {
   });
 }
 import { RangeControl } from '../ui/controls.js';
+import { createViewport } from '../graph/viewport.js';
+import { contactTangentSlope } from '../graph/curve-contacts.js';

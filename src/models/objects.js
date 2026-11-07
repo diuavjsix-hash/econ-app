@@ -1,5 +1,5 @@
 import { GraphObject, DrawableObject, MovableObject, StrokeObject } from './graph-object.js';
-import { curveFamilyOf } from './curve-families.js';
+import { curveFamilyOf, orientCurve, isOppositeCurve } from './curve-families.js';
 import { directionOf, normalizeSlope, interceptOf } from '../graph/math.js';
 import { CURVE_PRESETS, MAX_BEND, curveControlPoints, curveTangentRays } from '../graph/curve.js';
 import { displayedLineSegments, displayedCurveSegments } from '../graph/display.js';
@@ -8,18 +8,35 @@ import { displayedSumSegments } from '../graph/sum.js';
 import { clipSegment, validPoint, rulerMetrics } from '../graph/ruler.js';
 import { validFill, fillTouchesRectangle } from '../graph/fill.js';
 import { OBJECT_TYPES } from './object-types.js';
+import { isTrimmed, lineEndPoints, normalizeExtent, rotatedExtent } from '../graph/line-extent.js';
+
+export const LINE_STYLES = Object.freeze(['solid', 'dashed']);
 import { objectsOf } from '../objects.js';
 import { assertModelContract, assertRegistryContract } from './contracts.js';
 
 export class LineObject extends StrokeObject {
   visiblePieces(bounds, state) { return displayedLineSegments(this.data, bounds, state); }
   updateGeometry(patch) {
+    const before = { slope: this.data.slope, extent: this.data.extent ?? null };
     super.updateGeometry(patch);
-    if ('slope' in patch) this.data.slope = normalizeSlope(patch.slope);
+    if ('slope' in patch) {
+      this.data.slope = normalizeSlope(patch.slope);
+      // Without an explicit extent, keep the ends on the side nearest their old direction.
+      if (!('extent' in patch) && before.extent) this.setExtent(rotatedExtent(before.extent, this.data.slope, directionOf(before.slope)));
+    }
+    if ('extent' in patch) this.setExtent(patch.extent);
+    if (LINE_STYLES.includes(patch.style)) this.data.style = patch.style;
+  }
+  setExtent(extent) {
+    const value = normalizeExtent(extent);
+    if (value === undefined) return;
+    if (value) this.data.extent = value; else delete this.data.extent;
   }
   sameGeometry(other) {
     const a = this.data, b = other;
     if (b.type !== a.type || !a.anchor || !b.anchor) return false;
+    const ends = lineEndPoints(b);
+    if (!lineEndPoints(a).every((p, i) => p === null ? ends[i] === null : ends[i] !== null && Math.hypot(p.x - ends[i].x, p.y - ends[i].y) < 1e-8)) return false;
     const d = directionOf(a.slope), e = directionOf(b.slope);
     return Math.abs(d.x * e.y - d.y * e.x) < 1e-10 && Math.abs((a.anchor.x - b.anchor.x) * d.y - (a.anchor.y - b.anchor.y) * d.x) < 1e-8;
   }
@@ -33,7 +50,9 @@ export class LineObject extends StrokeObject {
   }
   serialize() {
     const line = this.data, direction = directionOf(line.slope);
+    const [start, end] = lineEndPoints(line);
     return { ...super.serialize(), slope: line.slope, intercept: interceptOf(line), anchor: { ...line.anchor },
+      style: line.style ?? 'solid', ...(isTrimmed(line) ? { extent: [...line.extent], segment: { start, end } } : {}),
       ...(line.binding ? { binding: { ...line.binding } } : {}), vertical: line.slope === null, xIntercept: line.slope === null ? line.anchor.x : null,
       implicit: { a: -direction.y, b: direction.x, c: direction.y * line.anchor.x - direction.x * line.anchor.y } };
   }
@@ -61,13 +80,24 @@ export class CurveObject extends StrokeObject {
 export class AnalyticCurveObject extends CurveObject {
   get family() { return curveFamilyOf(this.data); }
   get serializedFields() { return ['id', 'type', 'name', 'color', 'parentId']; }
-  updateGeometry(patch) { this.family.applyPatch(this.data, patch); }
+  updateGeometry(patch) {
+    const c = this.data;
+    if (typeof patch.opposite === 'boolean') orientCurve(c, patch.opposite, patch.oppositeOrigin);
+    // Moving an opposite curve's origin carries the whole drawing with it.
+    else if (isOppositeCurve(c) && validPoint(patch.oppositeOrigin)) {
+      const dx = patch.oppositeOrigin.x - c.oppositeOrigin.x, dy = patch.oppositeOrigin.y - c.oppositeOrigin.y;
+      c.oppositeOrigin = { ...patch.oppositeOrigin }; c.anchor = { x: c.anchor.x + dx, y: c.anchor.y + dy };
+      return;
+    }
+    this.family.applyPatch(c, patch);
+  }
   translatedAnchor(point) { return this.family.move(this.data, this.data.anchor, point); }
   nearbyOffset() { return this.family.nearbyOffset(this.data); }
   serialize() {
     const c = this.data;
     return { ...this.fields(), family: c.family, anchor: { ...c.anchor }, shape: c.shape,
-      ...(c.family === 'quasilinear' ? { linearAxis: c.linearAxis } : {}), geometry: this.family.geometry(c) };
+      ...(c.family === 'quasilinear' ? { linearAxis: c.linearAxis } : {}),
+      ...(isOppositeCurve(c) ? { orientation: 'opposite', oppositeOrigin: { ...c.oppositeOrigin } } : {}), geometry: this.family.geometry(c) };
   }
 }
 

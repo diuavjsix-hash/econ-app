@@ -7,10 +7,14 @@ import { distance, unitVector, sketchHandlePoints, translatedSketch } from './sk
 import { curveFamilyOf } from '../models/curve-families.js';
 import { snapMovingCurve } from './point-magnets.js';
 import { snapMovingLine } from './intercepts.js';
-import { snapMovingDashed } from './dashed-magnets.js';
+import { snapMovingDashed, snapDashedPoint } from './dashed-magnets.js';
 import { OBJECT_TYPES } from '../models/object-types.js';
 import { coordinateOrigins } from './axes.js';
-import { chooseSnapCandidate } from './snap-policy.js';
+import { chooseSnapCandidate, SNAP_RELEASE_PX } from './snap-policy.js';
+import { contactTangentsAt, slopeOfDirection } from './curve-contacts.js';
+import { LINE_END_ACTIONS, LINE_EDGE_PX, isTrimmed, lineParameter, rebasedExtent, rotatedExtent, visibleLineEnds } from './line-extent.js';
+
+const LINE_MIN_PX = 24;
 
 const deltaFor = (event, step, v) => ({
   x: (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0) * v.xDirection,
@@ -23,6 +27,8 @@ export class ShapeInteraction {
   constructor() { if (new.target === ShapeInteraction) throw new TypeError('ShapeInteraction is abstract'); }
   get movable() { return true; }
   start(object) { return object.anchor; }
+  /** The edit applied when a drag begins; it also becomes the drag snapshot. */
+  startPatch(object, anchor) { return { anchor }; }
   canDrag(object, action) { return this.movable && !(object.binding && action === 'move'); }
   drag() { throw new TypeError('A shape interaction must implement drag()'); }
   keyboard() { throw new TypeError('A shape interaction must implement keyboard()'); }
@@ -54,29 +60,80 @@ export class StrokeInteraction extends MovableInteraction {
 }
 export class LineInteraction extends StrokeInteraction {
   canDrag(object, action) { return !(object.binding && action === 'move'); }
-  start(object, ctx) { return lineEditingGeometry(object, displayedLineSegments(object, ctx.viewport.bounds, ctx.state))?.anchor ?? null; }
+  // A followed point stays the pivot; re-anchoring would fight the relation.
+  start(object, ctx) { return object.binding ? object.anchor : lineEditingGeometry(object, displayedLineSegments(object, ctx.viewport.bounds, ctx.state))?.anchor ?? null; }
+  startPatch(object, anchor) { return isTrimmed(object) ? { anchor, extent: rebasedExtent(object, anchor) } : { anchor }; }
   magnet(...args) { return snapMovingLine(...args); }
   drag(object, action, start, point, event, ctx) {
     if (action === 'move') return super.drag(object, action, start, point, event, ctx);
-    if (ctx.state.quadrantMode === 'edgeworth' && !event.altKey) {
-      const candidates = coordinateOrigins(ctx.state, ctx.viewport.bounds).filter(origin => distance(origin.point, object.anchor) > 1e-9)
-        .map(origin => ({ ...origin, key: `rotate-origin:${origin.label}`, priority: 0, kind: 'intercept', axis: 'origin', distance: distance(point, origin.point) * ctx.viewport.unit }));
-      const target = chooseSnapCandidate(candidates, ctx.tangentSnap);
-      if (target) {
-        const direction=directionOf(object.slope);
-        // Preserve an origin already on the line when rotating toward the other.
-        // Its stored/display editing anchor may be elsewhere on that same line.
-        const pivot=coordinateOrigins(ctx.state,ctx.viewport.bounds).find(origin => distance(origin.point,target.point)>1e-9
-          && Math.abs((origin.point.x-object.anchor.x)*direction.y-(origin.point.y-object.anchor.y)*direction.x)<1e-9)?.point ?? object.anchor;
-        const dx=target.point.x-pivot.x,dy=target.point.y-pivot.y;
-        return { patch: { anchor: {...pivot}, slope: dx===0?null:dy/dx }, tangentSnap: target };
-      }
-    }
+    if (Object.hasOwn(LINE_END_ACTIONS, action)) return this.dragEnd(object, LINE_END_ACTIONS[action], point, event, ctx);
+    const target = event.altKey ? null : chooseSnapCandidate(this.rotationCandidates(object, point, ctx), ctx.tangentSnap);
+    if (target) return { patch: this.keepEnds(object, target.rotation, start, point), tangentSnap: target };
     const dx = point.x - object.anchor.x, dy = point.y - object.anchor.y;
     if (Math.hypot(dx, dy) < 0.25) return { tangentSnap: null };
-    return { patch: { slope: Math.abs(dx * ctx.viewport.unit) < 4 ? null : dy / dx }, tangentSnap: null };
+    return { patch: this.keepEnds(object, { slope: Math.abs(dx * ctx.viewport.unit) < 4 ? null : dy / dx }, start, point), tangentSnap: null };
+  }
+  /** Rotation keeps each drawn end at its distance from the pivot, on the side the pointer carries it. */
+  keepEnds(object, rotation, start, point) {
+    if (!isTrimmed(object)) return rotation;
+    const pivot = rotation.anchor ?? object.anchor, d = directionOf(object.slope);
+    const side = (start.x - object.anchor.x) * d.x + (start.y - object.anchor.y) * d.y < 0 ? -1 : 1;
+    const heading = { x: side * (point.x - pivot.x), y: side * (point.y - pivot.y) };
+    const extent = rotation.anchor ? rebasedExtent(object, pivot) : object.extent;
+    return { ...rotation, extent: rotatedExtent(extent, rotation.slope, heading) };
+  }
+  /** Drag one end along the line. Near the edge it opens again; elsewhere it meets shared targets. */
+  dragEnd(object, index, point, event, ctx) {
+    const { bounds, unit } = ctx.viewport, ends = visibleLineEnds({ ...object, extent: null }, bounds, ctx.state);
+    if (!ends) return { tangentSnap: null };
+    const raw = lineParameter(object, point), [low, high] = ends.edge, margin = LINE_EDGE_PX / unit;
+    const extent = [...(object.extent ?? [null, null])];
+    if (index === 1 ? raw >= high - margin : raw <= low + margin) {
+      extent[index] = null;
+      return { patch: { extent }, tangentSnap: null };
+    }
+    const target = event.altKey ? null : snapDashedPoint(point, ctx.snapTargets(), unit, { guide: object, points: ctx.state.points, bounds, previous: ctx.tangentSnap });
+    let t = target ? lineParameter(object, target.point) : raw;
+    const other = extent[1 - index] ?? (index === 1 ? low : high), minimum = LINE_MIN_PX / unit;
+    t = index === 1 ? Math.max(t, other + minimum) : Math.min(t, other - minimum);
+    extent[index] = t;
+    return { patch: { extent }, tangentSnap: target && Math.abs(t - lineParameter(object, target.point)) < 1e-9 ? target : null };
+  }
+  /** Rotation magnets: Edgeworth origins, and the common tangent of a contact at the pivot. */
+  rotationCandidates(object, point, ctx) {
+    const { unit, bounds } = ctx.viewport, candidates = [];
+    if (ctx.state.quadrantMode === 'edgeworth') {
+      const origins = coordinateOrigins(ctx.state, bounds), direction = directionOf(object.slope);
+      for (const origin of origins) {
+        if (distance(origin.point, object.anchor) <= 1e-9) continue;
+        // Preserve an origin already on the line when rotating toward the other.
+        // Its stored/display editing anchor may be elsewhere on that same line.
+        const pivot = origins.find(other => distance(other.point, origin.point) > 1e-9
+          && Math.abs((other.point.x - object.anchor.x) * direction.y - (other.point.y - object.anchor.y) * direction.x) < 1e-9)?.point ?? object.anchor;
+        const dx = origin.point.x - pivot.x, dy = origin.point.y - pivot.y;
+        candidates.push({ ...origin, key: `rotate-origin:${origin.label}`, priority: 0, kind: 'intercept', axis: 'origin',
+          distance: distance(point, origin.point) * unit, rotation: { anchor: { ...pivot }, slope: dx === 0 ? null : dy / dx } });
+      }
+    }
+    // Only a contact at the pivot: the line keeps passing through it while rotating.
+    for (const contact of contactTangentsAt(ctx.snapTargets().crossings, object.anchor)) {
+      const t = contact.contactTangent, offset = { x: point.x - contact.point.x, y: point.y - contact.point.y };
+      if (Math.hypot(offset.x, offset.y) * unit < SNAP_RELEASE_PX) continue; // No direction near the pivot.
+      candidates.push({ point: { ...contact.point }, ids: contact.ids, kind: 'tangent', label: '접선 맞춤', priority: 0,
+        key: `rotate-tangent:${contact.ids.join(',')}:${contact.point.x}:${contact.point.y}`,
+        distance: Math.abs(offset.x * t.y - offset.y * t.x) * unit, rotation: { slope: slopeOfDirection(t) } });
+    }
+    return candidates;
   }
   keyboard(object, action, event, ctx) {
+    if (Object.hasOwn(LINE_END_ACTIONS, action)) {
+      const index = LINE_END_ACTIONS[action], ends = visibleLineEnds(object, ctx.viewport.bounds, ctx.state);
+      if (!ends) return null;
+      const step = (['ArrowUp', 'ArrowRight'].includes(event.key) ? 1 : -1) * (event.shiftKey ? 1 : 0.1);
+      const extent = [...(object.extent ?? [null, null])], t = (extent[index] ?? ends.ends[index].t) + step;
+      if (index === 1 ? t >= ends.edge[1] : t <= ends.edge[0]) extent[index] = null; else extent[index] = t;
+      return { patch: { extent } };
+    }
     if (action !== 'rotate') return super.keyboard(object, action, event, ctx);
     let angle = angleFromSlope(object.slope) + (['ArrowUp', 'ArrowRight'].includes(event.key) ? 1 : -1) * (event.shiftKey ? 1 : 0.1);
     if (angle > 90) angle -= 180;
@@ -99,6 +156,7 @@ export class AnalyticInteraction extends CurveInteraction {
     const family = curveFamilyOf(object);
     if (family.isEndpointAction(action)) return { patch: family.endpointPatch(object, action.slice(-1), point[action.slice(-1)]) };
     if (action === 'ic-shape') return { patch: family.shapeFromPoint(object, point) };
+    if (action === 'ic-origin') return { patch: { oppositeOrigin: dragTranslation(object.oppositeOrigin, start, point, event.shiftKey).anchor } };
     const moved = dragTranslation(object.anchor, start, point, event.shiftKey);
     // Family movement owns radial/linear-axis constraints; it takes precedence over Shift.
     const anchor = family.move(object, start, point, moved.axis);
@@ -111,6 +169,7 @@ export class AnalyticInteraction extends CurveInteraction {
       return { patch: family.endpointPatch(object, key, object.anchor[key] * Math.SQRT2 + delta[key]) };
     }
     if (action === 'ic-shape') return { patch: family.shapeKeyPatch(object, ['ArrowUp', 'ArrowRight'].includes(event.key), step) };
+    if (action === 'ic-origin') return { patch: { oppositeOrigin: shifted(object.oppositeOrigin, deltaFor(event, step, ctx.viewport)) } };
     return MovableInteraction.prototype.keyboard.call(this, object, action, event, ctx);
   }
 }

@@ -56,7 +56,7 @@ test('manual editing preserves the alphabet, and automatic colors avoid manual o
   assert.equal(store.getState().fills[0].label,'A');assert.equal(store.getState().fills[0].name,'내 구역');
   assert.notEqual(nextFillColor([{color:'#6068E8'},{color:'#E69451'}]),'#6068e8');
   store.addFill(shape(6));assert.notEqual(store.getState().fills[1].color,'#e69451');
-  const doc=serializeDocument(store.getState());assert.equal(doc.schemaVersion,10);assert.equal(doc.fills[0].label,'A');
+  const doc=serializeDocument(store.getState());assert.equal(doc.schemaVersion,11);assert.equal(doc.fills[0].label,'A');
   assert.deepEqual(doc.fills,doc.diagrams[0].fills);assert.equal('fillNextLabel' in doc,false);assert.equal('fillAutoColor' in doc,false);
 });
 

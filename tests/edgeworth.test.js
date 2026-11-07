@@ -92,7 +92,7 @@ test('A and B origins share exact point/dashed and line-translation targets with
 test('rotating a line snaps to either box origin before the near-vertical heuristic and supports Alt bypass',()=>{
   for (const boxSize of [{width:10,height:8},{width:1,height:100},{width:100,height:1}]) {
     const store=createStore();store.configureLayout('single',null,'edgeworth',{boxSize});store.addLine();store.updateSelected({slope:0});
-    const state=store.getState(),line=state.lines[0],viewport=createViewport(312,400,'edgeworth',state),controller=interactionFor(line),ctx={state,viewport};
+    const state=store.getState(),line=state.lines[0],viewport=createViewport(312,400,'edgeworth',state),controller=interactionFor(line),ctx={state,viewport,snapTargets:()=>buildSnapTargets(state,viewport.bounds)};
     for(const point of [{x:0,y:0},{x:boxSize.width,y:boxSize.height}]) {
       const result=controller.drag(line,'rotate',line.anchor,point,{},ctx);
       close(result.patch.slope,boxSize.height/boxSize.width);assert.deepEqual(result.tangentSnap.point,point);
@@ -115,7 +115,7 @@ test('rotating from a line through A onto B keeps A pinned even after editing-an
   store.selectDiagram(store.getState().diagrams[1].id);store.addLine();
   assert.equal(store.getState().lines[0].slope,7/12,'The first line in a new diagram is independent of global object IDs');
   store.updateSelected({anchor:{x:3,y:1},slope:1/3});
-  const state=store.getState(),line=state.lines[0],viewport=createViewport(800,540,'edgeworth',state),controller=interactionFor(line),ctx={state,viewport};
+  const state=store.getState(),line=state.lines[0],viewport=createViewport(800,540,'edgeworth',state),controller=interactionFor(line),ctx={state,viewport,snapTargets:()=>buildSnapTargets(state,viewport.bounds)};
   const anchor=controller.start(line,ctx),raw={...line,anchor};
   const result=controller.drag(raw,'rotate',anchor,{x:12,y:7},{},ctx);
   assert.deepEqual(result.patch.anchor,{x:0,y:0});assert.equal(result.patch.slope,7/12);

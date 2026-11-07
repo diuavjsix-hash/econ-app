@@ -138,7 +138,7 @@ test('snapped drag records once and leaves the source point, line and JSON schem
   }
   store.endHistory();
   const after = serializeDocument(store.getState());
-  assert.equal(after.schemaVersion, 10); assert.deepEqual(after.points, before.points);
+  assert.equal(after.schemaVersion, 11); assert.deepEqual(after.points, before.points);
   assert.deepEqual(after.lines.find(line => line.id === lineId), before.lines.find(line => line.id === lineId));
   assert.deepEqual(after.dashedLines[0].end, { x: 5, y: 3 });
   assert.equal('binding' in after.dashedLines[0], false);

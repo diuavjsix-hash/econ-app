@@ -1,10 +1,14 @@
 import { mountGraph } from './graph/canvas.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
 import { selectedIdsOf } from './objects.js';
+import { toolModeFlags, toolModeOf } from './tool-modes.js';
 
 export function diagramState(state, id) {
   const diagram = state.diagrams.find(d => d.id === id);
-  return { ...state, ...diagram, fillSelected: state.activeDiagramId===id && state.fillSelected, selectedIds:state.activeDiagramId===id?selectedIdsOf(state):[], selectedId: state.activeDiagramId === id ? state.selectedId : null, sketchSelected:state.activeDiagramId===id && state.sketchSelected, handSelected: state.activeDiagramId === id && state.handSelected, duplicatePanel: state.activeDiagramId === id && state.duplicatePanel, dashedSelected: state.activeDiagramId === id && state.dashedSelected, mouseSelected: state.activeDiagramId === id && state.mouseSelected };
+  const active = state.activeDiagramId === id;
+  // Inactive diagrams show no tool mode, selection or editing handles.
+  return { ...state, ...diagram, ...toolModeFlags(active ? toolModeOf(state) : null),
+    selectedIds: active ? selectedIdsOf(state) : [], selectedId: active ? state.selectedId : null };
 }
 
 export function mountWorkspace(root, store) {
