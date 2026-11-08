@@ -21,7 +21,7 @@ export function mountQuadrants(root, store) {
   }
   boxWidth.addEventListener('input',renderDraft); boxHeight.addEventListener('input',renderDraft);
   for (const [id, layout] of Object.entries(LAYOUTS)) {
-    const choice = document.createElement('button'); choice.dataset.layout = id;
+    const choice = document.createElement('button'); choice.type = 'button'; choice.className = 'choice choice-row'; choice.dataset.layout = id;
     const preview = document.createElement('span'); preview.className = 'layout-preview'; preview.setAttribute('aria-hidden', 'true');
     const rows = Math.max(...layout.slots.map(s => s.row)) + 1, columns = Math.max(...layout.slots.map(s => s.column)) + 1;
     preview.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
@@ -32,12 +32,12 @@ export function mountQuadrants(root, store) {
       cell.innerHTML = `<svg viewBox="0 0 32 28"><g transform="translate(${slot.flipX ? 32 : 0} ${slot.flipY ? 28 : 0}) scale(${slot.flipX ? -1 : 1} ${slot.flipY ? -1 : 1})"><path d="M5 3v20h24M2 6l3-3 3 3M26 20l3 3-3 3"/></g></svg>`;
       preview.append(cell);
     }
-    const label = document.createElement('span'); label.textContent = layout.label;
+    const label = document.createElement('span'); label.className = 'choice-label'; label.textContent = layout.label;
     choice.append(preview, label); layoutChoices.append(choice);
     choice.addEventListener('click', () => { preset = id; slots = structuredClone(layout.slots); renderDraft(); });
   }
   for (let row = 0; row < 3; row++) for (let column = 0; column < 3; column++) {
-    const cell = document.createElement('button'); cell.dataset.row = row; cell.dataset.column = column;
+    const cell = document.createElement('button'); cell.type = 'button'; cell.dataset.row = row; cell.dataset.column = column;
     cell.textContent = '+'; cell.setAttribute('aria-label', `${row + 1}행 ${column + 1}열 그래프`); customGrid.append(cell);
     cell.addEventListener('click', () => {
       preset = 'custom';
@@ -67,7 +67,7 @@ export function mountQuadrants(root, store) {
   close.addEventListener('click', () => dialog.close());
   dialog.addEventListener('cancel', event => { if (!chosen) event.preventDefault(); });
   const unsubscribe = store.subscribe(({ layout }) => {
-    button.textContent = `배치 · ${layout.slots.length}개`;
+    (button.querySelector('#choose-quadrants-label') ?? button).textContent = `배치 · ${layout.slots.length}개`;
     button.setAttribute('aria-label', `작업 영역 설정, 현재 ${LAYOUTS[layout.preset]?.label ?? '직접 배치'}`);
   });
   open();

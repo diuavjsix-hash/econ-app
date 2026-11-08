@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { alphabetLabel, nextFillColor } from '../src/graph/fill-style.js';
+import { alphabetLabel, nextFillColor, FILL_COLORS } from '../src/graph/fill-style.js';
+
+const [[FIRST], [SECOND]] = FILL_COLORS;
 import { fillLabelPosition, containsFill } from '../src/graph/fill.js';
 import { createStore } from '../src/state.js';
 import { serializeDocument } from '../src/export.js';
@@ -44,7 +46,7 @@ test('colors and alphabets start independently in each graph, including hidden g
   const first=store.getState().activeDiagramId, second=store.getState().diagrams[1].id;
   store.addFill(shape(0));store.addFill(shape(2));
   store.selectDiagram(second);assert.equal(store.getState().fillNextLabel,'A');
-  store.addFill(shape(0));assert.equal(store.getState().fills[0].label,'A');assert.equal(store.getState().fills[0].color,'#6068e8');
+  store.addFill(shape(0));assert.equal(store.getState().fills[0].label,'A');assert.equal(store.getState().fills[0].color,FIRST);
   store.selectDiagram(first);assert.equal(store.getState().fillNextLabel,'C');
   store.configureLayout('single');store.configureLayout('horizontal2');store.selectDiagram(second);
   assert.equal(store.getState().fills[0].label,'A');
@@ -52,11 +54,11 @@ test('colors and alphabets start independently in each graph, including hidden g
 
 test('manual editing preserves the alphabet, and automatic colors avoid manual overrides', () => {
   const store=createStore(),id=store.addFill(shape(0));
-  store.selectObject(id);store.updateSelected({color:'#e69451',name:'내 구역',opacity:0.5,anchor:{x:2,y:3}});
+  store.selectObject(id);store.updateSelected({color:SECOND,name:'내 구역',opacity:0.5,anchor:{x:2,y:3}});
   assert.equal(store.getState().fills[0].label,'A');assert.equal(store.getState().fills[0].name,'내 구역');
-  assert.notEqual(nextFillColor([{color:'#6068E8'},{color:'#E69451'}]),'#6068e8');
-  store.addFill(shape(6));assert.notEqual(store.getState().fills[1].color,'#e69451');
-  const doc=serializeDocument(store.getState());assert.equal(doc.schemaVersion,11);assert.equal(doc.fills[0].label,'A');
+  assert.equal(nextFillColor([{color:FIRST.toUpperCase()},{color:SECOND.toUpperCase()}]),FILL_COLORS[2][0]);
+  store.addFill(shape(6));assert.notEqual(store.getState().fills[1].color,SECOND);
+  const doc=serializeDocument(store.getState());assert.equal(doc.schemaVersion,12);assert.equal(doc.fills[0].label,'A');
   assert.deepEqual(doc.fills,doc.diagrams[0].fills);assert.equal('fillNextLabel' in doc,false);assert.equal('fillAutoColor' in doc,false);
 });
 

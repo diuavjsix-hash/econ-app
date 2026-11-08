@@ -6,8 +6,8 @@ import { CURVE_FAMILIES } from '../src/models/curve-families.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 const viewport = createViewport(800, 600, 'first');
-const ctx = { viewport, state: { lines: [], curves: [], sketches: [], sums: [], points: [], dashedLines: [], axisGapEnabled: false },
-  tangentSnap: null, snappedMove: anchor => anchor, dashedPosition: anchor => anchor, dashedTargets: () => ({ shapes: [], crossings: [] }), snapTargets: () => ({ shapes: [], crossings: [] }), dashedOptions: () => ({ altKey: true }) };
+const ctx = { viewport, state: { lines: [], curves: [], sketches: [], sums: [], points: [], axisGapEnabled: false },
+  tangentSnap: null, snappedMove: anchor => anchor, segmentPosition: anchor => anchor, segmentTargets: () => ({ shapes: [], crossings: [] }), snapTargets: () => ({ shapes: [], crossings: [] }), segmentOptions: () => ({ altKey: true }) };
 const point = { id: 'point-1', type: 'point', anchor: { x: 2, y: 3 } };
 
 test('new tool registrations fail early when an object or keyboard implementation is missing', () => {
@@ -39,12 +39,10 @@ test('line controllers preserve vertical null and use the same Shift movement an
   assert.ok(Number.isFinite(rotated.patch.slope));
 });
 
-test('dashed body moves preserve both endpoints and endpoint editing preserves the Shift lock', () => {
-  const segment = { id: 'dashed-1', type: 'dashed', anchor: { x: 2, y: 3 }, end: { x: 5, y: 6 } }, handler = interactionFor(segment);
+test('segment body moves keep both ends and Shift keeps the locked axis', () => {
+  const segment = { id: 'line-1', type: 'line', anchor: { x: 2, y: 3 }, slope: 1, extent: [0, 3 * Math.SQRT2] }, handler = interactionFor(segment);
   const body = handler.drag(segment, 'move', segment.anchor, { x: 3, y: 3.2 }, { shiftKey: true }, ctx).patch;
-  close(body.end.x - body.anchor.x, 3); close(body.end.y - body.anchor.y, 3); close(body.anchor.y, 3);
-  const endpoint = handler.drag(segment, 'end', segment.end, { x: 6, y: 6.1 }, { shiftKey: true }, ctx).patch;
-  close(endpoint.end.x, 6); close(endpoint.end.y, 6);
+  close(body.anchor.x, 3); close(body.anchor.y, 3); assert.equal(body.extent, undefined, 'a translation keeps the stored extent');
 });
 
 test('analytic keyboard and drag shape handlers share family geometry and PPC endpoint limits', () => {

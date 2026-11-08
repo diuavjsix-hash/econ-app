@@ -1,4 +1,5 @@
 import { canReparent, OBJECT_LABELS, objectsOf, selectedIdsOf } from '../objects.js';
+import { icon, objectGlyph } from '../ui/icons.js';
 
 export function mountObjectList(root, store) {
   const list = root.querySelector('#object-list');
@@ -89,7 +90,9 @@ export function mountObjectList(root, store) {
         const fold = document.createElement('button');
         fold.className = 'tree-fold';
         fold.dataset.action = 'fold';
-        fold.textContent = object.collapsed ? '›' : '⌄';
+        fold.type = 'button';
+        fold.innerHTML = icon('chevron');
+        fold.classList.toggle('is-collapsed', Boolean(object.collapsed));
         fold.setAttribute('aria-label', `${label(object)} ${object.collapsed ? '펼치기' : '접기'}`);
         fold.disabled = !descendants.length && object.type !== 'group';
         if (fold.disabled) fold.classList.add('empty-fold');
@@ -100,15 +103,13 @@ export function mountObjectList(root, store) {
         const swatch = document.createElement('span');
         swatch.className = `object-symbol ${object.type}`;
         swatch.style.setProperty('--object-color', object.color);
-        if (object.type === 'group' || descendants.length) {
-          swatch.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h7l2 2h9v11H3zM3 7V4h7l2 3"/></svg>';
-        } else swatch.textContent = object.type === 'fill' ? '▰' : object.type === 'sketch' ? '∿' : object.type === 'sum' ? 'Σ' : object.type === 'point' ? '●' : object.type === 'curve' ? '⌒' : object.type === 'ruler' ? '↔' : object.type === 'dashed' ? '┄' : '―';
+        swatch.innerHTML = objectGlyph(object.type === 'group' || descendants.length ? 'group' : object.type);
         const name = document.createElement('span');
         name.className = 'object-label';
         name.textContent = label(object);
         const grip = document.createElement('span');
         grip.className = 'tree-grip';
-        grip.textContent = '⠿';
+        grip.innerHTML = icon('grip');
         grip.setAttribute('aria-hidden', 'true');
         item.append(swatch, name, grip);
         row.append(fold, item);

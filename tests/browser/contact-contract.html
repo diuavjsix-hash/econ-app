@@ -1,11 +1,12 @@
 <!doctype html><html lang="ko"><meta charset="utf-8"><title>도구 간 접점 계약 검증</title>
-<style>@import url('/src/styles.css');@import url('/src/editor.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap;font:12px monospace}</style>
+<style>@import url('/src/ui/tokens.css');@import url('/src/ui/components.css');@import url('/src/graph/snap-feedback.css');@import url('/src/styles.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap;font:12px monospace}</style>
 <button id="run">도구 간 접점 검증</button><pre id="result">준비</pre><div id="stage"></div>
 <script type="module">
 import { CURVE_CONTACT_CASES } from '/tests/fixtures/curve-contact-cases.js';
 import { mountGraph } from '/src/graph/canvas.js';
 import { createViewport, toScreen } from '/src/graph/viewport.js';
 import { serializeDocument } from '/src/export.js';
+import { segmentEnds } from '/tests/fixtures/segments.js';
 const stage=document.querySelector('#stage'),out=document.querySelector('#result');
 let store,svg,dispose;
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-7;
@@ -38,19 +39,21 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
    const pointId=store.addPoint({x:2,y:6});store.update({handSelected:true});
    send('pointerdown',{x:2,y:6},{},svg.querySelector(`[data-id="${pointId}"][data-action="move"]`));move(pointer);
    check(marker()&&near(store.getState().points.at(-1).anchor,p),`${name}: moving a point uses the same target`);send('pointerup',pointer);store.undo();
-   store.update({dashedSelected:true});click({x:1.5,y:p.y},{altKey:true});move({x:p.x+0.08,y:p.y},{shiftKey:true});
-   check(marker()&&svg.querySelector('.dashed-preview.is-snapped'),`${name}: Shift dashed preview uses the same contact`);
+   // Line tool: a dashed segment drawn, its end handle edited, and the whole segment moved.
+   store.update({lineSelected:true,lineKind:'segment',lineStyle:'dashed'});click({x:1.5,y:p.y},{altKey:true});move({x:p.x+0.08,y:p.y},{shiftKey:true});
+   check(marker()&&svg.querySelector('.line-draft.is-snapped'),`${name}: Shift segment preview uses the same contact`);
    click({x:p.x+0.08,y:p.y},{shiftKey:true});
-   check(near(store.getState().dashedLines.at(-1).end,p),`${name}: dashed creation stores the exact contact`);
-   const dashId=store.getState().dashedLines.at(-1).id;store.update({handSelected:true});store.selectObject(dashId);
-   // Start away from the contact, then edit the endpoint back to it.
-   store.updateSelected({end:{x:2,y:6}});send('pointerdown',{x:2,y:6},{},svg.querySelector(`[data-id="${dashId}"][data-action="end"]`));move(pointer);
-   check(marker()&&near(store.getState().dashedLines.at(-1).end,p),`${name}: dashed endpoint editing uses the same target`);send('pointerup',pointer);
-   const dash=store.getState().dashedLines.at(-1),originalVector={x:dash.end.x-dash.anchor.x,y:dash.end.y-dash.anchor.y};
-   const mid={x:(dash.anchor.x+dash.end.x)/2,y:(dash.anchor.y+dash.end.y)/2};
-   send('pointerdown',mid,{},svg.querySelector(`[data-id="${dashId}"][data-action="move"]`));move({x:mid.x+0.08,y:mid.y+0.06});
-   const shifted=store.getState().dashedLines.at(-1);
-   check(marker()&&near(shifted.end,p)&&near({x:shifted.end.x-shifted.anchor.x,y:shifted.end.y-shifted.anchor.y},originalVector),`${name}: moving a dashed segment shares the target without stretching`);
+   const segId=store.getState().lines.at(-1).id,segment=()=>store.getState().lines.find(l=>l.id===segId),second=()=>segmentEnds(segment())[1];
+   check(near(second(),p),`${name}: segment creation stores the exact contact`);
+   check(store.getState().handSelected&&store.getState().selectedId===segId,`${name}: drawing returns to selection with the segment selected`);
+   // Start away from the contact, then drag the drawn end back along the segment to it.
+   const t=segment().extent[1];store.updateSelected({extent:[0,t-(p.x-2)]});
+   const awayEnd=second();send('pointerdown',awayEnd,{},svg.querySelector(`[data-id="${segId}"][data-action="line-to"]`));move(pointer);
+   check(marker()&&near(second(),p),`${name}: segment end editing uses the same target`);send('pointerup',pointer);
+   const drawnBefore=segment(),mid={x:(drawnBefore.anchor.x+second().x)/2,y:drawnBefore.anchor.y};
+   send('pointerdown',mid,{},svg.querySelector(`.graph-line [data-id="${segId}"]`));move({x:mid.x+0.08,y:mid.y+0.06});
+   const shifted=segment();
+   check(marker()&&near(second(),p)&&Math.abs((shifted.extent[1]-shifted.extent[0])-(drawnBefore.extent[1]-drawnBefore.extent[0]))<1e-9&&shifted.slope===drawnBefore.slope,`${name}: moving a segment snaps its end to the same target without stretching`);
    send('pointerup',{x:mid.x+0.08,y:mid.y+0.06});
    check(curves===JSON.stringify([store.getState().curves,store.getState().sketches]),`${name}: downstream tools preserve both curves`);
    move(pointer); // Hand mode clears feedback; return to point hover for layout checking.

@@ -75,10 +75,6 @@ function boundarySegments(state, bounds) {
   for (const curve of state.curves) for (const piece of displayedCurveSegments(curve, bounds, raw)) flatten(piece, add(curve.id));
   for (const sketch of state.sketches ?? []) for (const [a, b] of displayedSketchSegments(sketch, bounds, raw)) add(sketch.id)(a, b);
   for (const sum of state.sums ?? []) for (const [a, b] of displayedSumSegments(sum, raw, bounds)) add(sum.id)(a, b);
-  for (const dashed of state.dashedLines ?? []) {
-    const segment = clipSegment(dashed.anchor, dashed.end, bounds);
-    if (segment) add(dashed.id)(...segment);
-  }
   for (const axis of axisSegments(state,bounds)) add(axis.id)(...axis.points);
   // Keep exact line/curve tangencies connected even between display mesh vertices.
   const tangencies = buildSnapTargets(raw, bounds).crossings.filter(crossing => crossing.kind === 'tangent');

@@ -2,8 +2,8 @@ import { FILL_COLORS } from '../graph/fill-style.js';
 import { rangeField, RangeControl } from '../ui/controls.js';
 
 export function fillControls(mode) {
-  return `${mode === 'paint' ? '<div class="fill-next"><span>다음 구역</span><span id="fill-next-badge" class="fill-next-badge">A</span></div>' : `<div class="fill-colors" role="group" aria-label="구역 색">${FILL_COLORS.map(([color, name]) =>
-    `<button class="fill-color" data-fill-mode="${mode}" data-fill-color="${color}" style="--fill-color:${color}" aria-label="${name}" aria-pressed="false" title="${name}"></button>`).join('')}</div>`}
+  return `${mode === 'paint' ? '<div class="field"><span class="field-label">다음 구역</span><span id="fill-next-badge" class="fill-next-badge">A</span></div>' : `<div class="swatches" role="group" aria-label="구역 색">${FILL_COLORS.map(([color, name]) =>
+    `<button type="button" class="swatch" data-fill-mode="${mode}" data-fill-color="${color}" style="--swatch:${color}" aria-label="${name}" aria-pressed="false" title="${name}"></button>`).join('')}</div>`}
     ${rangeField({id:`fill-${mode}-opacity`,label:'진하기',outputId:`fill-${mode}-value`,output:'24%',min:10,max:60,step:1,value:24})}`;
 }
 

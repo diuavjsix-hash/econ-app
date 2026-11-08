@@ -2,6 +2,7 @@ import { createStore } from '../../src/state.js';
 import { curveFamilyOf } from '../../src/models/curve-families.js';
 import { curvePoint } from '../../src/graph/curve.js';
 import { sketchControls, quadraticPoint } from '../../src/graph/sketch.js';
+import { drawSegment } from './segments.js';
 
 import { OPPOSITE_CURVE_FAMILIES } from '../../src/models/curve-families.js';
 
@@ -9,7 +10,7 @@ const families = ['ppc', 'rectangular-hyperbola', 'cobb-douglas', 'substitutes',
 const OPPOSITE_ORIGIN = { x: 8, y: 8 };
 
 // Unit and mounted-canvas checks share the same original geometry, never display vertices.
-export const DASHED_CURVE_CASES = [
+export const SEGMENT_CURVE_CASES = [
   ...['basic', 'free', ...families].map(family => ({ name: `${family} crossing`, family, tangent: false })),
   ...['free', ...families.filter(f => !['substitutes', 'complements'].includes(f))]
     .map(family => ({ name: `${family} tangent`, family, tangent: true })),
@@ -43,6 +44,7 @@ export const DASHED_CURVE_CASES = [
   const direction = slope === null ? { x: 0, y: 1 } : { x: 1, y: slope };
   const length = Math.hypot(direction.x, direction.y);
   const endpoint = scale => ({ x: point.x + scale * direction.x / length, y: point.y + scale * direction.y / length });
-  const dashed = store.addDashedLine(endpoint(-1.2), endpoint(1.2));
-  return { store, curve: curve.id, dashed, point, kind: config.tangent ? 'tangent' : 'intersection', direction };
+  // A finite dashed segment drawn with the line tool.
+  const segment = drawSegment(store, endpoint(-1.2), endpoint(1.2), { style: 'dashed' });
+  return { store, curve: curve.id, segment, point, kind: config.tangent ? 'tangent' : 'intersection', direction };
 } }));

@@ -1,5 +1,5 @@
 <!doctype html><meta charset="utf-8"><title>공통 맞춤 UI 검증</title>
-<style>@import url('/src/styles.css');@import url('/src/editor.css');body{display:block;overflow:auto;padding:20px}#stage{position:relative;width:800px;height:540px;border:1px solid #ddd}pre{white-space:pre-wrap;font:12px monospace}button{padding:10px}</style>
+<style>@import url('/src/ui/tokens.css');@import url('/src/ui/components.css');@import url('/src/graph/snap-feedback.css');@import url('/src/styles.css');body{display:block;overflow:auto;padding:20px}#stage{position:relative;width:800px;height:540px;border:1px solid #ddd}pre{white-space:pre-wrap;font:12px monospace}button{padding:10px}</style>
 <button id="run">공통 맞춤 통합 검증</button><pre id="result">준비</pre><div id="stage"></div>
 <script type="module">
 import {createStore} from '/src/state.js';import {mountGraph} from '/src/graph/canvas.js';
@@ -7,7 +7,7 @@ import {createViewport,toScreen} from '/src/graph/viewport.js';import {serialize
 const stage=document.querySelector('#stage'),out=document.querySelector('#result');let dispose,store,svg,line;
 const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-8,same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const view=()=>createViewport(stage.clientWidth,stage.clientHeight,store.getState().quadrantMode,store.getState());
-function setup(mode='point',flip=false){dispose?.();store=createStore();line=store.addLine();store.updateSelected({slope:-1,anchor:{x:6,y:4}});store.updateDiagram({flipX:flip,flipY:flip});store.update({[mode==='point'?'mouseSelected':mode==='sketch'?'sketchSelected':mode==='dashed'?'dashedSelected':'handSelected']:true});dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};}
+function setup(mode='point',flip=false){dispose?.();store=createStore();line=store.addLine();store.updateSelected({slope:-1,anchor:{x:6,y:4}});store.updateDiagram({flipX:flip,flipY:flip});store.update({[mode==='point'?'mouseSelected':mode==='sketch'?'sketchSelected':mode==='line'?'lineSelected':'handSelected']:true});dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};}
 function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:71,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x*r.width/v.width,clientY:r.top+s.y*r.height/v.height,...flags}));}
 const move=(p,flags={})=>send('pointermove',p,flags),click=(p,flags={})=>{send('pointerdown',p,flags);send('pointerup',p,flags)};
 const marker=()=>svg.querySelector('.snap-feedback:not([data-snap-kind="free"])');
@@ -16,11 +16,11 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
  setup();move({x:6.17,y:4.17});const commonStyle=style();check(marker()&&svg.querySelectorAll('.snap-feedback').length===1,'point hover uses exactly one common matched marker');
  check(svg.querySelector(`[data-snap-source="${line}"]`)&&svg.querySelector('.snap-feedback-label').textContent.includes('선 맞춤'),'point hover highlights its source and uses shared wording');
  move({x:8,y:8});check(!marker()&&svg.querySelectorAll('.snap-feedback-free').length===1,'free drawing uses one common free cursor');
- setup('dashed');click({x:2,y:4});move({x:5.74,y:4.2},{shiftKey:true});
- check(same(style(),commonStyle)&&svg.querySelector('.dashed-preview.is-snapped'),'dashed drawing shares point marker style and highlights its draft');
- check(svg.querySelectorAll('.snap-feedback-ring').length===1&&svg.querySelectorAll('.snap-feedback-core').length===1,'dashed drawing has no duplicate marker');
- const end=svg.querySelector('.dashed-preview .dashed-segment');check(end.getAttribute('y1')===end.getAttribute('y2'),'Shift dashed drawing stays horizontal while matched');
- store.update({handSelected:true});check(!marker()&&!svg.querySelector('.dashed-preview'),'tool switch clears the draft and common feedback');
+ setup('line');store.update({lineKind:'segment',lineStyle:'dashed'});click({x:2,y:4});move({x:5.74,y:4.2},{shiftKey:true});
+ check(same(style(),commonStyle)&&svg.querySelector('.line-draft.is-snapped'),'segment drawing shares point marker style and highlights its draft');
+ check(svg.querySelectorAll('.snap-feedback-ring').length===1&&svg.querySelectorAll('.snap-feedback-core').length===1,'segment drawing has no duplicate marker');
+ const end=svg.querySelector('.line-draft');check(end.getAttribute('y1')===end.getAttribute('y2'),'Shift segment drawing stays horizontal while matched');
+ store.update({handSelected:true});check(!marker()&&!svg.querySelector('.line-draft'),'tool switch clears the draft and common feedback');
  setup('sketch');click({x:1,y:7});click({x:7,y:7});const before=serializeDocument(store.getState());move({x:6.17,y:4.17});
  check(same(style(),commonStyle)&&marker()?.dataset.snapKind==='tangent','curve third-point tangency shares the exact marker style');
  check(svg.querySelector('.snap-feedback-label').textContent.includes('접점 맞춤')&&svg.querySelector(`[data-snap-source="${line}"]`),'curve creation shows tangent wording and highlights the target line');

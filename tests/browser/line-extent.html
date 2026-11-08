@@ -1,8 +1,9 @@
 <!doctype html><html lang="ko"><meta charset="utf-8"><title>직선 끝 자르기 검증</title>
-<style>@import url('/src/styles.css');@import url('/src/editor.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap}</style>
+<style>@import url('/src/ui/tokens.css');@import url('/src/ui/components.css');@import url('/src/graph/snap-feedback.css');@import url('/src/styles.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap}</style>
 <button id="run">검증</button><pre id="result">준비</pre><div id="stage"></div>
 <script type="module">
 import { createStore } from '/src/state.js';
+import { segmentEnds } from '/tests/fixtures/segments.js';
 import { mountGraph } from '/src/graph/canvas.js';
 import { createViewport,toScreen,toWorld } from '/src/graph/viewport.js';
 import { lineEndPoints } from '/src/graph/line-extent.js';
@@ -21,10 +22,15 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
  for(const size of [800,312])for(const flipX of [false,true])for(const flipY of [false,true]){
   stage.style.width=size+'px';store=createStore();store.updateDiagram({flipX,flipY});
   const name=`${size} ${flipX}/${flipY}`;
-  const a=store.addLine();store.updateSelected({slope:1,anchor:{x:2,y:2}});
-  const b=store.addLine();store.updateSelected({slope:-1,anchor:{x:4,y:4}});
-  store.selectObject(a);store.update({handSelected:true});mount();
-  check(handle(a,'line-from')&&handle(a,'line-to')&&svg.querySelectorAll(`[data-id="${a}"].end-handle.is-open`).length===2,`${name}: an untrimmed line shows two open end handles`);
+  // Only drawn ends have handles; a full line has none (its kind changes only in the settings).
+  const open=store.addLine();store.updateSelected({slope:0.2,anchor:{x:1,y:1}});store.update({handSelected:true});mount();
+  check(!handle(open,'line-from')&&!handle(open,'line-to')&&handle(open,'rotate'),`${name}: a full line shows no end handles`);
+  store.removeSelected();
+  // a: a ray ending at (6,6); b: a ray starting at (1,7).
+  const a=store.addLine();store.updateSelected({slope:1,anchor:{x:2,y:2},extent:[null,4*Math.SQRT2]});
+  const b=store.addLine();store.updateSelected({slope:-1,anchor:{x:4,y:4},extent:[-3*Math.SQRT2,null]});
+  store.selectObject(a);store.update({handSelected:true});
+  check(!handle(a,'line-from')&&handle(a,'line-to'),`${name}: a ray has one end handle, on its drawn end`);
   check(getComputedStyle(handle(a,'line-to')).pointerEvents!=='none'&&handle(a,'line-to').getAttribute('aria-label')?.includes('끝 조절'),`${name}: end handles are labelled controls`);
   // Drag the + end onto the crossing with b.
   const before=JSON.stringify(serializeDocument(store.getState())),kink={x:4,y:4};
@@ -35,19 +41,19 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   send('pointermove',off,{altKey:true});check(!svg.querySelector('.snap-feedback'),`${name}: Alt bypasses the end magnet`);
   send('pointermove',off);send('pointerup',off);
   check(near(lineEndPoints(line(a))[1],kink,1e-12)&&lineEndPoints(line(a))[0]===null,`${name}: release stores the exact crossing as the end`);
-  check(!svg.querySelector('.snap-feedback')&&svg.querySelectorAll(`[data-id="${a}"].end-handle:not(.is-open)`).length===1,`${name}: the drawn end gets a closed handle`);
+  check(!svg.querySelector('.snap-feedback')&&svg.querySelectorAll(`[data-id="${a}"].end-handle`).length===1,`${name}: the moved end keeps its handle`);
   store.undo();check(JSON.stringify(serializeDocument(store.getState()))===before,`${name}: one undo restores the line`);store.redo();
   // b stops at the same point from its side: a kinked line from two lines.
   store.selectObject(b);
   send('pointerdown',handlePoint(handle(b,'line-from')),{},handle(b,'line-from'));send('pointermove',{x:3.9,y:4.08});
   check(/교점 맞춤|끝점 맞춤/.test(label()),`${name}: the second line meets the first one's end`);send('pointerup',{x:3.9,y:4.08});
   check(near(lineEndPoints(line(b))[0],kink,1e-12),`${name}: both ends share the kink exactly`);
-  // After release the end is a target for points and dashed lines.
+  // After release the end is a target for points and new segments.
   store.setToolMode('point');send('pointermove',{x:4.1,y:3.95});check(/끝점 맞춤|교점 맞춤/.test(label()),`${name}: point hover finds the kink`);
   click({x:4.1,y:3.95});check(near(store.getState().points.at(-1).anchor,kink,1e-12),`${name}: point stores the kink exactly`);store.undo();
-  store.setToolMode('dashed');click({x:6,y:1});send('pointermove',{x:4.1,y:3.95});click({x:4.1,y:3.95});
-  check(near(store.getState().dashedLines.at(-1)?.end,kink,1e-12),`${name}: dashed end stores the kink exactly`);store.undo();
-  // Rotation keeps the drawn part; dragging back to the edge reopens the end.
+  store.update({lineSelected:true,lineKind:'segment',lineStyle:'dashed'});click({x:6,y:1});send('pointermove',{x:4.1,y:3.95});click({x:4.1,y:3.95});
+  check(near(segmentEnds(store.getState().lines.at(-1))[1],kink,1e-12),`${name}: segment end stores the kink exactly`);store.undo();
+  // Rotation keeps the drawn part; dragging an end to the edge keeps it drawn there.
   store.setToolMode('hand');store.selectObject(a);
   const length=Math.hypot(...['x','y'].map(k=>lineEndPoints(line(a))[1][k]-line(a).anchor[k]));
   const rotate=[...svg.querySelectorAll(`[data-id="${a}"][data-action="rotate"]`)].sort((p,q)=>Math.hypot(handlePoint(p).x-kink.x,handlePoint(p).y-kink.y)-Math.hypot(handlePoint(q).x-kink.x,handlePoint(q).y-kink.y))[0];send('pointerdown',handlePoint(rotate),{},rotate);const pivot=line(a).anchor;
@@ -57,7 +63,7 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   store.undo();
   const toEdge=handle(a,'line-to'),edge=view().bounds;send('pointerdown',handlePoint(toEdge),{},toEdge);
   const far={x:Math.min(edge.xMax,edge.yMax)-0.05,y:Math.min(edge.xMax,edge.yMax)-0.05};send('pointermove',far);send('pointerup',far);
-  check(line(a).extent===undefined,`${name}: dragging an end to the edge continues the line again`);
+  check(line(a).extent&&near(lineEndPoints(line(a))[1],far,1e-6),`${name}: dragging an end to the edge never reopens the line`);
   // Style: dashed is a stroke style on the same line.
   store.updateSelected({style:'dashed'});check(svg.querySelector(`.graph-line.is-dashed [data-id="${a}"]`)&&getComputedStyle(svg.querySelector('.graph-line.is-dashed .plotted-line')).strokeDasharray!=='none',`${name}: dashed style draws the same line dashed`);
   check(length>0,`${name}: setup sanity`);

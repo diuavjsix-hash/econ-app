@@ -1,8 +1,9 @@
 <!doctype html><html lang="ko"><meta charset="utf-8"><title>상자 원점과 최저점 표시 검증</title>
-<style>@import url('/src/styles.css');@import url('/src/editor.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap}</style>
+<style>@import url('/src/ui/tokens.css');@import url('/src/ui/components.css');@import url('/src/graph/snap-feedback.css');@import url('/src/styles.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap}</style>
 <button id="run">검증</button><pre id="result">준비</pre><div id="stage"></div>
 <script type="module">
 import { createStore } from '/src/state.js';
+import { segmentEnds } from '/tests/fixtures/segments.js';
 import { mountGraph } from '/src/graph/canvas.js';
 import { createViewport,toScreen,toWorld } from '/src/graph/viewport.js';
 import { displayedLineSegments } from '/src/graph/display.js';
@@ -33,10 +34,10 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   const pinned=svg.querySelector(`[data-id="${id}"][data-action="rotate"]`),pinStart=toWorld({x:Number(pinned.getAttribute('cx')),y:Number(pinned.getAttribute('cy'))},view());
   send('pointerdown',pinStart,{},pinned);send('pointermove',b);send('pointerup',b);
   check(near(store.getState().lines[0].anchor,a)&&Math.abs(store.getState().lines[0].slope-boxSize.height/boxSize.width)<1e-9,`${name}: rotation to B keeps an existing A-origin crossing pinned`);
-  store.update({mouseSelected:true});click(a);click(b);
+  store.update({mouseSelected:true});click(a);store.update({mouseSelected:true});click(b);
   check(store.getState().points.length===2&&near(store.getState().points[0].anchor,a)&&near(store.getState().points[1].anchor,b),`${name}: exact boundary clicks create A/B points`);
-  store.update({dashedSelected:true});click(a);send('pointermove',b);click(b);
-  const dashed=store.getState().dashedLines[0];check(dashed&&near(dashed.anchor,a)&&near(dashed.end,b),`${name}: finite diagonal can be drawn between both origins`);
+  store.update({lineSelected:true,lineKind:'segment',lineStyle:'dashed'});click(a);send('pointermove',b);click(b);
+  const diagonal=store.getState().lines.at(-1),[d0,d1]=segmentEnds(diagonal);check(diagonal.extent&&near(d0,a)&&near(d1,b),`${name}: finite diagonal segment can be drawn between both origins`);
  }
  for(const size of [800,312]){
   stage.style.width=size+'px';store=createStore();const id=store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2},{mode:'horizontal'});store.markMinimum();store.update({handSelected:true});mount();
@@ -49,9 +50,9 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   store.update({mouseSelected:true,pointSnap:true});send('pointermove',off);
   check(minimumMarker()&&svg.querySelector('.snap-feedback-label')?.textContent.includes('최저점 맞춤'),`${size}: point hover snaps to the displayed minimum`);
   click(off);check(near(store.getState().points.at(-1).anchor,low)&&!store.getState().lines.length&&!store.getState().points.at(-1).binding,`${size}: point creation stores the exact minimum without a relation`);
-  store.undo();store.update({dashedSelected:true});click({x:low.x-2,y:low.y+3});send('pointermove',off);
-  check(minimumMarker(),`${size}: dashed preview endpoint snaps to the minimum`);click(off);
-  check(near(store.getState().dashedLines.at(-1).end,low),`${size}: dashed endpoint stores the exact minimum`);store.undo();
+  store.undo();store.update({lineSelected:true,lineKind:'segment',lineStyle:'dashed'});click({x:low.x-2,y:low.y+3});send('pointermove',off);
+  check(minimumMarker(),`${size}: segment preview end snaps to the minimum`);click(off);
+  check(near(segmentEnds(store.getState().lines.at(-1))[1],low),`${size}: segment end stores the exact minimum`);store.undo();
   store.selectObject(id);store.updateSelected({showMinimum:false});store.update({mouseSelected:true});send('pointermove',off);
   check(!minimumMarker(),`${size}: a hidden minimum is not a magnet`);store.undo();store.update({handSelected:true});store.selectObject(id);
   store.removeSelected();check(!svg.querySelector('[data-minimum-for]')&&!store.getState().points.length,`${size}: deleting the curve leaves no orphan minimum point`);

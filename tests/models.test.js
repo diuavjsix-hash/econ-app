@@ -4,7 +4,7 @@ import { createStore } from '../src/state.js';
 import { serializeDocument } from '../src/export.js';
 import { objectsOf } from '../src/objects.js';
 import { GraphObject, DrawableObject, MovableObject, StrokeObject } from '../src/models/graph-object.js';
-import { objectModel, objectModelsOf, OBJECT_MODELS, LineObject, CurveObject, AnalyticCurveObject, SegmentObject, DashedObject, RulerObject } from '../src/models/objects.js';
+import { objectModel, objectModelsOf, OBJECT_MODELS, LineObject, CurveObject, AnalyticCurveObject, SegmentObject, RulerObject } from '../src/models/objects.js';
 import { OBJECT_TYPES, OBJECT_COLLECTIONS, DUPLICATABLE_TYPES } from '../src/models/object-types.js';
 import { AnalyticCurveFamily, RadialCurveFamily, PowerCurveFamily, CURVE_FAMILIES, curveFamilyOf } from '../src/models/curve-families.js';
 import { SnapPolicy, NearestSnapPolicy, PrioritySnapPolicy } from '../src/graph/snap-policy.js';
@@ -12,11 +12,12 @@ import { objectsInRectangle } from '../src/graph/selection.js';
 import { snapFeedbackTargets } from '../src/graph/snap-feedback.js';
 import { createViewport } from '../src/graph/viewport.js';
 import { SvgRenderer, StrokeRenderer } from '../src/graph/svg-renderer.js';
+import { drawSegment, segmentEnds } from './fixtures/segments.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 function populatedStore() {
   const store = createStore();
-  store.addLine(); store.addCurve(); store.addPoint({ x: 2, y: 3 }); store.addDashedLine({ x: 1, y: 1 }, { x: 4, y: 5 });
+  store.addLine(); store.addCurve(); store.addPoint({ x: 2, y: 3 }); drawSegment(store,{ x: 1, y: 1 }, { x: 4, y: 5 });
   store.addGroup(); store.addSketch({ x: 1, y: 4 }, { x: 7, y: 4 }, { x: 4, y: 2 });
   store.addFill({ rings: [[{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 0, y: 3 }]] });
   store.addSum([store.getState().lines[0].id, store.getState().curves[0].id]);
@@ -28,7 +29,7 @@ test('abstract bases reject direct construction and the registry covers every do
   for (const Base of [GraphObject, DrawableObject, MovableObject, StrokeObject, SegmentObject, AnalyticCurveFamily, RadialCurveFamily, SnapPolicy]) assert.throws(() => new Base({}), /abstract/);
   assert.deepEqual(Object.keys(OBJECT_TYPES), Object.keys(OBJECT_MODELS));
   assert.equal(new Set(OBJECT_COLLECTIONS).size, OBJECT_COLLECTIONS.length);
-  assert.deepEqual(DUPLICATABLE_TYPES, ['line', 'curve', 'sketch', 'point', 'dashed', 'group']);
+  assert.deepEqual(DUPLICATABLE_TYPES, ['line', 'curve', 'sketch', 'point', 'group']);
   assert.throws(() => objectModel({ type: 'constructor' }), /Unknown graph object type/);
 });
 
@@ -56,12 +57,11 @@ test('models and curve strategies never enter live snapshots, undo snapshots or 
   store.updateSelected({ anchor: { x: 5, y: 6 } }); store.undo(); assertPlain(store.getState()); store.redo(); assertPlain(store.getState());
 });
 
-test('finite dashed and ruler subclasses share validation while preserving retired-ruler visibility rules', () => {
+test('the retired ruler keeps segment validation and stays invisible to selection and highlights', () => {
   const base = { id: 'segment-1', name: '선분', color: '#123456', parentId: null, anchor: { x: 1, y: 2 }, end: { x: 4, y: 6 } };
-  const dashed = objectModel({ ...structuredClone(base), type: 'dashed' }), ruler = objectModel({ ...structuredClone(base), type: 'ruler', style: 'solid', showMeasurement: true });
-  assert.ok(dashed instanceof DashedObject && dashed instanceof SegmentObject);
+  const ruler = objectModel({ ...structuredClone(base), type: 'ruler', style: 'solid', showMeasurement: true });
   assert.ok(ruler instanceof RulerObject && ruler instanceof SegmentObject);
-  for (const model of [dashed, ruler]) {
+  for (const model of [ruler]) {
     model.applyPatch({ anchor: { ...base.end }, name: '이름' });
     assert.deepEqual(model.data.anchor, base.anchor); assert.equal(model.data.name, '이름');
     model.applyPatch({ end: { x: Infinity, y: 2 } }); assert.deepEqual(model.data.end, base.end);
@@ -70,7 +70,7 @@ test('finite dashed and ruler subclasses share validation while preserving retir
     assert.deepEqual(model.data.anchor, base.anchor);
   }
   const bounds = { xMin: 0, xMax: 10, yMin: 0, yMax: 10 };
-  assert.ok(dashed.touchesRectangle(bounds, {})); assert.equal(ruler.touchesRectangle(bounds, {}), false);
+  assert.equal(ruler.touchesRectangle(bounds, {}), false);
   assert.equal(ruler.highlightGeometry(bounds, {}), null);
 });
 

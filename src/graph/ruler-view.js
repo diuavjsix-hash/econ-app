@@ -1,3 +1,4 @@
+import { ROLE_COLORS } from '../models/palette.js';
 import { clipSegment, rulerMetrics } from './ruler.js';
 import { toScreen } from './viewport.js';
 
@@ -9,7 +10,7 @@ export function drawRuler(ruler, viewport, { selected = false, preview = false, 
     if (text !== undefined) el.textContent = text;
     return el;
   };
-  const group = node('g', { class: `graph-ruler${preview ? ' ruler-preview' : ''}`, 'data-ruler-id': ruler.id ?? '', style: `--ruler-color:${ruler.color ?? '#7b879c'}` });
+  const group = node('g', { class: `graph-ruler${preview ? ' ruler-preview' : ''}`, 'data-ruler-id': ruler.id ?? '', style: `--ruler-color:${ruler.color ?? ROLE_COLORS.ruler}` });
   const visible = clipSegment(ruler.anchor, ruler.end, viewport.bounds);
   if (!visible) return group;
   const [a, b] = visible.map(p => toScreen(p, viewport));

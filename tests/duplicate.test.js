@@ -5,15 +5,16 @@ import { prepareDuplicate } from '../src/duplicate.js';
 import { interceptOf } from '../src/graph/math.js';
 import { objectsOf } from '../src/objects.js';
 import { serializeDocument } from '../src/export.js';
+import { drawSegment, segmentEnds } from './fixtures/segments.js';
 
 test('hand, point, dashed and duplicate tabs are exclusive and preserve drawing preferences without history', () => {
   const store=createStore();
   assert.equal(store.getState().handSelected,true);
-  for (const key of ['mouseSelected','dashedSelected','duplicatePanel','handSelected']) {
+  for (const key of ['mouseSelected','lineSelected','duplicatePanel','handSelected']) {
     store.update({[key]:true});
     const state=store.getState();
-    assert.equal(['handSelected','mouseSelected','dashedSelected','duplicatePanel'].filter(key=>state[key]).length,1);
-    assert.equal(state[key],true); assert.equal(state.activeTool,'point'); assert.equal(state.pointSnap,true); assert.equal(state.dashedSnap,true);
+    assert.equal(['handSelected','mouseSelected','lineSelected','duplicatePanel'].filter(key=>state[key]).length,1);
+    assert.equal(state[key],true); assert.equal(state.activeTool,'point'); assert.equal(state.pointSnap,true); assert.equal(state.segmentSnap,true);
   }
   assert.equal(store.getState().canUndo,false);
   store.update({duplicatePanel:true}); store.update({duplicatePanel:false}); assert.equal(store.getState().handSelected,true);
@@ -43,17 +44,23 @@ test('invalid or overflowing copies leave the complete document and ID sequence 
   assert.ok(prepareDuplicate({type:'line',slope:Number.MIN_VALUE,anchor:{x:0,y:1}},{slopeFactor:0.5}).error);
 });
 
-test('curve, point and dashed copies preserve their geometry and settings with detached coordinates', () => {
+test('curve, point and segment copies preserve their geometry and settings with detached coordinates', () => {
   const store=createStore(); const curve=store.addCurve(); store.updateSelected({name:'AC',bend:0.12});
   const point=store.addPoint({x:1.234567,y:4}); store.updateSelected({showCoordinates:true});
-  const dashed=store.addDashedLine({x:1,y:4},{x:5,y:4});
+  const dashed=drawSegment(store,{x:1,y:4},{x:5,y:4});
   for (const id of [curve,point,dashed]) {
     store.selectObject(id); const source=objectsOf(store.getState()).find(o=>o.id===id);
     const copyId=store.duplicateSelected({slopeFactor:2});
     const copy=objectsOf(store.getState()).find(o=>o.id===copyId);
-    const offset=source.type==='curve'?{x:0.6,y:0.8}:source.type==='dashed'?{x:0,y:1}:{x:1,y:0};
-    assert.equal(copy.name,`${source.name}′`); assert.ok(Math.abs(copy.anchor.x-source.anchor.x-offset.x)<1e-10); assert.ok(Math.abs(copy.anchor.y-source.anchor.y-offset.y)<1e-10);
-    if (source.end) assert.deepEqual(copy.end,{x:source.end.x+offset.x,y:source.end.y+offset.y});
+    assert.equal(copy.name,`${source.name}′`);
+    if (source.type==='line') {
+      // A copied segment keeps its slope, ends and style; it is placed beside the original.
+      assert.equal(copy.slope,source.slope*2); assert.deepEqual(copy.style,source.style);
+      assert.ok(copy.extent&&Math.hypot(copy.anchor.x-source.anchor.x,copy.anchor.y-source.anchor.y)>0);
+    } else {
+      const offset=source.type==='curve'?{x:0.6,y:0.8}:{x:1,y:0};
+      assert.ok(Math.abs(copy.anchor.x-source.anchor.x-offset.x)<1e-10); assert.ok(Math.abs(copy.anchor.y-source.anchor.y-offset.y)<1e-10);
+    }
     if (source.type==='curve') { assert.equal(copy.slope,source.slope); assert.equal(copy.bend,0.12); }
     if (source.type==='point') assert.equal(copy.showCoordinates,true);
     store.updateSelected({anchor:{x:9,y:9}});
@@ -140,7 +147,7 @@ test('nearby copies translate every child together and detach bindings without c
   assert.equal(copiedPoint.parentId,copyId);
   assert.ok(Math.abs((copiedPoint.anchor.x-2)-(copy.anchor.x-original.anchor.x))<1e-10);
   assert.ok(Math.abs((copiedPoint.anchor.y-3)-(copy.anchor.y-original.anchor.y))<1e-10);
-  const dash=store.addDashedLine({x:1,y:2},{x:6,y:2});store.duplicateSelected();
-  const dashed=store.getState().dashedLines.find(o=>o.id!==dash);
-  assert.deepEqual(dashed.anchor,{x:1,y:3});assert.deepEqual(dashed.end,{x:6,y:3});
+  const dash=drawSegment(store,{x:1,y:2},{x:6,y:2});store.duplicateSelected();
+  const copied=store.getState().lines.find(o=>o.id===store.getState().selectedId),[a,b]=segmentEnds(copied);
+  assert.notEqual(copied.id,dash); assert.equal(a.x,1);assert.equal(b.x,6);assert.ok(a.y>2&&a.y===b.y,'a horizontal segment copy moves up, unchanged');
 });

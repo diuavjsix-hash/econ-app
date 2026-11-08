@@ -48,7 +48,7 @@ export function mountSumTool(root, store) {
       const focusId = document.activeElement?.closest('#sum-sources input')?.value;
       sources.replaceChildren(...objects.map(object => {
         const label = document.createElement('label'), checkbox = document.createElement('input'), text = document.createElement('span');
-        checkbox.type = 'checkbox'; checkbox.value = object.id; checkbox.checked = selected.has(object.id);
+        label.className = 'check'; checkbox.className = 'check-input'; checkbox.type = 'checkbox'; checkbox.value = object.id; checkbox.checked = selected.has(object.id);
         text.textContent = object.name; label.append(checkbox, text); return label;
       }));
       signature = next;

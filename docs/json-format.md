@@ -1,4 +1,4 @@
-# JSON 출력 형식 · schemaVersion 11
+# JSON 출력 형식 · schemaVersion 12
 
 구현 기준은 `src/export.js`의 `serializeDocument(state)`입니다. 현재는 내보내기만 지원하며 JSON 불러오기 API와 UI는 없습니다. 화면에서 가려진 도형도 모두 내보냅니다.
 
@@ -18,7 +18,7 @@
 
 | 필드 | 설명 |
 | --- | --- |
-| `schemaVersion` | 현재 11. 직선의 `style`과 끝 자르기 `extent`/`segment` 추가(버전 10: 칠한 구역 fills); 기존 도형 자료 보존 |
+| `schemaVersion` | 현재 12. 별도 점선 도형 `dashedLines`를 없앰. 점선 선분은 `lines`의 `style:'dashed'`·`extent`로 저장(버전 11: 직선의 `style`·`extent`/`segment`, 버전 10: 칠한 구역 fills) |
 | `activeDiagramId` | 최상위 도형·좌표계 필드가 가리키는 그래프 ID |
 | `layout` | `preset`과 `slots`: `{diagramId, row, column}` 배열. 행·열은 0부터 시작 |
 | `diagrams` | 숨겨진 그래프를 포함한 모든 그래프. 각각 `id`, `name`, 아래의 좌표계·도형 필드를 보유 |
@@ -29,13 +29,12 @@
 | `sums` | 수직합·수평합의 방향·음수 처리·같은 그래프 원본 ID |
 | `sketches` | 세 점 자유 곡선의 시작·끝·가운데 점·접선·양쪽 휘어짐·접점 관계 |
 | `points` | 모든 점과 이름·좌표 표시 설정 |
-| `dashedLines` | 모든 점선의 두 끝점·이름·색상·계층 |
 | `fills` | 칠한 구역의 수학 좌표 다각형 rings·색·진하기·이동 기준점·계층 |
 | `rulers` | 비활성화된 이전 자 자료 보존용 배열 |
 | `groups` | 도형 없이 분류에 사용하는 폴더 |
 | `objectOrder` | 모든 종류를 섞은 생성 순서의 ID 배열 |
 
-최상위 `coordinateSystem`, `showGrid`, `lines`, `curves`, `sketches`, `sums`, `points`, `dashedLines`, `fills`, `rulers`, `groups`, `objectOrder`는 선택한 그래프의 사본입니다. 전체 문서는 `diagrams`와 `layout`으로 읽습니다. 배치를 줄여도 `diagrams`에서 삭제하지 않으며 `layout.slots`에 있는 그래프만 표시합니다. 다음 예시는 좌우 대면 배치입니다.
+최상위 `coordinateSystem`, `showGrid`, `lines`, `curves`, `sketches`, `sums`, `points`, `fills`, `rulers`, `groups`, `objectOrder`는 선택한 그래프의 사본입니다. 전체 문서는 `diagrams`와 `layout`으로 읽습니다. 배치를 줄여도 `diagrams`에서 삭제하지 않으며 `layout.slots`에 있는 그래프만 표시합니다. 다음 예시는 좌우 대면 배치입니다.
 
 ```json
 {"preset":"face2","slots":[{"diagramId":"diagram-1","row":0,"column":0},{"diagramId":"diagram-2","row":0,"column":1}]}
@@ -61,11 +60,11 @@ rings는 유한한 수학 좌표로 된 닫힌 다각형들의 배열이며 각 
 
 ## 축 간격
 
-각 coordinateSystem.lineAxisGap은 `{enabled, distance}`입니다. 기본은 enabled=false, distance=0.75이고 거리 범위는 0.25~2 내부 좌표 단위입니다. 이 필드는 직선·곡선의 축 주변 표시만 자르는 설정이며 anchor/slope/제어점은 원본을 유지합니다. 축·점·독립 점선은 자르지 않습니다. 이전 출력에 이 필드가 없으면 기본값을 사용합니다.
+각 coordinateSystem.lineAxisGap은 `{enabled, distance}`입니다. 기본은 enabled=false, distance=0.75이고 거리 범위는 0.25~2 내부 좌표 단위입니다. 이 필드는 직선·곡선의 축 주변 표시만 자르는 설정이며 anchor/slope/제어점은 원본을 유지합니다. 축·점은 자르지 않습니다. 선분·반직선도 직선이므로 같은 규칙으로 잘립니다(버전 12부터; 이전 독립 점선은 자르지 않았음). 이전 출력에 이 필드가 없으면 기본값을 사용합니다.
 
 ## 이름과 계층
 
-직선·기본/자유 곡선·합산·점·점선·칠한 구역·이전 자·폴더에는 `parentId`가 있습니다. null은 최상위이며 다른 항목 ID면 그 아래에 들어갑니다. 계층은 같은 그래프 안에서만 연결하고 순환을 허용하지 않습니다. 같은 상위 항목의 자식은 `objectOrder` 순서로 정렬합니다. 분류는 좌표를 바꾸지 않으며 `name`은 방향과 독립적입니다. 목록 접기·그리기 모드·점 보정 토글은 UI 상태여서 출력하지 않습니다. 일반 스냅은 보정된 좌표만 출력합니다. 명시적인 따라가기는 별도의 binding으로 아래에 기록합니다.
+직선·기본/자유 곡선·합산·점·칠한 구역·이전 자·폴더에는 `parentId`가 있습니다. null은 최상위이며 다른 항목 ID면 그 아래에 들어갑니다. 계층은 같은 그래프 안에서만 연결하고 순환을 허용하지 않습니다. 같은 상위 항목의 자식은 `objectOrder` 순서로 정렬합니다. 분류는 좌표를 바꾸지 않으며 `name`은 방향과 독립적입니다. 목록 접기·그리기 모드·점 보정 토글은 UI 상태여서 출력하지 않습니다. 일반 스냅은 보정된 좌표만 출력합니다. 명시적인 따라가기는 별도의 binding으로 아래에 기록합니다.
 
 ## 무차별곡선 · 버전 9
 
@@ -182,11 +181,9 @@ schemaVersion 5에서 점 보조선 기능과 `guides` 필드를 제거했습니
 
 폴더는 `type: 'group'`, `id`, `name`, `parentId`만 포함합니다. 그래프 도형이나 좌표가 없습니다. v2의 수요·공급 방향 코드 `demand`/`supply`는 v3에서 각각 `descending`/`ascending`으로 바뀌었습니다. JSON 불러오기는 아직 지원하지 않습니다.
 
-## 점선
+## 점선 (버전 12에서 제거)
 
-`dashedLines`의 각 항목은 `id`, `type: 'dashed'`, `name`, `color`, `parentId`, `anchor`(시작점), `end`(끝점)를 포함합니다. 두 끝점은 내부 좌표이며 유한한 선분입니다. 항상 점선으로 표시하므로 실선 전환용 style 필드나 측정·길이 표시 필드가 없습니다. 끝없는 점선·점선 반직선은 `lines`의 `style:'dashed'`와 `extent`로 저장합니다. 좌표 반전·화면 크기 변경은 원본 좌표를 바꾸지 않습니다.
-
-점선 탭 선택·방향 제한·마우스 보정 설정·미완성 미리보기는 출력하지 않습니다. 완성한 점선만 `dashedLines`와 `objectOrder`에 포함합니다. 기존 점과의 스냅은 생성/편집 당시 좌표 보정이며 점을 나중에 옮겨도 자동으로 따라가지 않습니다.
+버전 11까지의 `dashedLines`(두 끝점 `anchor`/`end`를 가진 별도 점선 도형)는 버전 12에서 없앴습니다. 점선 선분은 직선 도구로 그리며 `lines` 항목의 `style:'dashed'`와 양 끝이 있는 `extent`(출력의 `segment.start`/`end`)로 저장합니다. 첫 클릭 위치가 `anchor`입니다. JSON 불러오기가 없으므로 변환 코드는 없습니다.
 
 ## 비활성화된 이전 자 자료
 
@@ -194,13 +191,13 @@ schemaVersion 5에서 점 보조선 기능과 `guides` 필드를 제거했습니
 
 ## 복제와 UI 상태
 
-복제본은 원본과 같은 line/curve/sketch/point/dashed/group 타입의 독립 객체입니다. sum과 ruler는 복제 대상이 아닙니다. 새 ID와 이름을 사용하고 함께 복제한 계층의 parentId는 새 ID를 가리킵니다. 직선은 현재 기준점에서 기울기 배율을 적용한 뒤 자동으로 옆에 띄우며 결과를 실제 slope/anchor에 반영합니다. 기준·절편 유지·배치 선택은 없고 수직선 null을 유지합니다. 자유 곡선은 start/anchor/end를 함께 이동합니다. binding은 같은 계층을 함께 복제해도 모두 끊어 독립 사본으로 만듭니다.
+복제본은 원본과 같은 line/curve/sketch/point/group 타입의 독립 객체입니다. sum과 ruler는 복제 대상이 아닙니다. 새 ID와 이름을 사용하고 함께 복제한 계층의 parentId는 새 ID를 가리킵니다. 직선은 현재 기준점에서 기울기 배율을 적용한 뒤 자동으로 옆에 띄우며 결과를 실제 slope/anchor에 반영합니다. 기준·절편 유지·배치 선택은 없고 수직선 null을 유지합니다. 자유 곡선은 start/anchor/end를 함께 이동합니다. binding은 같은 계층을 함께 복제해도 모두 끊어 독립 사본으로 만듭니다.
 
-선택·점·점선·자유 곡선·칠하기·복제·합산의 UI 플래그와 생성/복제 옵션은 출력하지 않습니다. 현재 형식 버전은 **10**입니다. 6은 독립 점선, 7은 원본 참조 합산, 8은 자유 곡선·따라가기 관계, 9는 무차별곡선, 10은 칠한 구역을 추가한 버전입니다. JSON 불러오기는 현재 제공하지 않으므로 과거 버전의 자동 마이그레이션을 약속하는 형식은 아닙니다.
+선택·직선 도구(종류·모양·마우스 보정)·점·자유 곡선·칠하기·복제·합산의 UI 플래그와 생성/복제 옵션은 출력하지 않습니다. 현재 형식 버전은 **12**입니다. 6은 독립 점선(12에서 제거), 7은 원본 참조 합산, 8은 자유 곡선·따라가기 관계, 9는 무차별곡선, 10은 칠한 구역, 11은 직선 style·extent, 12는 점선 도형 제거입니다. JSON 불러오기는 현재 제공하지 않으므로 과거 버전의 자동 마이그레이션을 약속하는 형식은 아닙니다.
 
 ## 예시
 
-[두 그래프의 전체 예시](examples/editor-v11.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, 최저점을 표시한 U자 곡선과 별도 일반 점의 통과 직선, 폴더와 독립 점선, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다.
+[두 그래프의 전체 예시](examples/editor-v12.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, 최저점을 표시한 U자 곡선과 별도 일반 점의 통과 직선, 폴더와 점선 선분, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다(당시 형식이며 현재 출력과 다릅니다).
 
 버전 9 당시 직렬화 함수로 생성한 점과 점선 문서입니다. 축 간격 기본 설정도 함께 포함합니다.
 

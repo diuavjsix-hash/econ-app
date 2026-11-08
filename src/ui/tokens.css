@@ -1,0 +1,144 @@
+/*
+ * Design tokens — the only place a raw color, font stack, size or shadow is written.
+ * components.css, styles.css and snap-feedback.css use these variables only
+ * (enforced by tests/design-system.test.js). Drawing colors saved in documents
+ * live in src/models/palette.js; --ink-* mirrors those values for chrome that
+ * previews a drawing color.
+ * See docs/design-system.md for the references and rules behind these values.
+ */
+:root {
+  color-scheme: light;
+
+  /* Neutral scale: warm graphite, the paper-and-pencil base of the whole UI. */
+  --gray-0: #ffffff;
+  --gray-25: #fbfbfa;
+  --gray-50: #f6f6f4;
+  --gray-100: #efefec;
+  --gray-150: #e7e7e3;
+  --gray-200: #dcdcd7;
+  --gray-300: #c8c8c2;
+  --gray-400: #a2a29b;
+  --gray-500: #7b7b74;
+  --gray-600: #5d5d57;
+  --gray-700: #44443f;
+  --gray-800: #2d2d29;
+  --gray-900: #1b1b18;
+
+  /* Drawing inks (same values as src/models/palette.js INK). */
+  --ink-blue: #2a5db0;
+  --ink-blue-strong: #214a8d;
+  --ink-blue-wash: #edf2fa;
+  --ink-blue-tint: #d8e3f4;
+  --ink-red: #c43d32;
+  --ink-red-strong: #a5332a;
+  --ink-red-wash: #fbeeec;
+  --ink-red-tint: #efc9c4;
+
+  /* Semantic surfaces. */
+  --bg-app: var(--gray-50);
+  --bg-surface: var(--gray-0);
+  --bg-sheet: var(--gray-0);
+  --bg-subtle: var(--gray-25);
+  --bg-hover: var(--gray-100);
+  --bg-pressed: var(--gray-150);
+  --bg-track: var(--gray-100);
+  --bg-inverse: var(--gray-900);
+  --bg-inverse-hover: var(--gray-700);
+
+  /* Semantic text. */
+  --text: var(--gray-900);
+  --text-strong: var(--gray-800);
+  --text-secondary: var(--gray-600);
+  --text-tertiary: var(--gray-500);
+  --text-disabled: var(--gray-400);
+  --text-inverse: var(--gray-0);
+
+  /* Lines. */
+  --border: var(--gray-200);
+  --border-strong: var(--gray-300);
+  --border-subtle: var(--gray-150);
+  --border-inverse: var(--gray-900);
+
+  /* One accent: value states of inputs, selection and snapping on the canvas. */
+  --accent: var(--ink-blue);
+  --accent-strong: var(--ink-blue-strong);
+  --accent-wash: var(--ink-blue-wash);
+  --accent-tint: var(--ink-blue-tint);
+  --danger: var(--ink-red);
+  --danger-strong: var(--ink-red-strong);
+  --danger-wash: var(--ink-red-wash);
+  --danger-tint: var(--ink-red-tint);
+
+  /* Canvas. */
+  --canvas-grid: var(--gray-100);
+  --canvas-axis: var(--gray-700);
+  --canvas-label: var(--gray-700);
+  --canvas-muted: var(--gray-500);
+  --canvas-halo: var(--gray-0);
+  --canvas-handle: var(--gray-0);
+  --snap-color: var(--accent);
+  --selection-color: var(--accent);
+
+  /* Type. Pretendard for Korean UI text, a math serif only for formulas. */
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --font-math: 'STIX Two Math', 'Cambria Math', 'Latin Modern Math', 'Times New Roman', serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --text-xl: 20px;
+  --text-equation: 17px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --leading-tight: 1.25;
+  --leading: 1.5;
+  --tracking-tight: -0.01em;
+
+  /* Space: a 4px scale. */
+  --space-0: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Sizes. */
+  --control-sm: 26px;
+  --control: 30px;
+  --control-lg: 36px;
+  --icon-sm: 14px;
+  --icon: 16px;
+  --icon-lg: 18px;
+  --header-height: 48px;
+  --panel-width: 288px;
+
+  /* Shape. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+  --stroke-hairline: 1px;
+
+  /* Elevation: hairline first, shadow only for things that float. */
+  --shadow-raised: 0 1px 2px rgb(27 27 24 / 0.08), 0 0 0 1px rgb(27 27 24 / 0.06);
+  --shadow-float: 0 4px 12px rgb(27 27 24 / 0.08), 0 0 0 1px rgb(27 27 24 / 0.06);
+  --shadow-dialog: 0 16px 48px rgb(27 27 24 / 0.18), 0 0 0 1px rgb(27 27 24 / 0.08);
+  --backdrop: rgb(27 27 24 / 0.32);
+  --swatch-edge: rgb(27 27 24 / 0.12);
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px rgb(42 93 176 / 0.45);
+
+  /* Motion. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 90ms;
+  --duration: 140ms;
+
+  /* Assets drawn with token colors (data URIs cannot read variables). */
+  --chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%237b7b74' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4.5 6.5 3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
+  --check-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 8.5 2.5 2.5L12 5.5'/%3E%3C/svg%3E");
+}

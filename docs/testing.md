@@ -1,5 +1,37 @@
 # 검증과 재현
 
+## 2026-11-08 · 디자인 시스템 개편
+
+로컬 결과는 **앱 398개·별도 headless Chrome 2,407개·구문/의존 경계 119개 모듈·정적 빌드 통과**입니다. 늘어난 앱 검사 7개는 새 `design-system.test.js`입니다.
+
+- `design-system.test.js`: `tokens.css` 밖 CSS의 색 리터럴 금지, 정의되지 않은 CSS 변수 금지, `palette.js` 밖 JS의 16진 색 금지와 곡선 기본색의 역할 출처, 토큰과 팔레트의 잉크 값 일치, 스타일시트 순서, `appShell()` 버튼의 공통 클래스·`type="button"`·ID 중복, 아이콘 격자. 임시 CSS 파일에 `#abc`와 정의되지 않은 변수를 넣었을 때 두 검사가 실패하는 것도 확인한 뒤 파일을 지웠습니다.
+- 바뀐 기대값: `fill-style.test.js`가 색 값을 직접 쓰지 않고 `FILL_COLORS`의 첫째·둘째 색을 읽습니다.
+- 브라우저 고정 화면(`tests/browser/*.html`)은 `editor.css` 대신 `tokens → components → snap-feedback → styles` 순서로 불러옵니다.
+- 실제 브라우저(내장 브라우저, 1280×800·375×812 에뮬레이션)에서 시작 창·직선 그리기·곡선 패널·복제 패널·그래프 설정 창·모바일 세로 배치를 눈으로 확인했습니다. 콘솔 오류는 없었습니다. 물리 모바일 기기와 손으로 한 조작은 확인하지 않았습니다.
+
+## 2026-11-08 · 점선 도형 제거·선분 이동 끝 맞춤·자유 곡선 끝점 맞춤
+
+로컬 결과는 **앱 391개·별도 headless Chrome 2,407개·구문/의존 경계 115개 모듈·정적 빌드 통과**입니다. 앱 검사 수가 줄어든 것은 점선 도형 전용 `dashed.test.js`를 지우고 나머지를 선분으로 옮겼기 때문입니다.
+
+- 이전: `dashed-magnets.test.js` → `segment-magnets.test.js`, `dashed-curve-contact.test.js`·`fixtures/dashed-curve-cases.js` → `segment-curve-contact.test.js`·`fixtures/segment-curve-cases.js`, 브라우저 `dashed-curve-contact.html` → `segment-curve-contact.html`. 공통 도우미 `tests/fixtures/segments.js`(선분 생성·두 점 순서·`snapMovingEnds` 감싸기).
+- 공통 계약: `contact-contract.html`이 직선 도구로 Shift 선분을 접점에 그리고, 끝 손잡이를 접점으로 되돌리고, 선분 전체를 옮겨 끝이 접점에 붙는지(길이·기울기 유지) 확인합니다. `edgeworth-minimum.html`·`line-extent.html`·`snap-feedback.html`·`contact-tangent-line.html`의 점선 생성도 직선 도구 선분으로 바꿨습니다.
+- 새 검사: 선분 이동 끝 맞춤(교차 직선·점·24px 유지·Alt·Shift·열린 직선 제외, `line-extent.test.js`), 자유 곡선 시작/끝 끝점 맞춤과 자기 편집 제외(`line-tool.test.js`).
+- 바뀐 기대값: 축 간격 안의 선분은 다른 직선처럼 선택되지 않습니다(`selection.test.js`). 선분 복제는 직선 복제 규칙(옆으로 띄움)을 따릅니다(`duplicate.test.js`). JSON은 12입니다.
+
+물리 모바일 터치와 손으로 직접 한 조작은 이번에 확인하지 않았습니다.
+
+## 2026-11-08 · 선택 도구 복귀 통일·점선 버튼 제거
+
+로컬 결과는 **앱 394개·별도 headless Chrome 2,371개·구문/의존 경계 116개 모듈·정적 빌드 통과**입니다. `tests/line-tool.test.js`에 직선·점·자유 곡선·점선(내부)·무차별곡선 추가와 복제가 모두 선택 도구로 돌아가고 결과를 선택하는지 검사를 추가했습니다. `fill.test.js`는 칠한 뒤 선택 도구 복귀로 바꿨습니다. `line-extent.test.js`는 그려진 끝만 끌 수 있고, 열린 끝은 손잡이·드래그·키보드로 바뀌지 않으며, 가장자리에서 다시 열리지 않고 보이는 범위에 머무는지 검사합니다. 브라우저 `line-extent.html`은 직선에 끝 손잡이가 없고 반직선은 한 개인지, 가장자리로 끌어도 열리지 않는지 확인합니다. `suite.js`는 선분을 그린 뒤 선택 도구로 돌아가 새 선분이 선택되는지, 직선 도구가 마지막 종류를 기억하는지, 점선 버튼이 없는지 확인합니다. `edgeworth-minimum.html`의 연속 점 찍기는 점마다 점 도구를 다시 켜도록 바꿨습니다.
+
+실제 앱(로컬 미리보기, 스크립트로 버튼·포인터 입력)에서 선분·점 생성 뒤 선택 도구 복귀와 결과 선택, 직선의 끝 손잡이 없음, 툴바에 점선 버튼 없음을 확인했습니다. 물리 모바일 터치와 손으로 직접 한 조작은 이번에 확인하지 않았습니다.
+
+## 2026-11-08 · 두 점 직선 도구
+
+로컬 결과는 **앱 393개·별도 headless Chrome 2,359개·구문/의존 경계 117개 모듈·정적 빌드 통과**입니다. `tests/line-tool.test.js` 6개는 두 점에서 직선·반직선·선분 생성(역방향 포함), x가 같을 때 정확한 수직선, 도구 유지·선택 없음·종류/모양 저장·한 번 되돌리기·잘못된 설정 무시·기존 `addLine()` 유지, 그린 선분 끝의 **끝점 맞춤** 등록, 선택한 직선의 종류 변경, 클릭·클릭/드래그·Shift 고정·도구 종료 시 초안 취소를 검사합니다. 브라우저 `suite.js`는 1280×800과 390×844에서 실제 버튼으로 선분 두 번 클릭, 점선 직선 드래그+Shift, 되돌리기, 선택한 선의 선분→반직선→직선→선분 전환을 확인합니다.
+
+실제 앱(로컬 미리보기)에서 선분·점선 직선·선분 끝에 맞춘 반직선을 그리고, 선택한 선분을 반직선으로 바꾸는 조작을 확인했습니다. 물리 모바일 터치, 에지워드 상자에서의 수동 조작, 축 반전 상태의 수동 조작은 이번에 확인하지 않았습니다.
+
 ## 2026-11-07 · 직선 끝 자르기·점선 스타일
 
 로컬 결과는 **앱 387개·별도 headless Chrome 2,337개·구문/의존 경계 116개 모듈·정적 빌드 통과**입니다. JSON 예시는 schemaVersion 11의 `docs/examples/editor-v11.json`으로 새로 생성했고 이전 예시 파일은 보존했습니다. `tests/line-extent.test.js` 7개는 다음을 검사합니다.
@@ -286,7 +318,7 @@ node scripts/browser-test.mjs
 | interactions.test.js | 6 | 등록된 포인터/키보드·반전/Shift·수직/회전·점선 길이·곡선/연결 제약 |
 | ppc.test.js | 5 | ¼타원·독립 반지름/비율·정확한 접점/교점·자석·복제/기록/JSON |
 | edgeworth.test.js | 4 | 총량/동일 배율/반전·독립 그래프/기록·네 축 스냅/칠하기·JSON |
-| dashed-magnets.test.js | 14 | 점선 생성/끝점/전체 이동·Shift 교차·길이 유지·Alt·포착/해제 |
+| segment-magnets.test.js | 14 | 직선 도구 두 점·끝 손잡이·선분 전체 이동 끝 맞춤·Shift 교차·Alt·포착/해제 (2026-11-08 dashed-magnets에서 이전) |
 | snap-feedback.test.js | 8 | 공통 거리·표시 계약·후보 정규화·대상 강조·곡선 생성 유지/기록 |
 | kink-snap.test.js | 6 | 꼭짓점 우선·팔에서 꺾임 전환·Shift/Alt·점선 길이·숨긴 대상 제외 |
 | fill.test.js | 15 | 닫힌 구역/구멍·독립 편집·계층·기록·그래프·JSON |
@@ -311,6 +343,7 @@ node scripts/browser-test.mjs
 | snap-targets.test.js | 8 | 공통 자기/종속 제외·합/계층 구분·10,000단계 의존 순회·캐시 공유/무효화·기록/그래프 |
 | movement.test.js | 4 | Shift 축 선택·경계·스냅 제한·반전·기록 |
 | server.test.js | 3 | 동시 시작·포트 충돌·다른 프로세스 보호 |
+| design-system.test.js | 7 | 토큰 밖 색 리터럴·미정의 변수·팔레트 출처·잉크 일치·스타일시트 순서·공통 버튼 클래스·아이콘 격자 |
 | selection.test.js | 10 | 영역/축/곡선/합·다중 상태·일괄 삭제/관계/계층/기록·그래프 격리·삭제 키 보호 |
 | 합계 | 316 | 앱 313개 + Windows 서버 3개; 서버는 이번 변경에서 재실행하지 않음 |
 
@@ -325,7 +358,7 @@ node scripts/generate-doc-example.mjs
 git diff --check
 ```
 
-이 컴퓨터의 일반 PowerShell에서 node를 찾지 못하면 다음 경로를 사용합니다.
+현재 데스크톱은 2026-11-07부터 PATH의 `node`로 위 명령을 바로 실행합니다. `node`를 찾지 못하고 Codex가 설치된 환경에서만 다음 번들 경로를 대체 수단으로 사용합니다.
 
 ```powershell
 & "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/check.mjs
@@ -339,7 +372,7 @@ Windows 서버 테스트는 .local/server-test-* 안에 임시 서버를 만들�
 
 Windows 서버 검사만 실행하려면 `node --test tests/server.test.js` 또는 `npm run test:server`를 사용합니다. `node --test` 전체 실행은 서버 검사도 포함하므로 기본 앱 검사 명령과 결과 개수가 다릅니다.
 
-빌드는 index.html, src/, public/을 dist/로 복사합니다. 새 editor.css도 포함합니다. 이전 dist 파일을 자동 삭제하지 않으므로 원본에서 파일을 제거한 작업이라면 잔여 파일을 별도로 확인합니다. Check 검사에는 배포 단계가 없으며 저장소의 별도 Pages 자동 실행은 위 현재 반영 기록과 구분합니다.
+빌드는 index.html, src/, public/을 dist/로 복사합니다. `src/ui/`의 tokens.css·components.css도 포함합니다(editor.css는 2026-11-08에 삭제). 이전 dist 파일을 자동 삭제하지 않으므로 원본에서 파일을 제거한 작업이라면 잔여 파일을 별도로 확인합니다. Check 검사에는 배포 단계가 없으며 저장소의 별도 Pages 자동 실행은 위 현재 반영 기록과 구분합니다.
 
 ## 실제 브라우저에서 확인한 범위
 

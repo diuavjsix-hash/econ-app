@@ -1,5 +1,17 @@
 # 구현 구조
 
+## 두 점 직선 도구 · 2026-11-08
+
+`TOOL_MODES.line`(`lineSelected`)이 생성 도구로 등록됐습니다. 점선 도구의 포인터 흐름을 `creation-tools.js`의 `TwoPointCreation`으로 올리고 `DashedCreation`과 `LineCreation`이 상속합니다. 두 도구는 클릭·클릭/드래그, Shift 축 고정, canvas의 `dashedPosition`(공통 `snapDashedPoint`와 `dashedSnap` 토글)을 공유하며 방향 모드·기존 도형 누르기·미리보기·결과만 다릅니다. 직선 도구는 기존 직선을 눌러도 잡지 않고 그 위치에서 그리기를 시작합니다.
+
+- 기하: `line-extent.js`의 `lineFromPoints(from,to,kind)`가 첫 점을 기준점으로 기울기(`slopeThrough`, x가 같으면 null)와 extent를 만듭니다. 종류는 저장하지 않고 extent에서 `lineKindOf`로 읽습니다. `extentForKind`는 선택한 직선의 종류 변경에서 있는 끝을 유지하고 없는 끝을 보이는 부분(`visibleLineEnds(...).edge`) 안에 둡니다.
+- 상태: `lineKind`·`lineStyle`은 도구 설정이며 문서·기록에 들어가지 않습니다. `addLine(from,to,{kind,style})`은 두 점이 있을 때만 새 경로를 쓰고 인자 없는 호출은 이전 기본 직선을 유지합니다. 직선 도구 중에 추가한 직선은 선택하지 않고 도구를 유지합니다.
+- UI: `main.js`의 `lineShapeControls()`가 도구 패널(`#line-options`)과 선택 설정(`#line-shape-selected`)에 같은 버튼을 만들고 `tools/line.js`의 `mountShapeButtons`가 연결합니다. 선택 설정의 보이는 범위는 활성 그래프 컨테이너 크기로 `createViewport`를 다시 계산해 얻습니다.
+- 각 그래프의 범위 제한 store(`workspace.js`)에 `addLine`을 추가했습니다.
+- 같은 날 두 번째 변경: 툴바 점선 버튼·패널과 `tools/dashed.js`를 삭제했습니다. 세 번째 변경에서 내부 점선 도형·모드도 모두 제거했습니다(아래). 직선 끝 손잡이는 그려진 끝에만 렌더링하고(`editing-handles.js`), `LineInteraction.canDrag`가 열린 끝을 거절하며, `dragEnd`/키보드는 끝을 보이는 범위 안에 고정하고 가장자리에서 다시 열지 않습니다(`LINE_EDGE_PX` 삭제).
+- 세 번째 변경(2026-11-08): `dashed` 도형·모드·`DashedCreation`·`DashedInteraction`·`snapMovingDashed`·`dashed-view.js`를 삭제하고 JSON을 schemaVersion 12로 올렸습니다(`dashedLines` 없음). `dashed-magnets.js`는 `segment-magnets.js`로, `snapDashedPoint`/`dashedSnap`/`dashedPosition`은 `snapSegmentPoint`/`segmentSnap`/`segmentPosition`으로 이름을 바꿨습니다. 선분·반직선 전체 이동은 `intercepts.js`의 `snapLineEnds`가 `snapMovingEnds`로 그려진 끝을 공통 대상(`ctx.snapTargets()`, 자기·종속 제외)에 맞추고 `chooseShapeMagnet`에서 직선 자석과 경쟁합니다(`LineInteraction.snap`이 잘린 직선일 때만 대상을 넘김). `buildSnapTargets`는 선분 끝과 자유 곡선 시작·끝을 계산한 교점 뒤에 `endpoint`로 등록하고, 같은 획이 걸린 교점·접점이 이미 있으면 등록하지 않습니다. `guideSnapCandidates`는 등록된 대상과 같은 위치의 계산 교차를 추가하지 않습니다. 공통 계약 브라우저 검사(`contact-contract.html` 등)는 직선 도구 선분으로 옮겼습니다.
+- 생성 후 도구 복귀: store의 `add()`가 모든 생성 결과에 대해 `enterToolMode('hand')` 후 결과를 선택합니다. 기존 칠하기 재클릭(`addFill`)과 `duplicateSelected`도 같습니다. 도구 설정(`lineKind`·`lineStyle`·칠하기 색 등)은 유지합니다.
+
 ## 직선 끝 자르기·점선 스타일 · 2026-11-07
 
 직선은 선택적 `extent:[from,to]`(기준점에서 `directionOf(slope)` 방향 거리, null은 열린 끝)와 `style`을 가집니다. `math.js`의 `clipLineParameters`/`clipLine`이 extent를 반영하므로 `displayedLineSegments`를 쓰는 렌더링·클릭 영역·맞춤 대상·칠하기 경계·절편 대상이 자동으로 잘린 부분만 사용합니다. 계산은 `graph/line-extent.js`(`onLineExtent`, `rebasedExtent`, `rotatedExtent`, `visibleLineEnds`, `lineEndPoints`)에 모았습니다.
@@ -44,7 +56,7 @@
 
 생성된 점선 끝점이 표시 근사 곡선에 붙어 원본 곡선과 어긋나는 문제도 함께 수정했습니다. 대상 캐시에 자유 곡선의 원본 이차 구간을 표시 영역으로 매개변수 클리핑한 `quadratics`, 해석 곡선의 원본 객체·보이는 영역·탐색 표본을 담은 `analyticCurves`를 추가했습니다. `guidedSnapCandidates`에서 점/점선의 최근접·Shift 맞춤을 공통 처리합니다. 해석 곡선의 `AnalyticCurveFamily.nearestPoint`는 표시 표본으로 최소점 구간을 찾고 원본 `pointAt`에서 수치 최소화합니다. Shift는 원본 `lineIntersections`를 사용합니다. 새 표시는 없으며 16/24px·Alt·공통 강조·기록/JSON 구조를 유지합니다.
 
-`tests/fixtures/dashed-curve-cases.js`를 Node/브라우저 검사가 공유합니다. 정지한 교점/접점뿐 아니라 실제 점선 생성 → 곡선 끝점 맞춤 → 점 생성/이동을 정상/반전/모바일 크기에서 검사합니다. 모든 등록 곡선 종류의 점선 교차 사례를 요구합니다. 일반 곡선끼리 교점과 합의 표시 근사는 기존 제한으로 남습니다.
+`tests/fixtures/segment-curve-cases.js`(이전 `dashed-curve-cases.js`)를 Node/브라우저 검사가 공유합니다. 정지한 교점/접점뿐 아니라 실제 점선 생성 → 곡선 끝점 맞춤 → 점 생성/이동을 정상/반전/모바일 크기에서 검사합니다. 모든 등록 곡선 종류의 점선 교차 사례를 요구합니다. 일반 곡선끼리 교점과 합의 표시 근사는 기존 제한으로 남습니다.
 
 ## 공통화 재점검과 보수 · 2026-11-04
 
@@ -194,17 +206,20 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 
 | 파일 | 역할 |
 | --- | --- |
-| `index.html` | CSS와 ES module 진입점 로드; 경로는 상대 경로 |
-| `src/main.js` | 화면 마크업과 아이콘 생성, store 생성, 각 기능 mount |
+| `index.html` | Pretendard와 `tokens → components → snap-feedback → styles` 순서의 CSS, ES module 진입점 로드; 경로는 상대 경로 |
+| `src/main.js` | `appShell()` 장착, store 생성, 각 기능 mount |
+| `src/ui/tokens.css`, `components.css` | 디자인 토큰(원시 값의 유일한 출처)과 공통 컴포넌트 스타일; [디자인 시스템](design-system.md) |
+| `src/ui/shell.js`, `icons.js` | 정적 화면 배치(공통 생성기만 사용)와 유일한 아이콘·도형 기호 모음 |
+| `src/models/palette.js` | 문서에 저장되는 도형 기본색(`INK`·`STROKE_CYCLE`·`FILL_PALETTE`·`ROLE_COLORS`) |
 | `src/models/graph-object.js`, `objects.js`, `object-types.js`, `contracts.js` | 공통 행동 상속·도형 어댑터·컬렉션/능력 목록·필수 구현 등록 검사 |
 | `src/models/curve-families.js` | 곡선 종류 상속·고유 이동/편집/접점·기하 능력과 등록 계약 |
-| `src/ui/controls.js` | 도구 버튼·숫자/슬라이더 마크업과 공통 검증·접근성 값/진행 표시 |
+| `src/ui/controls.js` | 버튼·아이콘 버튼·도구·분할 선택·스위치·체크·선택/텍스트/숫자/슬라이더 마크업 생성과 공통 검증·접근성 값/진행 표시 |
 | `src/graph/interactions.js`, `editing-handles.js` | 도형별 조작과 포인터/키보드 훅·선택 손잡이 |
 | `src/graph/curve-contacts.js`, `curve-curve-tangency.js` | 공유 원본 접점 기하와 허용 이동 제약에 맞춘 곡선끼리 자석 |
 | `src/graph/snap-context.js` | 자기/계산 종속 도형 공통 제외·캐시용 수학 기하 키 |
 | `src/graph/ppc.js`, `axes.js` | ¼타원 기하와 공통 유한 좌표축 |
 | `src/graph/svg-renderer.js` | SVG 노드·경로와 공통 획/히트 영역·접근성 속성 |
-| `src/editor-ui.js`, `src/editor.css` | 도구막대·현재 작업별 편집 패널·그래프 설정 창과 반응형 표현 |
+| `src/editor-ui.js` | 현재 작업별 편집 패널 문맥·그래프 설정 창 열기 |
 | `src/duplicate.js` | 원본을 바꾸지 않는 복제 준비, 기울기 배율·자동 옆 배치·숫자 검증 |
 | `src/graph/sum.js` | 수직합·수평합의 원본 평가·역함수·기여분 절단·분할·표시 근사 |
 | `src/graph/sketch.js`, `src/graph/sketch-view.js` | 세 점 자유 곡선의 내부 좌표 기하·최저점·표시·편집 손잡이 |
@@ -221,12 +236,10 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/graph/curve.js` | 우상향·우하향 프리셋, 곡선 점·베지어 제어점·접선 연장·경계 교차 구간·드래그 곡률 계산 |
 | `src/graph/indifference.js` | 곡선 종류 클래스의 기하·고유 이동·모양·직선 접점/교점 호환 함수 |
 | `src/graph/snap-policy.js`, `snap-feedback.js/.css`, `sketch-magnets.js` | 16/24px 공통 자석 규칙·단일 맞춤 표시·곡선 생성 접점 후보 |
-| `src/graph/dashed-magnets.js` | 점선 생성/끝점/전체 이동의 Shift 교차·후보 유지·길이 보존 |
+| `src/graph/segment-magnets.js` | 직선 도구 두 점·끝 손잡이(`snapSegmentPoint`), 선분 전체 이동의 끝 맞춤(`snapMovingEnds`)·Shift 교차·후보 유지 |
 | `src/graph/fill.js`, `fill-style.js`, `src/tools/fill.js` | 닫힌 구역 탐색·독립 다각형·색/알파벳·글자 위치·칠하기 패널 |
 | `src/graph/selection.js`, `src/tools/selection.js` | 실제 표시 획의 영역 선택·다중 선택·공통 삭제 명령 |
 | `src/graph/ruler.js` | 공유 선분의 방향 제한·클리핑·평행 이동과 보관 중인 자 길이 계산 |
-| `src/graph/dashed-view.js` | 점선·선택한 두 끝점 SVG 렌더; 측정·눈금 없음 |
-| `src/tools/dashed.js` | 점선 탭·방향·별도 마우스 보정 설정 |
 | `src/graph/ruler-view.js` | 비활성화된 자 렌더 구현; 현재 canvas에서 호출하지 않음 |
 | `src/tools/ruler.js` | 비활성화된 자 UI 구현; 현재 main에서 mount하지 않음 |
 | `src/graph/point.js` | 좌표 표시용 반올림 |
@@ -245,7 +258,7 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/quadrants.js` | 배치·사분면의 초안 선택과 일괄 적용, 첫 시작과 이후 변경 창 |
 | `src/axes.js` | 수평·수직축 이름과 축 간격 입력 |
 | `src/export.js` | `serializeDocument`와 JSON 모달·복사·다운로드 |
-| `src/styles.css` | 미니멀한 외관, SVG 조작 스타일, 반응형 배치 |
+| `src/styles.css` | 앱 배치·캔버스 SVG 표현·반응형 배치(토큰만 사용) |
 | `scripts/dev-server.mjs` | localhost 정적 파일 서버; 앱 자산만 제공 |
 | `server.cmd`, `start-server.cmd`, `stop-server.cmd` | Windows 더블클릭 실행 파일; 작업 폴더와 무관하게 PowerShell 제어 스크립트 호출 |
 | `scripts/server.ps1` | Node 실행 파일 탐색, 서버 시작·종료·상태 확인과 메뉴 |
@@ -272,9 +285,9 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `tests/editor-ui.test.js` | 합산 포함 모드 배타성·문맥 편집·그래프 전환·명시적 곡선 생성 회귀 4개 |
 | `tests/sum.test.js` | 수직합·수평합·역함수·꺾임·의존 삭제·기록·JSON·수치 범위 회귀 11개 |
 | `tests/sketch.test.js` | 자유 곡선·접점·최저점·관계·복제·기록·스냅·수직 회전 경계 회귀 15개 |
-| `tests/dashed-curve-contact.test.js`, `tests/fixtures/dashed-curve-cases.js` | 점선·곡선의 원본 교점/접점·끝점 배치 후 점 생성·모든 곡선 종류·유한 구간/가시성/캐시·기록 회귀 20개와 브라우저 공통 사례 |
+| `tests/segment-curve-contact.test.js`, `tests/fixtures/segment-curve-cases.js`, `tests/fixtures/segments.js` | 선분(직선 도구)·곡선의 원본 교점/접점·끝점 배치 후 점 생성·모든 곡선 종류·유한 구간/가시성/캐시·기록 회귀 20개와 브라우저 공통 사례 |
 | `tests/edgeworth.test.js` | 상자 총량/축·점/칠하기/JSON·상자 비율별 원점 직선·A/B 이동/회전·경계 왕복 회귀 9개 |
-| `tests/browser/dashed-curve-contact.html`, `edgeworth-minimum.html` | 실제 canvas의 합성 포인터/키 입력으로 점선→점 생성, 상자 양 원점 조작, 최저점 표시만 유지하는 계약을 검증 |
+| `tests/browser/segment-curve-contact.html`, `edgeworth-minimum.html` | 실제 canvas의 합성 포인터/키 입력으로 선분→점 생성, 상자 양 원점 조작, 최저점 표시만 유지하는 계약을 검증 |
 | `tests/tangency.test.js` | 직선 이동 접선 맞춤·수직/사선·포착/해제·Alt·표시 범위·종속 제외·기록·Shift 축 제한 회귀 14개 |
 | `tests/curve-tangency.test.js` | 복제 곡선 이동·새 기울기·양쪽 접점·수직/사선·Shift/Alt·해제·표시 범위·종속 제외·모양/기록 보존 회귀 12개 |
 | `tests/movement.test.js` | Shift 축 선택·경계·스냅 제한·반전·기록 회귀 4개 |
@@ -296,7 +309,7 @@ sumPanel은 다른 생성 도구·복제와 배타적인 UI 상태입니다. 합
   curves: [],
   sketches: [],
   sums: [],
-  points: [], dashedLines: [], fills: [], rulers: [],
+  points: [], fills: [], rulers: [],
   groups: [],
   objectOrder: [],
   selectedId: null, handSelected: true, duplicatePanel: false, sumPanel: false, sketchSelected: false, sketchMode: 'auto',
@@ -313,7 +326,7 @@ sumPanel은 다른 생성 도구·복제와 배타적인 UI 상태입니다. 합
 }
 ```
 
-`diagrams`가 그래프별 문서를 보관하고, 최상위 `lines`, `curves`, `sketches`, `sums`, `points`, `dashedLines`, `rulers`, `groups`, `objectOrder`, `quadrantMode`, `axisNames`, `showGrid`, `axisGapEnabled`, `axisGap`는 활성 그래프의 편집용 투영입니다. `syncDiagram`으로 변경을 반영하고 `loadDiagram`으로 전환합니다. `configureLayout`은 필요한 그래프를 추가하며 배치를 줄여도 나머지 그래프를 보관합니다. 표시되는 그래프는 `diagrams`의 앞 N개와 `layout.slots`의 위치를 대응시킵니다. `diagram-N` ID 카운터도 되돌리지 않습니다.
+`diagrams`가 그래프별 문서를 보관하고, 최상위 `lines`, `curves`, `sketches`, `sums`, `points`, `fills`, `rulers`, `groups`, `objectOrder`, `quadrantMode`, `axisNames`, `showGrid`, `axisGapEnabled`, `axisGap`는 활성 그래프의 편집용 투영입니다. `syncDiagram`으로 변경을 반영하고 `loadDiagram`으로 전환합니다. `configureLayout`은 필요한 그래프를 추가하며 배치를 줄여도 나머지 그래프를 보관합니다. 표시되는 그래프는 `diagrams`의 앞 N개와 `layout.slots`의 위치를 대응시킵니다. `diagram-N` ID 카운터도 되돌리지 않습니다.
 
 `workspace.js`는 그래프마다 `diagramState`로 분리한 store 구독을 전달합니다. SVG의 pointerdown·keydown capture 단계에서 먼저 그래프를 선택하므로 빈 평면·도형·좌클릭 생성도 올바른 그래프에 적용합니다. 비활성 그래프에는 선택 손잡이와 마우스 커서를 표시하지 않습니다. 각 SVG의 clipPath ID는 고유합니다. 숨긴 그래프는 mount를 해제하고 다시 표시할 때 재생성합니다. 도구·계층·스냅은 활성 그래프 문서만 읽습니다. 마우스 옵션은 작업 전체에서 공유합니다.
 
@@ -371,13 +384,9 @@ axisGapEnabled는 기본 false, axisGap는 기본 0.75이며 0.25~2 내부 좌�
 
 키보드 방향키는 이동에 0.1 내부 좌표, Shift와 함께 1 내부 좌표를 사용합니다. 직선 회전점에서는 0.1° / Shift 1°, 곡선 휘어짐점에서는 bend 0.01 / Shift 0.05를 조절합니다. SVG 노드를 다시 만들기 때문에 키보드 입력 후 같은 조작점에 포커스를 복원합니다.
 
-## 점선 도구와 자 비활성화
+## 자 비활성화 (점선 도구는 2026-11-08 제거)
 
-점선은 독립 도형(`type: 'dashed'`)이며 `dashedLines`에 시작점 `anchor`, 끝점 `end`, 이름·색상·계층을 보관합니다. 항상 점선으로 표시하며 길이 숫자·눈금·실선 전환·측정 속성은 없습니다. `drawDashedLine`이 유한 선분만 클리핑하고 선택할 때만 두 끝점 손잡이를 표시합니다.
-
-`dashedSelected`, `dashedMode`(free/horizontal/vertical), `dashedSnap`(기본 true)는 UI 상태입니다. 점선과 점 탭은 상호 배타적이고, 점선 보정은 점 보정(pointSnap)과 독립적입니다. 두 번 클릭하거나 4px 이상 드래그해 완성하고, Shift는 방향을 일시 제한합니다. 미완성 draft는 canvas 로컬 상태이며 Esc·도구 전환·그래프 전환·기록 복원에서 취소합니다. 완성된 점선만 addDashedLine으로 저장합니다. 길이가 0이거나 유한하지 않으면 저장하지 않습니다.
-
-전체 이동은 두 끝점을 같은 양만큼 옮기고, 선택한 끝점은 드래그·방향키로 편집합니다. 기존 점·선·곡선·축·유한 점선과 교점에 붙으며 자신의 선분에는 붙지 않습니다. 다른 종류의 도형을 목록이나 키보드로 선택하면 점선 그리기를 종료해 해당 도형을 바로 편집합니다. 그래프별 독립 문서·계층·삭제·전체 삭제·undo/redo·JSON에 dashedLines를 포함합니다.
+별도 점선 도형(`type:'dashed'`, `dashedLines`)과 점선 도구·모드·`DashedCreation`·`DashedInteraction`·`dashed-view.js`는 2026-11-08에 제거했습니다. 점선 선분은 직선 도구가 `lines`에 `style:'dashed'`와 extent로 만듭니다. 생성 맞춤 토글은 `segmentSnap`(이전 `dashedSnap`), 캔버스의 후보는 `segmentPosition`/`segmentTargets`입니다.
 
 자 버튼과 ruler 옵션·측정 패널은 기본 화면에서 제외했습니다. main은 mountRulerTool을 호출하지 않으며 store.update의 rulerSelected 활성화 요청도 무시합니다. 이전 rulers 자료와 계산·테스트 구현은 보관하지만, canvas 렌더·생성 입력·스냅 대상에는 연결하지 않습니다. JSON schemaVersion 6에서 추가한 dashedLines와 기존 rulers 자료 보존 배열은 현재 schemaVersion 10에도 유지합니다.
 

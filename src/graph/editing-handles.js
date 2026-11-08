@@ -5,7 +5,7 @@ import { curvePoint } from './curve.js';
 import { drawSketch } from './sketch-view.js';
 import { curveFamilyOf, isOppositeCurve } from '../models/curve-families.js';
 import { oppositeOriginEditable } from './axes.js';
-import { LINE_END_ACTIONS, LINE_EDGE_PX, linePointAt, visibleLineEnds } from './line-extent.js';
+import { LINE_END_ACTIONS, linePointAt, visibleLineEnds } from './line-extent.js';
 
 const node = (...args) => SVG_RENDERER.element(...args);
 const circle = (object, point, action, radius, className, label, title, viewport) => {
@@ -39,15 +39,13 @@ function lineHandles(object, viewport, state) {
     const point = { x: editing.anchor.x + (endpoint.x - editing.anchor.x) * fraction, y: editing.anchor.y + (endpoint.y - editing.anchor.y) * fraction };
     group.append(circle(object, point, 'rotate', 7, 'rotate-handle', `기울기 조절 ${index + 1}`, '드래그하여 기울기 조절', viewport));
   }
-  // End handles: a drawn end sits on its point; an open end sits just inside the edge.
-  const ends = visibleLineEnds(object, viewport.bounds, state), inset = LINE_EDGE_PX * 0.6 / viewport.unit;
+  // End handles exist only on drawn ends (segment, ray start). Open ends have none:
+  // the kind (line, ray, segment) changes only with the line settings buttons.
+  const ends = visibleLineEnds(object, viewport.bounds, state);
   for (const [index, action] of Object.keys(LINE_END_ACTIONS).entries()) {
     const end = ends?.ends[index];
-    if (!end) continue;
-    const t = end.open ? end.t + (index ? -inset : inset) : end.t;
-    if (end.open && ends.ends[1].t - ends.ends[0].t < 2 * inset) continue; // Too short to hold an inset handle.
-    const label = `끝 조절 ${index + 1}`;
-    group.append(circle(object, linePointAt(object, t), action, 5, `rotate-handle end-handle${end.open ? ' is-open' : ''}`, label, '드래그하여 길이 조절 · 가장자리로 끌면 다시 이어짐', viewport));
+    if (!end || end.open) continue;
+    group.append(circle(object, linePointAt(object, end.t), action, 5, 'rotate-handle end-handle', `끝 조절 ${index + 1}`, '드래그하여 끝 위치 조절', viewport));
   }
   group.append(circle(object, editing.anchor, 'move', 5, 'move-handle', null, '드래그하여 이동', viewport));
   return group;

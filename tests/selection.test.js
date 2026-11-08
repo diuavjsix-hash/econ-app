@@ -8,6 +8,7 @@ import { createViewport, toScreen, toWorld } from '../src/graph/viewport.js';
 import { diagramState } from '../src/workspace.js';
 import { editorContext } from '../src/editor-ui.js';
 import { canDeleteSelection } from '../src/tools/selection.js';
+import { drawSegment, segmentEnds } from './fixtures/segments.js';
 
 const bounds={xMin:0,xMax:12,yMin:0,yMax:12};
 const region={xMin:4,xMax:6,yMin:4,yMax:6};
@@ -15,8 +16,8 @@ const region={xMin:4,xMax:6,yMin:4,yMax:6};
 test('rectangle selection touches visible strokes with anchors outside and excludes distant finite strokes and folders',()=>{
   const store=createStore(),line=store.addLine();store.updateSelected({slope:-1,anchor:{x:0,y:10}});
   const vertical=store.addLine();store.updateSelected({slope:null,anchor:{x:5,y:100}});
-  const point=store.addPoint({x:5,y:5}),dashed=store.addDashedLine({x:3,y:5},{x:7,y:5});
-  store.addDashedLine({x:0,y:5},{x:2,y:5});store.addPoint({x:9,y:9});store.addGroup();store.addRuler({x:4,y:5},{x:6,y:5});
+  const point=store.addPoint({x:5,y:5}),dashed=drawSegment(store,{x:3,y:5},{x:7,y:5});
+  drawSegment(store,{x:0,y:5},{x:2,y:5});store.addPoint({x:9,y:9});store.addGroup();store.addRuler({x:4,y:5},{x:6,y:5});
   assert.deepEqual(objectsInRectangle(store.getState(),region),[line,vertical,point,dashed]);
   assert.deepEqual(objectsInRectangle(store.getState(),{...region,xMax:4}),[]);
 });
@@ -33,12 +34,13 @@ test('rectangle selection includes exact basic curves, finite sketches, sums and
   assert.ok(!hits.includes(line));
 });
 
-test('axis-gap-hidden strokes do not select but visible points and finite dashed strokes inside the gap do',()=>{
+test('axis-gap-hidden strokes and segments do not select but visible points inside the gap do',()=>{
   const store=createStore();store.update({axisGapEnabled:true,axisGap:1});
   store.addLine();store.updateSelected({slope:1,anchor:{x:0,y:0}});
   store.addCurve({anchor:{x:0.4,y:0.4},span:2});
-  const point=store.addPoint({x:0.4,y:0.4}),dashed=store.addDashedLine({x:0.2,y:0.3},{x:0.6,y:0.3});
-  assert.deepEqual(objectsInRectangle(store.getState(),{xMin:0.1,xMax:0.7,yMin:0.1,yMax:0.7}),[point,dashed]);
+  // A segment is a line: like every line it is hidden inside the axis-gap band.
+  const point=store.addPoint({x:0.4,y:0.4});drawSegment(store,{x:0.2,y:0.3},{x:0.6,y:0.3});
+  assert.deepEqual(objectsInRectangle(store.getState(),{xMin:0.1,xMax:0.7,yMin:0.1,yMax:0.7}),[point]);
 });
 
 test('selection rectangles normalize both drag directions, clamp to the graph and work under reflected axes',()=>{

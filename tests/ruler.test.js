@@ -6,17 +6,17 @@ import { createViewport, toScreen, toWorld } from '../src/graph/viewport.js';
 import { serializeDocument } from '../src/export.js';
 import { objectsOf } from '../src/objects.js';
 
-test('ruler activation is disabled and point creation preference survives dashed-tool switches', () => {
+test('ruler activation is disabled and point creation preference survives line-tool switches', () => {
   const store = createStore();
   assert.equal(store.getState().activeTool, 'point');
   store.update({ rulerSelected: true }); assert.equal(store.getState().rulerSelected, false);
-  store.update({ mouseSelected: true }); store.update({ dashedSelected: true });
+  store.update({ mouseSelected: true }); store.update({ lineSelected: true });
   assert.equal(store.getState().mouseSelected, false); assert.equal(store.getState().activeTool, 'point');
-  store.update({ mouseSelected: true }); assert.equal(store.getState().dashedSelected, false);
-  store.update({ activeTool: 'select' }); store.update({ dashedSelected: true }); store.update({ mouseSelected: true });
+  store.update({ mouseSelected: true }); assert.equal(store.getState().lineSelected, false);
+  store.update({ activeTool: 'select' }); store.update({ lineSelected: true }); store.update({ mouseSelected: true });
   assert.equal(store.getState().activeTool, 'select');
-  const line=store.addLine(); store.update({dashedSelected:true}); store.selectObject(line);
-  assert.equal(store.getState().dashedSelected,false);
+  const line=store.addLine(); store.update({lineSelected:true}); store.selectObject(line);
+  assert.equal(store.getState().lineSelected,false);
 });
 
 test('ruler metrics use mathematical units and direction constraints preserve the starting point', () => {
@@ -80,7 +80,7 @@ test('JSON exports both endpoints and styles per diagram, without point guides o
   const store=createStore(); store.addPoint({x:1,y:2});
   const id=store.addRuler({x:1,y:2},{x:4,y:6});
   const document=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(document.schemaVersion,11); assert.equal(document.rulers[0].id,id);
+  assert.equal(document.schemaVersion,12); assert.equal(document.rulers[0].id,id);
   assert.deepEqual(document.rulers[0].end,{x:4,y:6});
   assert.equal(document.rulers[0].showMeasurement,true); assert.equal('guides' in document.points[0],false);
   assert.deepEqual(document.rulers,document.diagrams[0].rulers);

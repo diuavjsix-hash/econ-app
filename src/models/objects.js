@@ -152,7 +152,6 @@ export class SegmentObject extends StrokeObject {
   get copySlope() { const c = this.data; return c.end.x === c.anchor.x ? null : (c.end.y - c.anchor.y) / (c.end.x - c.anchor.x); }
   serialize() { return { ...super.serialize(), anchor: { ...this.data.anchor }, end: { ...this.data.end } }; }
 }
-export class DashedObject extends SegmentObject {}
 export class RulerObject extends SegmentObject {
   touchesRectangle() { return false; }
   highlightGeometry() { return null; }
@@ -199,7 +198,7 @@ export class GroupObject extends GraphObject {
   get serializedFields() { return ['id', 'type', 'name', 'parentId']; }
 }
 
-export const OBJECT_MODELS = assertRegistryContract({ line: LineObject, curve: CurveObject, sketch: SketchObject, sum: SumObject, point: PointObject, dashed: DashedObject, fill: FillObject, ruler: RulerObject, group: GroupObject }, OBJECT_TYPES);
+export const OBJECT_MODELS = assertRegistryContract({ line: LineObject, curve: CurveObject, sketch: SketchObject, sum: SumObject, point: PointObject, fill: FillObject, ruler: RulerObject, group: GroupObject }, OBJECT_TYPES);
 assertModelContract(AnalyticCurveObject);
 export function objectModel(data, collectionType = data?.type) {
   if (!data || !Object.hasOwn(OBJECT_MODELS, collectionType)) throw new TypeError(`Unknown graph object type: ${collectionType}`);

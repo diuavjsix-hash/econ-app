@@ -6,6 +6,7 @@ import { prepareDuplicate, DUPLICATABLE, placeCopiesNearby } from './duplicate.j
 import { validPoint, rulerMetrics } from './graph/ruler.js';
 import { LAYOUTS, normalizeSlots } from './layouts.js';
 import { normalizeSlope, directionOf } from './graph/math.js';
+import { LINE_KINDS, LINE_STYLES, lineFromPoints, lineKindOf } from './graph/line-extent.js';
 import { QUADRANT_MODES } from './graph/viewport.js';
 import { CURVE_PRESETS } from './graph/curve.js';
 import { canReparent, objectsOf } from './objects.js';
@@ -18,18 +19,20 @@ import { followBoxOrigin, defaultOppositeOrigin } from './graph/axes.js';
 import { validFill, fillKey } from './graph/fill.js';
 import { nextFillColor, nextFillLabel } from './graph/fill-style.js';
 
-const COLORS = ['#6068e8', '#e69451', '#43a999', '#cf7299', '#849353', '#699bd1'];
+import { INK, ROLE_COLORS, STROKE_CYCLE, sumColor } from './models/palette.js';
+
+const COLORS = STROKE_CYCLE;
 
 /** Internal mathematical coordinates; hierarchy only organizes objects. */
 export function createStore() {
   const state = {
     selectedIds: [],
     ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [],
-    ...toolModeFlags('hand'), fillColor: '#6068e8', fillAutoColor: true, fillOpacity: 0.24,
-    selectedId: null, indifferenceOpposite: false, sketchMode: 'auto', activeTool: 'point', rulerSelected: false, dashedMode: 'free', dashedSnap: true, pointSnap: true, pointCoordinates: false, showGrid: true,
+    ...toolModeFlags('hand'), fillColor: INK.blue, fillAutoColor: true, fillOpacity: 0.24,
+    selectedId: null, indifferenceOpposite: false, sketchMode: 'auto', activeTool: 'point', rulerSelected: false, segmentSnap: true, lineKind: 'line', lineStyle: 'solid', pointSnap: true, pointCoordinates: false, showGrid: true,
     quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
-  let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1, nextDashedId = 1;
+  let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1;
   let nextSumId = 1;
   let nextSketchId = 1;
   let nextFillId = 1;
@@ -118,8 +121,10 @@ export function createStore() {
     object.collapsed = false;
     state[collection].push(object);
     state.objectOrder.push(object.id);
+    // Every creation ends in the selection tool with the new object selected,
+    // so it can be moved or edited at once. Tools never stay armed after one result.
+    enterToolMode('hand');
     setSelection([object.id]);
-    if (['line', 'curve', 'sketch', 'sum'].includes(object.type)) enterToolMode('hand');
     emit();
     return object.id;
   };
@@ -196,8 +201,9 @@ export function createStore() {
       if (typeof patch.pointCoordinates === 'boolean') state.pointCoordinates = patch.pointCoordinates;
       // The ruler tool is intentionally disabled until its behavior is redesigned.
       state.rulerSelected = false;
-      if (typeof patch.dashedSnap === 'boolean') state.dashedSnap = patch.dashedSnap;
-      if (['free', 'horizontal', 'vertical'].includes(patch.dashedMode)) state.dashedMode = patch.dashedMode;
+      if (typeof patch.segmentSnap === 'boolean') state.segmentSnap = patch.segmentSnap;
+      if (LINE_KINDS.includes(patch.lineKind)) state.lineKind = patch.lineKind;
+      if (LINE_STYLES.includes(patch.lineStyle)) state.lineStyle = patch.lineStyle;
       if (Object.hasOwn(QUADRANT_MODES, patch.quadrantMode)) state.quadrantMode = patch.quadrantMode;
       if (['select', 'point'].includes(patch.activeTool)) state.activeTool = patch.activeTool;
       for (const axis of ['x', 'y']) {
@@ -218,7 +224,22 @@ export function createStore() {
     toggleToolMode(mode) {
       return this.setToolMode(toolModeOf(state) === mode ? 'hand' : mode);
     },
-    addLine() {
+    /**
+     * Without points: the default line of earlier versions. With two points: the line
+     * tool's result, anchored at the first point, as a line, ray or segment.
+     */
+    addLine(from, to, { kind = state.lineKind, style = state.lineStyle } = {}) {
+      if (from !== undefined || to !== undefined) {
+        if (!validPoint(from) || !validPoint(to)) return null;
+        const geometry = lineFromPoints(from, to, LINE_KINDS.includes(kind) ? kind : 'line');
+        if (!geometry) return null;
+        const index = nextId - 1, label = { line: '직선', ray: '반직선', segment: '선분' }[lineKindOf(geometry)];
+        const line = { id: `line-${nextId}`, type: 'line', name: `${label} ${String(nextId++).padStart(2, '0')}`,
+          anchor: geometry.anchor, slope: geometry.slope, color: COLORS[index % COLORS.length] };
+        if (geometry.extent) line.extent = geometry.extent;
+        if (style === 'dashed') line.style = 'dashed';
+        return add('lines', line);
+      }
       const index = nextId - 1;
       const box = state.quadrantMode === 'edgeworth' ? state.boxSize : null;
       return add('lines', {
@@ -258,7 +279,7 @@ export function createStore() {
         tangent:unitVector(tangent ?? (mode==='horizontal' ? {x:1,y:0} : mode==='vertical' ? {x:0,y:1} : {x:end.x-start.x,y:end.y-start.y})), leftReach:0.5, rightReach:0.5 };
       if (!validSketch(curve)) return null;
       const index=nextSketchId++;
-      return add('sketches',{...curve,id:`sketch-${index}`,type:'sketch',name:`자유 곡선 ${String(index).padStart(2,'0')}`,color:'#4c8e9a',
+      return add('sketches',{...curve,id:`sketch-${index}`,type:'sketch',name:`자유 곡선 ${String(index).padStart(2,'0')}`,color:ROLE_COLORS.sketch,
         binding:target ? {kind:'tangent',sourceId:target.id,parameter:projection.parameter,direction:directionOf(target.slope)}:null });
     },
     attachSelectedToLine(lineId) {
@@ -291,24 +312,16 @@ export function createStore() {
       endHistory();
       const index = nextSumId++;
       return add('sums', { id: `sum-${index}`, type: 'sum', name: `${direction === 'vertical' ? '수직합' : '수평합'} ${String(index).padStart(2, '0')}`,
-        direction, nonnegative: Boolean(nonnegative), sourceIds: [...sourceIds], color: ['#b67836', '#9b5eb5', '#257f96', '#ad5265'][(index - 1) % 4] });
+        direction, nonnegative: Boolean(nonnegative), sourceIds: [...sourceIds], color: sumColor(index - 1) });
     },
     addPoint(anchor) {
       if (!Number.isFinite(anchor?.x) || !Number.isFinite(anchor?.y)) return null;
       const index = nextPointId++;
       return add('points', {
         id: `point-${index}`, type: 'point', name: `점 ${String(index).padStart(2, '0')}`,
-        color: '#59627a', anchor: { x: anchor.x === 0 ? 0 : anchor.x, y: anchor.y === 0 ? 0 : anchor.y },
+        color: ROLE_COLORS.point, anchor: { x: anchor.x === 0 ? 0 : anchor.x, y: anchor.y === 0 ? 0 : anchor.y },
         showCoordinates: state.pointCoordinates,
       });
-    },
-    addDashedLine(anchor, end) {
-      if (!validPoint(anchor) || !validPoint(end)) return null;
-      const length = rulerMetrics({ anchor, end }).length;
-      if (!Number.isFinite(length) || length < 1e-8) return null;
-      const index = nextDashedId++;
-      return add('dashedLines', { id: `dashed-${index}`, type: 'dashed', name: `점선 ${String(index).padStart(2, '0')}`,
-        anchor: { ...anchor }, end: { ...end }, color: '#7b879c' });
     },
     addRuler(anchor, end) {
       if (!validPoint(anchor) || !validPoint(end)) return null;
@@ -316,11 +329,11 @@ export function createStore() {
       if (!Number.isFinite(length) || length < 1e-8) return null;
       const index = nextRulerId++;
       return add('rulers', { id: `ruler-${index}`, type: 'ruler', name: `자 ${String(index).padStart(2, '0')}`,
-        anchor: { ...anchor }, end: { ...end }, color: '#7b879c', style: 'solid', showMeasurement: true });
+        anchor: { ...anchor }, end: { ...end }, color: ROLE_COLORS.ruler, style: 'solid', showMeasurement: true });
     },
     addGroup() {
       const index = nextGroupId++;
-      return add('groups', { id: `group-${index}`, type: 'group', name: `폴더 ${String(index).padStart(2, '0')}`, color: '#949aab' });
+      return add('groups', { id: `group-${index}`, type: 'group', name: `폴더 ${String(index).padStart(2, '0')}`, color: ROLE_COLORS.group });
     },
     addFill(region) {
       if (!validFill(region)) return null;
@@ -329,7 +342,7 @@ export function createStore() {
         if (!state.fillAutoColor) existing.color = state.fillColor;
         existing.opacity = state.fillOpacity;
         state.fillAutoColor = true;
-        setSelection([existing.id]); emit(); return existing.id;
+        enterToolMode('hand'); setSelection([existing.id]); emit(); return existing.id;
       }
       const index = nextFillId++;
       const color = state.fillAutoColor ? nextFillColor(state.fills) : state.fillColor, label = nextFillLabel(state.fills);
@@ -386,13 +399,14 @@ export function createStore() {
       const ids = new Map();
       for (const object of copies) {
         const previous = object.id;
-        object.id = object.type === 'line' ? `line-${nextId++}` : object.type === 'curve' ? `curve-${nextCurveId++}` : object.type === 'sketch' ? `sketch-${nextSketchId++}` : object.type === 'point' ? `point-${nextPointId++}` : object.type === 'dashed' ? `dashed-${nextDashedId++}` : `group-${nextGroupId++}`;
+        object.id = object.type === 'line' ? `line-${nextId++}` : object.type === 'curve' ? `curve-${nextCurveId++}` : object.type === 'sketch' ? `sketch-${nextSketchId++}` : object.type === 'point' ? `point-${nextPointId++}` : `group-${nextGroupId++}`;
         ids.set(previous, object.id);
       }
       for (const object of copies) {
         object.parentId = ids.get(object.parentId) ?? object.parentId;
         state[OBJECT_TYPES[object.type].collection].push(object); state.objectOrder.push(object.id);
       }
+      enterToolMode('hand');
       setSelection([ids.get(source.id)]);
       historyRevision++;
       emit();

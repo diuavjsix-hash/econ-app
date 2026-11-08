@@ -2,22 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { snapFeedbackModel, snapFeedbackTargets } from '../src/graph/snap-feedback.js';
 import { SNAP_CAPTURE_PX, SNAP_RELEASE_PX } from '../src/graph/snap-policy.js';
-import { DASHED_CAPTURE_PX, DASHED_RELEASE_PX } from '../src/graph/dashed-magnets.js';
+import { SEGMENT_CAPTURE_PX, SEGMENT_RELEASE_PX } from '../src/graph/segment-magnets.js';
 import { TANGENT_CAPTURE_PX, TANGENT_RELEASE_PX } from '../src/graph/tangency.js';
 import { buildSnapTargets, snapPoint, SNAP_RADIUS } from '../src/graph/snap.js';
 import { snapSketchTangent } from '../src/graph/sketch-magnets.js';
 import { createViewport } from '../src/graph/viewport.js';
 import { createStore } from '../src/state.js';
 import { serializeDocument } from '../src/export.js';
+import { drawSegment, segmentEnds } from './fixtures/segments.js';
 
 const bounds={xMin:0,xMax:10,yMin:0,yMax:10},unit=50;
-const state={lines:[{id:'line-1',type:'line',anchor:{x:5,y:4},slope:null}],curves:[],sketches:[],sums:[],dashedLines:[],points:[],axisGapEnabled:false};
+const state={lines:[{id:'line-1',type:'line',anchor:{x:5,y:4},slope:null}],curves:[],sketches:[],sums:[],points:[],axisGapEnabled:false};
 const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,`${a} != ${b}`);
 
 test('point, dashed, tangency and sketch magnets obey one 16/24 pixel policy',()=>{
   assert.equal(SNAP_CAPTURE_PX,16);assert.equal(SNAP_RELEASE_PX,24);
-  assert.equal(SNAP_RADIUS,SNAP_CAPTURE_PX);assert.equal(DASHED_CAPTURE_PX,SNAP_CAPTURE_PX);assert.equal(TANGENT_CAPTURE_PX,SNAP_CAPTURE_PX);
-  assert.equal(DASHED_RELEASE_PX,SNAP_RELEASE_PX);assert.equal(TANGENT_RELEASE_PX,SNAP_RELEASE_PX);
+  assert.equal(SNAP_RADIUS,SNAP_CAPTURE_PX);assert.equal(SEGMENT_CAPTURE_PX,SNAP_CAPTURE_PX);assert.equal(TANGENT_CAPTURE_PX,SNAP_CAPTURE_PX);
+  assert.equal(SEGMENT_RELEASE_PX,SNAP_RELEASE_PX);assert.equal(TANGENT_RELEASE_PX,SNAP_RELEASE_PX);
   const targets=buildSnapTargets(state,bounds);
   const first=snapPoint({x:4.7,y:4},targets,unit);assert.ok(first);
   assert.equal(snapPoint({x:4.6,y:4},targets,unit),null);
@@ -78,7 +79,7 @@ test('shared feedback normalizes target ids and wording without changing geometr
 test('source highlights cover lines, axes, curves, sketches, sums, points and finite dashed geometry',()=>{
   const store=createStore(),line=store.addLine();store.updateSelected({slope:0,anchor:{x:3,y:3}});
   const second=store.addLine(),curve=store.addCurve(),sketch=store.addSketch({x:1,y:5},{x:7,y:5},{x:4,y:2});
-  const sum=store.addSum([line,second]),point=store.addPoint({x:3,y:3}),dashed=store.addDashedLine({x:2,y:2},{x:5,y:2});
+  const sum=store.addSum([line,second]),point=store.addPoint({x:3,y:3}),dashed=drawSegment(store,{x:2,y:2},{x:5,y:2});
   const ids=[line,curve,sketch,sum,point,dashed,'axis-x'];
   for(const flipX of [false,true])for(const flipY of [false,true]) {
     const view=createViewport(800,600,'first',{flipX,flipY}),targets=snapFeedbackTargets(ids,store.getState(),view);

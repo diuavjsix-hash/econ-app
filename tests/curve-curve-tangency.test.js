@@ -125,7 +125,7 @@ test('oblique tangencies solve both original parabola equations and derivatives 
       rightReach: 1.5 * Math.hypot(1, slope) / Math.hypot(end.x - 4, end.y - y), binding: null };
   };
   const target = parabola('sketch-1', 0.2, 4), moving = parabola('sketch-2', -0.3, 4.08);
-  const state = { lines: [], curves: [], sketches: [target, moving], points: [], sums: [], dashedLines: [], axisGapEnabled: false };
+  const state = { lines: [], curves: [], sketches: [target, moving], points: [], sums: [], axisGapEnabled: false };
   for (const axis of [null, 'x', 'y']) {
     const snap = snapCurveToCurveTangency(moving, state, bounds, unit, { axis }); assert.ok(snap);
     const x = snap.point.x, a = snap.anchor, targetY = 4 + 0.7 * (x - 4) + 0.2 * (x - 4) ** 2;

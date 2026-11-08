@@ -13,7 +13,7 @@ const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 const c={id:'curve-1',type:'curve',family:'ppc',anchor:{x:4/Math.SQRT2,y:3/Math.SQRT2},shape:1};
 const bounds={xMin:0,xMax:12,yMin:0,yMax:10};
 const onEllipse=(curve,p)=>{const r=ppcRadii(curve);close((p.x/r.x)**2+(p.y/r.y)**2,1);};
-const stateOf=curve=>({lines:[],curves:[curve],sketches:[],sums:[],points:[],dashedLines:[],axisGapEnabled:false});
+const stateOf=curve=>({lines:[],curves:[curve],sketches:[],sums:[],points:[],axisGapEnabled:false});
 
 test('PPC is a finite quarter ellipse with exact intercepts and inverse values',()=>{
   for (const x of [0,0.2,1,2.4,4]) {

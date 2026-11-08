@@ -6,6 +6,7 @@ import { createStore } from '../src/state.js';
 import { serializeDocument } from '../src/export.js';
 import { sketchControls, quadraticPoint } from '../src/graph/sketch.js';
 import { snapLineToTangency } from '../src/graph/tangency.js';
+import { segmentLine } from './fixtures/segments.js';
 
 const bounds = { xMin: 0, xMax: 10, yMin: 0, yMax: 10 };
 const state = (lines = [], curves = []) => ({ lines, curves });
@@ -111,13 +112,13 @@ test('toggling snap changes only the tool preference, and snapped coordinates re
   assert.equal(store.getState().selectedId, id);
   close(store.getState().points[0].anchor, { x: 4, y: 4 });
   const exported = serializeDocument(store.getState());
-  assert.equal(exported.schemaVersion, 11);
+  assert.equal(exported.schemaVersion, 12);
   assert.equal('pointSnap' in exported, false);
   close(exported.points[0].anchor, { x: 4, y: 4 });
 });
 
-test('finite dashed strokes participate in snapping without extending and exclude their own segment', () => {
-  const measured = { lines: [], curves: [], points: [], dashedLines: [{id:'dashed-1',anchor:{x:2,y:4.3},end:{x:6,y:4.3}}] };
+test('finite segments participate in snapping without extending and exclude their own segment', () => {
+  const measured = { lines: [segmentLine('dashed-1',{x:2,y:4.3},{x:6,y:4.3})], curves: [], points: [] };
   const snapped = snapPoint({x:3,y:4.4},buildSnapTargets(measured,bounds),56);
   assert.equal(snapped.kind,'shape'); close(snapped.point,{x:3,y:4.3});
   assert.equal(snapPoint({x:8,y:4.3},buildSnapTargets(measured,bounds),56),null);
@@ -190,7 +191,7 @@ test('exact free-curve line intersections retain both crossings and reject hidde
 test('axis-gap-hidden tangencies and coincident straight free pieces create no point magnets',()=>{
   const store=createStore();store.addSketch({x:1,y:5},{x:7,y:5},{x:4,y:1},{mode:'horizontal'});
   store.addLine();store.updateSelected({slope:0,anchor:{x:4,y:1}});store.update({axisGapEnabled:true,axisGap:2});
-  assert.equal(buildSnapTargets(store.getState(),bounds).crossings.some(c=>c.ids.includes('sketch-1')),false);
+  assert.equal(buildSnapTargets(store.getState(),bounds).crossings.some(c=>c.ids.includes('sketch-1')&&c.kind!=='endpoint'),false); // only its drawn ends
   const flat=createStore();flat.addSketch({x:1,y:3},{x:7,y:3},{x:4,y:3},{mode:'horizontal'});
   flat.addLine();flat.updateSelected({slope:0,anchor:{x:4,y:3}});
   assert.equal(buildSnapTargets(flat.getState(),bounds).crossings.some(c=>c.ids.includes('sketch-1')&&c.ids.includes('line-1')),false);

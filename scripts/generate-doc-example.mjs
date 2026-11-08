@@ -29,7 +29,7 @@ const point = store.addPoint({ x: 5, y: 3 });
 store.moveObject(point, group);
 const through = store.lineThroughSelectedPoint({ slope: 1 });
 store.moveObject(through, point);
-store.addDashedLine({ x: 4, y: 0 }, { x: 4, y: 2 });
+store.setToolMode('line'); store.addLine({ x: 4, y: 0 }, { x: 4, y: 2 }, { kind: 'segment', style: 'dashed' }); // a dashed guide segment
 store.updateSelected({ name: '독립 점선' });
 for (const family of ['cobb-douglas','substitutes','complements','quasilinear']) store.addIndifference(family);
 store.addIndifference('rectangular-hyperbola', { anchor: { x: 3, y: 4 } });
@@ -42,7 +42,7 @@ store.addLine();
 store.updateSelected({ name: '점선 반직선', slope: 0, anchor: { x: 2, y: 4 }, extent: [0, null], style: 'dashed' });
 store.selectDiagram(first.id);
 
-const output = new URL('../docs/examples/editor-v11.json', import.meta.url);
+const output = new URL('../docs/examples/editor-v12.json', import.meta.url);
 await mkdir(new URL('../docs/examples/', import.meta.url), { recursive: true });
 await writeFile(output, `${JSON.stringify(serializeDocument(store.getState()), null, 2)}\n`);
-console.log('Generated docs/examples/editor-v11.json');
+console.log('Generated docs/examples/editor-v12.json');

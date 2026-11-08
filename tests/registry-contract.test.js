@@ -11,6 +11,7 @@ import { serializeDocument } from '../src/export.js';
 import { createViewport } from '../src/graph/viewport.js';
 import { buildSnapTargets } from '../src/graph/snap.js';
 import { geometryKey } from '../src/graph/snap-context.js';
+import { drawSegment, segmentEnds } from './fixtures/segments.js';
 
 const activeFlags = state => TOOL_MODE_FLAGS.filter(flag => state[flag]);
 
@@ -35,7 +36,7 @@ test('every registered tool mode is exclusive, toggles back to selection and dri
 });
 
 test('legacy flag patches map to one mode with the same precedence and exit rule', () => {
-  assert.equal(requestedToolMode({ dashedSelected: true }, 'hand'), 'dashed');
+  assert.equal(requestedToolMode({ lineSelected: true }, 'hand'), 'line');
   assert.equal(requestedToolMode({ mouseSelected: true, handSelected: true }, 'fill'), 'hand');
   assert.equal(requestedToolMode({ fillSelected: false }, 'fill'), 'hand');
   assert.equal(requestedToolMode({ fillSelected: false }, 'point'), null, 'closing another mode keeps the current one');
@@ -47,12 +48,11 @@ test('legacy flag patches map to one mode with the same precedence and exit rule
 
 test('each mode keeps or clears the selection through its own registered rule', () => {
   const store = createStore();
-  const line = store.addLine(), point = store.addPoint({ x: 1, y: 1 }), dashed = store.addDashedLine({ x: 1, y: 2 }, { x: 3, y: 2 });
+  const line = store.addLine(), point = store.addPoint({ x: 1, y: 1 }), dashed = drawSegment(store,{ x: 1, y: 2 }, { x: 3, y: 2 });
   const selectThen = (id, mode) => { store.selectObject(id); store.setToolMode(mode); return store.getState().selectedIds; };
   assert.deepEqual(selectThen(line, 'point'), []);
   assert.deepEqual(selectThen(point, 'point'), [point]);
-  assert.deepEqual(selectThen(dashed, 'dashed'), [dashed]);
-  assert.deepEqual(selectThen(line, 'dashed'), []);
+  assert.deepEqual(selectThen(dashed, 'line'), [], 'the line tool starts without a selection');
   assert.deepEqual(selectThen(line, 'sketch'), []);
   assert.deepEqual(selectThen(line, 'duplicate'), [line]);
   store.setToolMode('hand'); store.selectObjects([line, point]); store.setToolMode('sum');
@@ -76,7 +76,7 @@ function storeWithEveryStroke() {
   const line = store.addLine(); store.addCurve();
   store.addSketch({ x: 1, y: 6 }, { x: 7, y: 6 }, { x: 4, y: 2 });
   store.addSum([line, store.addLine()]);
-  store.addDashedLine({ x: 1, y: 3 }, { x: 6, y: 3 });
+  drawSegment(store,{ x: 1, y: 3 }, { x: 6, y: 3 });
   store.addPoint({ x: 2, y: 2 }); store.addGroup();
   return store;
 }
@@ -128,7 +128,7 @@ test('every creation mode registers one pointer controller with a draft layer co
   const creation = Object.keys(TOOL_MODES).filter(mode => TOOL_MODES[mode].kind === 'creation').sort();
   assert.deepEqual(Object.keys(CREATION_TOOLS).sort(), creation);
   class Silent extends CreationTool {}
-  class Undrawn extends CreationTool { get slot() { return 'dashed'; } pointerDown() { return true; } }
+  class Undrawn extends CreationTool { get slot() { return 'lines'; } pointerDown() { return true; } }
   assert.throws(() => assertCreationTools({ ...CREATION_TOOLS, extra: new Silent() }), /must register/);
   assert.throws(() => assertCreationTools({ ...CREATION_TOOLS, point: new Silent() }), /pointerDown/);
   assert.throws(() => assertCreationTools({ ...CREATION_TOOLS, point: new Undrawn() }), /draw its draft layer/);

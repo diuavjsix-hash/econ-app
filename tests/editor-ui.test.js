@@ -5,11 +5,11 @@ import { editorContext } from '../src/editor-ui.js';
 import { serializeDocument } from '../src/export.js';
 
 test('only one drawing or operation mode remains active, including sum; navigation adds no history',()=>{
-  const store=createStore(), modes=['handSelected','mouseSelected','dashedSelected','sketchSelected','duplicatePanel','sumPanel'];
+  const store=createStore(), modes=['handSelected','mouseSelected','lineSelected','sketchSelected','duplicatePanel','sumPanel'];
   for(const key of [...modes,'mouseSelected','sumPanel','handSelected']) {
     store.update({[key]:true});const state=store.getState();
     assert.equal(modes.filter(mode=>state[mode]).length,1,key);assert.equal(state[key],true);
-    assert.equal(state.canUndo,false);assert.equal(state.pointSnap,true);assert.equal(state.dashedSnap,true);
+    assert.equal(state.canUndo,false);assert.equal(state.pointSnap,true);assert.equal(state.segmentSnap,true);
   }
 });
 
@@ -27,12 +27,12 @@ test('inspector follows the current task and object, then returns from sum to th
 
 test('changing diagrams exits an operation and preserves drawing preferences and document serialization',()=>{
   const store=createStore();store.configureLayout('face2');store.addLine();
-  store.update({pointSnap:false,dashedSnap:false});const original=serializeDocument(store.getState());
+  store.update({pointSnap:false,segmentSnap:false});const original=serializeDocument(store.getState());
   store.update({sumPanel:true});assert.deepEqual(serializeDocument(store.getState()),original);
   const second=store.getState().diagrams[1].id;store.selectDiagram(second);
   assert.equal(store.getState().sumPanel,false);assert.equal(store.getState().handSelected,true);
   store.update({duplicatePanel:true});store.selectDiagram(store.getState().diagrams[0].id);
-  assert.equal(store.getState().duplicatePanel,false);assert.equal(store.getState().pointSnap,false);assert.equal(store.getState().dashedSnap,false);
+  assert.equal(store.getState().duplicatePanel,false);assert.equal(store.getState().pointSnap,false);assert.equal(store.getState().segmentSnap,false);
 });
 
 test('explicit rising and falling curve commands create the requested shape in a single undo step',()=>{

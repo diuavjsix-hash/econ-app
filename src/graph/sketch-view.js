@@ -1,10 +1,11 @@
+import { ROLE_COLORS } from '../models/palette.js';
 import { displayedSketchSegments, sketchHandlePoints } from './sketch.js';
 import { isLinePointVisible } from './display.js';
 import { toScreen } from './viewport.js';
 import { STROKE_RENDERER } from './svg-renderer.js';
 const node=(...args)=>STROKE_RENDERER.element(...args);
 export function drawSketch(curve, viewport, state, {selected=false, editable=false, clipId, preview=false, handlesOnly=false}={}) {
-  const group=node('g',{class:handlesOnly?'sketch-handles':preview?'sketch-draft':'graph-sketch',style:`--line-color:${curve.color??'#4c8e9a'}`});
+  const group=node('g',{class:handlesOnly?'sketch-handles':preview?'sketch-draft':'graph-sketch',style:`--line-color:${curve.color??ROLE_COLORS.sketch}`});
   const d=STROKE_RENDERER.pathData(displayedSketchSegments(curve,viewport.bounds,state),viewport);
   if (!handlesOnly) STROKE_RENDERER.append(group,curve,d,{selected,clipId,interactive:!preview});
   if (!selected || !editable || preview) return group;

@@ -11,7 +11,7 @@ import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
 const bounds={xMin:0,xMax:16,yMin:0,yMax:16};
 const close=(a,b,tolerance=1e-8)=>assert.ok(Math.abs(a-b)<tolerance,`${a} != ${b}`);
 const curve=(family,extra={})=>({id:'curve-1',type:'curve',family,anchor:{x:3,y:4},shape:1.4,linearAxis:'y',...extra});
-const stateOf=c=>({lines:[],curves:[c],sketches:[],sums:[],points:[],dashedLines:[],axisGapEnabled:false});
+const stateOf=c=>({lines:[],curves:[c],sketches:[],sums:[],points:[],axisGapEnabled:false});
 
 test('Cobb-Douglas movement is a homothety about the origin, including a grab away from the anchor',()=>{
   const c=curve('cobb-douglas'),start={x:2,y:indifferenceValue(c,2)},point={x:start.x*1.7,y:start.y*1.7};
@@ -133,7 +133,7 @@ test('creation, preference edits, repeated copies, history, graph isolation, del
     assert.deepEqual(store.getState().curves.find(c=>c.id===id),original);
     assert.equal(before.family,family);
   }
-  const doc=serializeDocument(store.getState());assert.equal(doc.schemaVersion,11);
+  const doc=serializeDocument(store.getState());assert.equal(doc.schemaVersion,12);
   assert.equal(doc.curves.length,3*Object.keys(INDIFFERENCE_FAMILIES).length);assert.deepEqual(doc.curves,doc.diagrams[0].curves);
   assert.ok(!JSON.stringify(doc).includes('quadratic-bezier'));
   for (const c of JSON.parse(JSON.stringify(doc)).curves) assert.ok(Number.isFinite(c.anchor.x) && Number.isFinite(c.anchor.y) && Number.isFinite(c.shape));

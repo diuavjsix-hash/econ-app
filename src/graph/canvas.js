@@ -3,7 +3,6 @@ import { renderEditingHandles } from './editing-handles.js';
 import { SVG_RENDERER, STROKE_RENDERER } from './svg-renderer.js';
 import { objectModel } from '../models/objects.js';
 import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions } from './display.js';
-import { drawDashedLine } from './dashed-view.js';
 import { createViewport, toScreen as projectPoint, toWorld } from './viewport.js';
 import { pointCoordinatesLabel } from './point.js';
 import { SnapTargetCache, snapPoint } from './snap.js';
@@ -14,7 +13,7 @@ import { distance, displayedSketchMinimum } from './sketch.js';
 import { drawSketch } from './sketch-view.js';
 import { axisAlignedSnap } from './movement.js';
 import { selectionRectangle, objectsInRectangle } from './selection.js';
-import { snapDashedPoint } from './dashed-magnets.js';
+import { snapSegmentPoint } from './segment-magnets.js';
 import { buildFillRegions, fillLabelPosition } from './fill.js';
 import { renderSnapFeedback } from './snap-feedback.js';
 import { CREATION_TOOLS } from './creation-tools.js';
@@ -34,7 +33,7 @@ export function mountGraph(container, store) {
   let marquee = null;
   let snapTarget = null;
   let tangentSnap = null;
-  let dashedSnap = null;
+  let segmentSnap = null;
   let pointer = null;
   const snapCache = new SnapTargetCache();
   let fillCache = { signature: '', regions: [] };
@@ -67,25 +66,26 @@ export function mountGraph(container, store) {
     layer.append(element('text', { x: point.x, y: point.y, 'font-size': size, 'text-anchor': 'middle', 'dominant-baseline': 'central',
       class: 'fill-label', 'data-fill-label': cacheId, 'aria-hidden': 'true' }, fill.label));
   }
-  function dashedTargets() {
+  function segmentTargets() {
     return snapCache.get(currentState, viewport.bounds, drag?.object.id ?? null);
   }
-  function dashedOptions(event, axis = null) {
-    return { axis, previous: dashedSnap, enabled: currentState.dashedSnap, altKey: event.altKey,
+  function segmentOptions(event, axis = null) {
+    return { axis, previous: segmentSnap, enabled: currentState.segmentSnap, altKey: event.altKey,
       points: currentState.points, bounds: viewport.bounds };
   }
-  function dashedPosition(point, event, axis = null) {
-    dashedSnap = snapDashedPoint(point, dashedTargets(), viewport.unit, dashedOptions(event, axis));
-    snapTarget = dashedSnap;
-    return dashedSnap?.point ?? point;
+  function segmentPosition(point, event, axis = null) {
+    segmentSnap = snapSegmentPoint(point, segmentTargets(), viewport.unit, segmentOptions(event, axis));
+    snapTarget = segmentSnap;
+    return segmentSnap?.point ?? point;
   }
 
   function snappedPosition(point, event, axis=null) {
     const previous=snapTarget;
     snapTarget = null;
     const { bounds } = viewport;
-    const snapping = currentState.dashedSelected || drag?.object.type === 'dashed' ? currentState.dashedSnap : currentState.pointSnap;
-    if (currentState.dashedSelected || drag?.object.type === 'dashed') return dashedPosition(point, event);
+    // The two-point line tool uses the segment snap and its toggle.
+    if (currentState.lineSelected) return segmentPosition(point, event);
+    const snapping = currentState.pointSnap;
     if (!snapping || event.altKey || point.x < bounds.xMin || point.x > bounds.xMax || point.y < bounds.yMin || point.y > bounds.yMax) return point;
     snapTarget = snapPoint(point, snapCache.get(currentState, bounds, drag?.object.id ?? null), viewport.unit,{previous,axis});
     return snapTarget?.point ?? point;
@@ -104,8 +104,7 @@ export function mountGraph(container, store) {
     svg.classList.toggle('has-mouse-cursor',Boolean(visible));
     let candidate=null,point=position,coordinates=false;
     if (drag) {
-      if (drag.object.type==='dashed') candidate=dashedSnap;
-      else if (drag.object.type==='line'&&Object.hasOwn(LINE_END_ACTIONS,drag.action)) {candidate=tangentSnap;coordinates=true;}
+      if (drag.object.type==='line'&&Object.hasOwn(LINE_END_ACTIONS,drag.action)) {candidate=tangentSnap;coordinates=true;}
       else if (['line','curve','sketch'].includes(drag.object.type)&&(drag.action==='move'||drag.object.type==='line'&&drag.action==='rotate')) candidate=tangentSnap;
       else if (drag.object.type==='point'||['sketch-start','sketch-end','sketch-middle'].includes(drag.action)) {candidate=snapTarget;coordinates=true;}
     } else if (inside&&drawingPointer) {
@@ -116,13 +115,13 @@ export function mountGraph(container, store) {
     }
     if (candidate&&drag) {
       const object=objectsOf(currentState).find(object=>object.id===drag.object.id);
-      const key=drag.object.type==='point'?'anchor':drag.object.type==='dashed'&&drag.action!=='move'?(drag.action==='start'?'anchor':'end')
+      const key=drag.object.type==='point'?'anchor'
         :['sketch-start','sketch-end','sketch-middle'].includes(drag.action)?(drag.action==='sketch-middle'?'anchor':drag.action.slice(7)):null;
       // Relations or validation may reject a handle move. Never show a match the shape did not adopt.
       if (key&&object?.[key]&&distance(object[key],candidate.point)>1e-8) candidate=null;
     }
     if (!candidate&&visible&&!drag) candidate={kind:'free',point:point??worldPoint(pointer)};
-    for (const line of svg.querySelectorAll('.graph-dashed')) line.classList.toggle('is-snapped',Boolean(candidate&&candidate.kind!=='free'&&(line.classList.contains('dashed-preview')||line.dataset.dashedId===drag?.object.id)));
+    for (const line of svg.querySelectorAll('.line-draft')) line.classList.toggle('is-snapped',Boolean(candidate&&candidate.kind!=='free'));
     svg.querySelector('.sketch-draft')?.classList.toggle('is-snapped',Boolean(candidate&&candidate.kind!=='free'&&currentState.sketchSelected));
     renderSnapFeedback(layer,candidate,{state:currentState,viewport,clipId,coordinates});
   }
@@ -235,8 +234,7 @@ export function mountGraph(container, store) {
         groupClass:'graph-sum',selected:selectedIds.has(sum.id),clipId:lineClipId,action:'select',title:`${sum.name} · 원본을 수정하면 자동 갱신`,
       }));
     }
-    for (const ruler of currentState.dashedLines) svg.append(drawDashedLine(ruler, viewport, { selected: selectedIds.has(ruler.id), editable: currentState.handSelected && selectedIds.size===1, clipId }));
-    appendCreationLayers('dashed');
+    appendCreationLayers('lines');
     const pointLayer = element('g', { class: 'graph-points' });
     svg.append(pointLayer);
     for (const sketch of currentState.sketches) {
@@ -310,9 +308,9 @@ export function mountGraph(container, store) {
   }
   const creationContext = {
     get state() { return currentState; }, get viewport() { return viewport; }, get pointer() { return pointer; },
-    get snapTarget() { return snapTarget; }, get dashedSnap() { return dashedSnap; }, store, clipId,
-    setDashedSnap(value) { dashedSnap = value; },
-    worldPoint: event => worldPoint(event), snappedPosition: (...args) => snappedPosition(...args), dashedPosition: (...args) => dashedPosition(...args),
+    get snapTarget() { return snapTarget; }, get segmentSnap() { return segmentSnap; }, store, clipId,
+    setSegmentSnap(value) { segmentSnap = value; },
+    worldPoint: event => worldPoint(event), snappedPosition: (...args) => snappedPosition(...args), segmentPosition: (...args) => segmentPosition(...args),
     inside: point => point.x >= viewport.bounds.xMin && point.x <= viewport.bounds.xMax && point.y >= viewport.bounds.yMin && point.y <= viewport.bounds.yMax,
     capturePointer: id => svg.setPointerCapture(id),
     releasePointer: id => { if (id != null && svg.hasPointerCapture(id)) svg.releasePointerCapture(id); },
@@ -330,12 +328,12 @@ export function mountGraph(container, store) {
     return aligned;
   }
   function interactionContext() {
-    return {state:currentState,viewport,snappedMove,dashedPosition,dashedTargets,snapTargets:dashedTargets,dashedOptions,tangentSnap};
+    return {state:currentState,viewport,snappedMove,segmentPosition,segmentTargets,snapTargets:segmentTargets,segmentOptions,tangentSnap};
   }
   function applyInteraction(result) {
     if (!result) return;
     if (Object.hasOwn(result,'tangentSnap')) tangentSnap=result.tangentSnap;
-    if (Object.hasOwn(result,'dashedSnap')) dashedSnap=result.dashedSnap;
+    if (Object.hasOwn(result,'segmentSnap')) segmentSnap=result.segmentSnap;
     if (result.patch) store.updateSelected(result.patch);
   }
   function worldPoint(event) {
@@ -395,7 +393,7 @@ export function mountGraph(container, store) {
     if (!anchor) return;
     const startPatch=controller.startPatch(object,anchor);
     drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), object: { ...structuredClone(object), ...startPatch } };
-    dashedSnap = null;
+    segmentSnap = null;
     snapTarget = null; tangentSnap = null;
     store.beginHistory();
     event.preventDefault();
@@ -430,7 +428,7 @@ export function mountGraph(container, store) {
   const stopDrag = (event) => {
     const creation = activeCreation();
     if (event.type==='pointercancel'&&!drag) {
-      pointer=null;snapTarget=null;dashedSnap=null;
+      pointer=null;snapTarget=null;segmentSnap=null;
       creation?.tool.clearHover(creation.session,creationContext);updateSnapFeedback();
     }
     if (marquee?.pointerId===event.pointerId) {
@@ -448,7 +446,7 @@ export function mountGraph(container, store) {
     drag = null;
     snapTarget = null;
     tangentSnap = null;
-    dashedSnap = null;
+    segmentSnap = null;
     svg.classList.remove('is-dragging');
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
     store.endHistory();
@@ -457,7 +455,7 @@ export function mountGraph(container, store) {
   svg.addEventListener('pointerenter', (event) => { pointer = event; updateSnapFeedback(); });
   svg.addEventListener('pointerleave', () => {
     if (drag || marquee) return;
-    pointer = null; dashedSnap=null; snapTarget=null;
+    pointer = null; segmentSnap=null; snapTarget=null;
     const creation = activeCreation();
     creation?.tool.clearHover(creation.session, creationContext);
     updateSnapFeedback();
@@ -490,10 +488,10 @@ export function mountGraph(container, store) {
   const unsubscribe = store.subscribe((state) => {
     if (state.historyRevision!==currentState.historyRevision || state.activeDiagramId!==currentState.activeDiagramId
       ||toolModeOf(state)!==toolModeOf(currentState)||state.pointSnap!==currentState.pointSnap) {
-      snapTarget=null;tangentSnap=null;dashedSnap=null;
+      snapTarget=null;tangentSnap=null;segmentSnap=null;
     }
     if (state.historyRevision !== currentState.historyRevision || state.activeDiagramId !== currentState.activeDiagramId
-      || state.dashedMode !== currentState.dashedMode || state.dashedSelected !== currentState.dashedSelected || !state.dashedSnap) dashedSnap = null;
+      || !state.segmentSnap) segmentSnap = null;
     if (marquee && (!state.handSelected || state.historyRevision!==currentState.historyRevision)) cancelMarquee(false);
     // Every tool drops its own stale draft, including tools that were just switched off.
     for (const [mode, tool] of Object.entries(CREATION_TOOLS)) tool.sync(creationSessions[mode], state, currentState, creationContext);

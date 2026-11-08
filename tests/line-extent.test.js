@@ -6,7 +6,8 @@ import { objectModel } from '../src/models/objects.js';
 import { displayedLineSegments } from '../src/graph/display.js';
 import { lineEndPoints, linePointAt, rebasedExtent, visibleLineEnds } from '../src/graph/line-extent.js';
 import { buildSnapTargets, snapPoint, SnapTargetCache } from '../src/graph/snap.js';
-import { snapDashedPoint, snapMovingDashed } from '../src/graph/dashed-magnets.js';
+import { snapSegmentPoint } from '../src/graph/segment-magnets.js';
+import { snapMovingSegment } from './fixtures/segments.js';
 import { snapLineToIntercept } from '../src/graph/intercepts.js';
 import { snapShapeToPoint } from '../src/graph/point-magnets.js';
 import { snapSketchTangent } from '../src/graph/sketch-magnets.js';
@@ -49,9 +50,10 @@ test('an untrimmed line is unchanged; a trimmed one draws only its stored part, 
   store.updateSelected({ extent: [null, null] }); assert.equal(lineOf(store, vertical).extent, undefined, 'both ends open is an ordinary line');
 });
 
-test('dragging an end meets crossings, axes, points and other ends exactly; the edge opens it again', () => {
+test('dragging a drawn end meets crossings, axes, points and other ends exactly; it never reopens', () => {
   const store = createStore();
-  const a = addLine(store, 1, { x: 2, y: 2 }), b = addLine(store, -1, { x: 5, y: 3 });
+  // Segments drawn with the line tool; only drawn ends have handles.
+  const a = addLine(store, 1, { x: 2, y: 2 }, { extent: [-2, 6] }), b = addLine(store, -1, { x: 5, y: 3 }, { extent: [-6, 6] });
   // Crossing with another line: both ends land on the same exact point.
   let result = dragEnd(store, a, 'line-to', { x: 4.1, y: 4.15 });
   assert.equal(snapFeedbackModel(result.tangentSnap).label, '교점 맞춤'); assert.ok(result.tangentSnap.ids.includes(b));
@@ -62,16 +64,21 @@ test('dragging an end meets crossings, axes, points and other ends exactly; the 
   result = dragEnd(store, b, 'line-to', { x: 8.1, y: -0.05 });
   assert.equal(snapFeedbackModel(result.tangentSnap).label, 'x절편'); close(lineEndPoints(lineOf(store, b))[1], { x: 8, y: 0 }, 1e-12);
   // A point already on the line.
-  const c = addLine(store, 0, { x: 0, y: 7 }), point = store.addPoint({ x: 6, y: 7 });
+  const c = addLine(store, 0, { x: 0, y: 7 }, { extent: [-1, 9.5] }), point = store.addPoint({ x: 6, y: 7 });
   result = dragEnd(store, c, 'line-to', { x: 6.1, y: 7.2 });
   assert.equal(result.tangentSnap.kind, 'point'); assert.deepEqual(result.tangentSnap.ids, [point]);
   close(lineEndPoints(lineOf(store, c))[1], { x: 6, y: 7 }, 1e-12);
-  // Held inside 24px, released beyond, Alt bypasses, and the edge opens the end.
+  // Held inside 24px, released beyond, Alt bypasses; at the edge the end stays drawn, in view.
   const held = dragEnd(store, c, 'line-to', { x: 6 + 20 / unit, y: 7 }, {}, result.tangentSnap);
   assert.equal(held.tangentSnap?.kind, 'point');
   assert.equal(dragEnd(store, c, 'line-to', { x: 6 + 30 / unit, y: 7 }, {}, result.tangentSnap).tangentSnap, null);
   dragEnd(store, c, 'line-to', { x: 6.05, y: 7 }, { altKey: true }); close(lineEndPoints(lineOf(store, c))[1], { x: 6.05, y: 7 }, 1e-12);
-  dragEnd(store, c, 'line-to', { x: 9.9, y: 7 }); assert.equal(lineOf(store, c).extent, undefined, 'dragging to the edge continues the line again');
+  dragEnd(store, c, 'line-to', { x: 9.9, y: 7 }); close(lineEndPoints(lineOf(store, c))[1], { x: 9.9, y: 7 }, 1e-12);
+  dragEnd(store, c, 'line-to', { x: 30, y: 7 }); close(lineEndPoints(lineOf(store, c))[1], { x: 10, y: 7 }, 1e-12);
+  // An open end has no handle and dragging it changes nothing: the kind changes only in the settings.
+  const open = addLine(store, 0.5, { x: 1, y: 1 }), line = lineOf(store, open);
+  assert.equal(interactionFor(line).canDrag(line, 'line-to'), false);
+  assert.deepEqual(dragEnd(store, open, 'line-to', { x: 5, y: 3 }), { tangentSnap: null }); assert.equal(lineOf(store, open).extent, undefined);
   // The two ends never cross.
   dragEnd(store, c, 'line-from', { x: 5, y: 7 }, { altKey: true }); dragEnd(store, c, 'line-to', { x: 2, y: 7 }, { altKey: true });
   const [from, to] = lineOf(store, c).extent; assert.ok(to - from >= 24 / unit - 1e-12);
@@ -80,12 +87,12 @@ test('dragging an end meets crossings, axes, points and other ends exactly; the 
 test('a trimmed end is a shared point target for every point and dashed consumer, excluded while editing its own line', () => {
   const store = createStore(), id = addLine(store, 1, { x: 2, y: 2 }, { extent: [null, 2 * Math.SQRT2] }), end = { x: 4, y: 4 };
   const targets = buildSnapTargets(store.getState(), bounds), pointer = { x: 4.12, y: 3.95 };
-  for (const result of [snapPoint(pointer, targets, unit), snapDashedPoint(pointer, targets, unit)]) {
+  for (const result of [snapPoint(pointer, targets, unit), snapSegmentPoint(pointer, targets, unit)]) {
     assert.equal(result.kind, 'endpoint'); assert.equal(snapFeedbackModel(result).label, '끝점 맞춤'); close(result.point, end, 1e-12);
   }
   for (const endpoint of ['anchor', 'end']) {
     const segment = endpoint === 'anchor' ? { anchor: pointer, end: { x: 8, y: 1 } } : { anchor: { x: 8, y: 1 }, end: pointer };
-    const moved = snapMovingDashed(segment, targets, unit, { bounds });
+    const moved = snapMovingSegment(segment, targets, unit, { bounds });
     assert.equal(moved.kind, 'endpoint'); close(moved.geometry[endpoint], end, 1e-12);
   }
   // Past the trimmed end there is nothing to snap to on this line.
@@ -152,14 +159,53 @@ test('fills follow the drawn part, sums exclude trimmed lines, and copies keep e
   assert.equal(serializeDocument(store.getState()).lines.find(l => l.id === flat).style, 'dashed');
 });
 
-test('end handles sit on drawn ends or just inside the edge, and the keyboard trims and reopens', () => {
+test('the keyboard moves only drawn ends, inside the view, and never trims or reopens a line', () => {
   const store = createStore(), id = addLine(store, 0, { x: 3, y: 5 }), line = lineOf(store, id);
   const ends = visibleLineEnds(line, bounds, store.getState());
   assert.ok(ends.ends.every(end => end.open)); close(ends.ends[1].point, { x: 10, y: 5 });
   const handler = interactionFor(line), ctx = ctxFor(store, id);
-  assert.equal(handler.keyboard(line, 'line-to', { key: 'ArrowRight' }, ctx).patch.extent[1], null, 'past the edge stays open');
-  const trimmed = handler.keyboard(line, 'line-to', { key: 'ArrowLeft', shiftKey: true }, ctx).patch.extent;
-  store.updateSelected({ extent: trimmed }); close(lineEndPoints(lineOf(store, id))[1], { x: 9, y: 5 });
-  const reopened = visibleLineEnds(lineOf(store, id), bounds, store.getState());
-  assert.equal(reopened.ends[1].open, false); assert.deepEqual(rebasedExtent(lineOf(store, id), { x: 9, y: 5 })[1], 0);
+  assert.equal(handler.keyboard(line, 'line-to', { key: 'ArrowLeft', shiftKey: true }, ctx), null, 'an open end is not trimmed');
+  store.updateSelected({ extent: [null, 6] });
+  const segment = lineOf(store, id);
+  const moved = handler.keyboard(segment, 'line-to', { key: 'ArrowLeft', shiftKey: true }, ctxFor(store, id)).patch.extent;
+  store.updateSelected({ extent: moved }); close(lineEndPoints(lineOf(store, id))[1], { x: 8, y: 5 });
+  store.updateSelected({ extent: [null, 6.95] });
+  const edge = handler.keyboard(lineOf(store, id), 'line-to', { key: 'ArrowRight', shiftKey: true }, ctxFor(store, id)).patch.extent;
+  assert.equal(edge[1], 7, 'past the edge the end stops at the edge instead of reopening');
+  assert.deepEqual(rebasedExtent({ ...line, extent: [null, 6] }, { x: 9, y: 5 })[1], 0);
+});
+
+test('moving a segment or ray snaps a drawn end to shared targets without stretching', () => {
+  const store = createStore();
+  const cross = addLine(store, -1, { x: 5, y: 3 }); // y = -x + 8
+  const point = store.addPoint({ x: 2, y: 7 });
+  const seg = addLine(store, 0, { x: 1, y: 2 }, { extent: [0, 2] }); // (1,2) → (3,2)
+  const move = (to, event = {}, previous = null) => {
+    const line = lineOf(store, seg), handler = interactionFor(line), ctx = ctxFor(store, seg, previous);
+    const result = handler.snap(line, to, event.shiftKey ? 'x' : null, to, event, ctx);
+    return result;
+  };
+  // The + end (anchor + 2) lands on the crossing line: (x+2, y) on y = -x + 8.
+  let result = move({ x: 3.08, y: 3.0 });
+  assert.equal(result.tangentSnap.endIndex, 1);
+  const moved = { ...lineOf(store, seg), anchor: result.patch.anchor };
+  const end = lineEndPoints(moved)[1];
+  assert.ok(Math.abs(end.y - (-end.x + 8)) < 1e-9, 'the end lies on the other line');
+  assert.equal(moved.slope, 0); assert.deepEqual(moved.extent, [0, 2]);
+  // The - end lands on an explicit point.
+  result = move({ x: 2.05, y: 6.96 });
+  assert.equal(result.tangentSnap.endIndex, 0); close(result.patch.anchor, { x: 2, y: 7 }, 1e-9);
+  assert.deepEqual(result.tangentSnap.ids, [point]);
+  // Held inside 24px, released beyond, Alt bypasses.
+  const held = move({ x: 2 + 20 / unit, y: 7 }, {}, result.tangentSnap);
+  close(held.patch.anchor, { x: 2, y: 7 }, 1e-9);
+  assert.equal(move({ x: 2 + 40 / unit, y: 7.6 }, {}, result.tangentSnap).tangentSnap, null);
+  assert.equal(move({ x: 2.05, y: 6.96 }, { altKey: true }).tangentSnap, null);
+  // Shift keeps the locked axis: only a horizontal shift can make the end meet a target.
+  const locked = move({ x: 4.1, y: 2 }, { shiftKey: true });
+  assert.equal(locked.patch.anchor.y, 2);
+  // An untrimmed line has no drawn end to offer.
+  const open = addLine(store, 0, { x: 1, y: 5 }), openLine = lineOf(store, open);
+  const plain = interactionFor(openLine).snap(openLine, { x: 1, y: 5.02 }, null, { x: 1, y: 5.02 }, {}, ctxFor(store, open));
+  assert.notEqual(plain.tangentSnap?.endIndex, 0); assert.notEqual(plain.tangentSnap?.endIndex, 1);
 });

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
 import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
 import { snapMovingCurve } from '../src/graph/point-magnets.js';
-import { snapDashedPoint, snapMovingDashed } from '../src/graph/dashed-magnets.js';
+import { snapSegmentPoint } from '../src/graph/segment-magnets.js';
+import { snapMovingSegment } from './fixtures/segments.js';
 import { CURVE_CONTACT_CASES, NON_SMOOTH_CONTACT_FAMILIES } from './fixtures/curve-contact-cases.js';
 import { CURVE_FAMILIES, OPPOSITE_CURVE_FAMILIES } from '../src/models/curve-families.js';
 import { serializeDocument } from '../src/export.js';
@@ -23,8 +24,8 @@ test('a curve movement contact remains a shared point and dashed target after th
   // No live drag candidate is passed to the target builder: it must recover the contact.
   const targets = buildSnapTargets(store.getState(), bounds);
   const pointer = { x: contact.point.x + 0.12, y: contact.point.y + 0.08 };
-  for (const result of [snapPoint(pointer, targets, unit), snapDashedPoint(pointer, targets, unit),
-    snapMovingDashed({ anchor: { x: 1, y: 8 }, end: pointer }, targets, unit, { bounds })]) {
+  for (const result of [snapPoint(pointer, targets, unit), snapSegmentPoint(pointer, targets, unit),
+    snapMovingSegment({ anchor: { x: 1, y: 8 }, end: pointer }, targets, unit, { bounds })]) {
     assert.equal(result?.kind, 'tangent'); close(result.point, contact.point);
     assert.deepEqual(new Set(result.ids), new Set([fixed, moving]));
   }
@@ -55,7 +56,7 @@ for (const fixture of CURVE_CONTACT_CASES) test(`contact round trip: ${fixture.n
   assert.ok(pair.some(c => Math.hypot(c.point.x - contact.point.x, c.point.y - contact.point.y) < 1e-7));
   for (const offset of [-0.12, 0.12]) {
     const pointer = { x: contact.point.x + offset, y: contact.point.y + 0.06 };
-    const point = snapPoint(pointer, targets, unit), dashed = snapDashedPoint(pointer, targets, unit);
+    const point = snapPoint(pointer, targets, unit), dashed = snapSegmentPoint(pointer, targets, unit);
     for (const result of [point, dashed]) {
       assert.equal(result?.kind, 'tangent'); close(result.point, contact.point);
       assert.deepEqual(new Set(result.ids), new Set([target, moving]));
@@ -64,14 +65,14 @@ for (const fixture of CURVE_CONTACT_CASES) test(`contact round trip: ${fixture.n
   }
   for (const axis of ['x', 'y']) {
     const pointer = { ...contact.point, [axis]: contact.point[axis] + 0.1 };
-    for (const result of [snapPoint(pointer, targets, unit, { axis }), snapDashedPoint(pointer, targets, unit, { axis })]) {
+    for (const result of [snapPoint(pointer, targets, unit, { axis }), snapSegmentPoint(pointer, targets, unit, { axis })]) {
       assert.equal(result?.kind, 'tangent'); close(result.point, contact.point);
     }
   }
   for (const endpoint of ['anchor', 'end']) {
     const pointer = { x: contact.point.x + 0.1, y: contact.point.y }, far = { x: 1, y: 8 };
     const segment = endpoint === 'anchor' ? { anchor: pointer, end: far } : { anchor: far, end: pointer };
-    const result = snapMovingDashed(segment, targets, unit, { bounds });
+    const result = snapMovingSegment(segment, targets, unit, { bounds });
     assert.equal(result?.kind, 'tangent'); assert.equal(result.endpoint, endpoint); close(result.geometry[endpoint], contact.point);
     close({ x: result.geometry.end.x - result.geometry.anchor.x, y: result.geometry.end.y - result.geometry.anchor.y },
       { x: segment.end.x - segment.anchor.x, y: segment.end.y - segment.anchor.y });
@@ -92,7 +93,7 @@ function adoptedContact() {
 
 test('shared contacts keep 16/24px hysteresis and the exact Shift lock for every guided consumer', () => {
   const { store, point } = adoptedContact(), targets = buildSnapTargets(store.getState(), bounds);
-  for (const consumer of [snapPoint, snapDashedPoint]) {
+  for (const consumer of [snapPoint, snapSegmentPoint]) {
     const at = pixels => ({ x: point.x + pixels / unit, y: point.y });
     const captured = consumer(at(15), targets, unit); assert.equal(captured.kind, 'tangent'); close(captured.point, point);
     const retained = consumer(at(23), targets, unit, { previous: captured });
@@ -101,8 +102,8 @@ test('shared contacts keep 16/24px hysteresis and the exact Shift lock for every
     assert.notEqual(consumer(at(25), targets, unit, { previous: retained })?.kind, 'tangent');
     assert.notEqual(consumer({ x: point.x + 0.1, y: point.y + 0.02 }, targets, unit, { axis: 'x' })?.kind, 'tangent');
   }
-  assert.equal(snapDashedPoint(point, targets, unit, { altKey: true }), null);
-  assert.equal(snapDashedPoint(point, targets, unit, { enabled: false }), null);
+  assert.equal(snapSegmentPoint(point, targets, unit, { altKey: true }), null);
+  assert.equal(snapSegmentPoint(point, targets, unit, { enabled: false }), null);
 });
 
 test('contact targets disappear after geometry/history/graph changes and obey exclusions and visibility', () => {

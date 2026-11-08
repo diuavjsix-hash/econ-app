@@ -1,17 +1,14 @@
-/* Shared snap visuals. Tool-specific selectors must not redefine this feedback. */
-:root { --snap-color:#4d55c5; }
+/* Shared snap visuals. Tool-specific selectors must not redefine this feedback.
+   --snap-color and every other value come from src/ui/tokens.css. */
 .snap-feedback { pointer-events:none; }
 .snap-feedback-target path,.snap-feedback-target circle { fill:none; stroke:var(--snap-color); stroke-width:7; stroke-opacity:.18; stroke-linecap:round; }
 .snap-feedback-marker circle { stroke:var(--snap-color); }
 .snap-feedback-ring { fill:none; stroke-width:4; stroke-opacity:.3; }
-.snap-feedback-core { fill:white; stroke-width:2; }
-.snap-feedback[data-snap-kind=point] .snap-feedback-core { fill:#59627a; }
+.snap-feedback-core { fill:var(--canvas-handle); stroke-width:2; }
+.snap-feedback[data-snap-kind=point] .snap-feedback-core { fill:var(--canvas-label); }
 .snap-feedback-free { fill:none; stroke-width:1.5; stroke-dasharray:3 2; }
-.snap-feedback-label { fill:var(--snap-color); stroke:white; stroke-width:4; paint-order:stroke; font:600 12px Inter,'Noto Sans KR',sans-serif; }
-.snap-feedback[data-snap-kind=free] .snap-feedback-label { font-weight:400; font-size:11px; }
-.graph-dashed.is-snapped { opacity:1; }
-.graph-dashed.is-snapped .dashed-segment { stroke:var(--snap-color); stroke-width:2.4; }
-.graph-dashed.is-snapped .dashed-endpoint { stroke:var(--snap-color); }
+.snap-feedback-label { fill:var(--snap-color); stroke:var(--canvas-halo); stroke-width:4; paint-order:stroke; font:var(--weight-semibold) var(--text-sm) var(--font-sans); }
+.snap-feedback[data-snap-kind=free] .snap-feedback-label { font-weight:var(--weight-regular); font-size:var(--text-xs); }
 .sketch-draft.is-snapped .plotted-line { stroke:var(--snap-color); }
 .graph-svg.is-mouse-adjusting,.graph-svg.is-mouse-adjusting * { cursor:crosshair; }
 .graph-svg.has-mouse-cursor,.graph-svg.has-mouse-cursor * { cursor:none!important; }

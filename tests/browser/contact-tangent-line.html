@@ -1,5 +1,5 @@
 <!doctype html><html lang="ko"><meta charset="utf-8"><title>접점 통과 직선 검증</title>
-<style>@import url('/src/styles.css');@import url('/src/editor.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap}</style>
+<style>@import url('/src/ui/tokens.css');@import url('/src/ui/components.css');@import url('/src/graph/snap-feedback.css');@import url('/src/styles.css');body{overflow:auto;padding:16px}#stage{width:800px;height:540px;position:relative}pre{white-space:pre-wrap}</style>
 <button id="run">검증</button><pre id="result">준비</pre><div id="stage"></div>
 <script type="module">
 import { mountGraph } from '/src/graph/canvas.js';
@@ -50,9 +50,9 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   store.undo();check(JSON.stringify(serializeDocument(store.getState()))===before,`${name}: one undo restores the rotation`);
   store.redo();
   // The contact is still a shared target for other tools after the gesture.
-  store.setToolMode('dashed');click(pointerAt(contact.point,found.slope,-3,4));
+  store.setToolMode('line');store.update({lineKind:'segment',lineStyle:'dashed'});click(pointerAt(contact.point,found.slope,-3,4));
   const far=pointerAt(contact.point,found.slope,-120,-60);send('pointermove',far);click(far);
-  check(near(store.getState().dashedLines.at(-1)?.anchor??{x:NaN,y:NaN},contact.point),`${name}: dashed start still snaps to the contact`);
+  check(near(store.getState().lines.at(-1)?.anchor??{x:NaN,y:NaN},contact.point),`${name}: segment start still snaps to the contact`);
  }
  dispose?.();out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
 }catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};

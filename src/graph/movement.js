@@ -1,4 +1,4 @@
-/** Match dashed drawing: the larger displacement chooses horizontal or vertical. */
+/** Match two-point drawing: the larger displacement chooses horizontal or vertical. */
 export function dragTranslation(anchor,start,pointer,shiftKey=false,bounds=null,margin=0) {
   const dx=pointer.x-start.x,dy=pointer.y-start.y;
   const axis=shiftKey?(Math.abs(dx)>=Math.abs(dy)?'x':'y'):null;

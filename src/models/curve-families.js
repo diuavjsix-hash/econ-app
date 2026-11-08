@@ -1,3 +1,4 @@
+import { ROLE_COLORS } from './palette.js';
 import { clipLine } from '../graph/math.js';
 import { clipSegment, validPoint } from '../graph/ruler.js';
 import { ppcValue, clipPpc, ppcContact, ppcThroughPoint, ppcOnLine, ppcLineIntersections, ppcRadii } from '../graph/ppc.js';
@@ -44,7 +45,7 @@ export class AnalyticCurveFamily {
   swapped() { return false; }
   includesZero() { return false; }
   pointAt(c, t) { return this.swapped(c) ? { x: this.value(c, t, 'horizontal'), y: t } : { x: t, y: this.value(c, t) }; }
-  /** Refine adaptive display samples on the original curve, shared by point/dashed tools. */
+  /** Refine adaptive display samples on the original curve, shared by point/line tools. */
   nearestPoint(c, point, bounds, pieces = this.clip(c, bounds)) {
     const range = this.parameterRange(c, bounds);
     if (!range || !pieces.length) return null;
@@ -335,12 +336,12 @@ export function registerCurveFamilies(entries) {
 }
 
 export const CURVE_FAMILIES = registerCurveFamilies({
-  ppc: new PpcFamily({ label: 'PPC', movement: '원점 기준 크기 조절 · 양 끝점으로 타원 조절', shape: '세로 / 가로 비율', color: '#b67836' }),
-  'rectangular-hyperbola': new RectangularHyperbolaFamily({ label: '직각 쌍곡선', movement: '축을 점근선으로 유지 · 크기 조절', shape: '크기', color: '#6068e8' }),
-  'cobb-douglas': new CobbDouglasFamily({ label: '콥더글라스', movement: '원점 기준 확대·축소', shape: '휘어짐', color: '#6068e8' }),
-  substitutes: new SubstitutesFamily({ label: '완전대체재', movement: '기울기 유지 · 평행이동', shape: '기울기', color: '#43a999' }),
-  complements: new ComplementsFamily({ label: '완전보완재', movement: '원점 기준 · 꺾임 이동', shape: '꺾임 비율', color: '#b67836' }),
-  quasilinear: new QuasilinearFamily({ label: '준선형효용', movement: '선형 축으로 평행이동', shape: '휘어짐', color: '#ad5265' }),
+  ppc: new PpcFamily({ label: 'PPC', movement: '원점 기준 크기 조절 · 양 끝점으로 타원 조절', shape: '세로 / 가로 비율', color: ROLE_COLORS.ppc }),
+  'rectangular-hyperbola': new RectangularHyperbolaFamily({ label: '직각 쌍곡선', movement: '축을 점근선으로 유지 · 크기 조절', shape: '크기', color: ROLE_COLORS.hyperbola }),
+  'cobb-douglas': new CobbDouglasFamily({ label: '콥더글라스', movement: '원점 기준 확대·축소', shape: '휘어짐', color: ROLE_COLORS.cobbDouglas }),
+  substitutes: new SubstitutesFamily({ label: '완전대체재', movement: '기울기 유지 · 평행이동', shape: '기울기', color: ROLE_COLORS.substitutes }),
+  complements: new ComplementsFamily({ label: '완전보완재', movement: '원점 기준 · 꺾임 이동', shape: '꺾임 비율', color: ROLE_COLORS.complements }),
+  quasilinear: new QuasilinearFamily({ label: '준선형효용', movement: '선형 축으로 평행이동', shape: '휘어짐', color: ROLE_COLORS.quasilinear }),
 });
 /** Families whose mirrored drawing is offered in the indifference library. */
 export const OPPOSITE_CURVE_FAMILIES = Object.freeze(['cobb-douglas', 'substitutes', 'complements', 'quasilinear']);

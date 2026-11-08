@@ -232,10 +232,6 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
       if (domains.length) analyticCurves.push({ curve, domains });
     }
   }
-  for (const ruler of state.dashedLines ?? []) {
-    const segment = clipSegment(ruler.anchor, ruler.end, bounds);
-    if (segment) shapes.push(straightPiece(ruler.id, ...segment));
-  }
   for (const sum of state.sums ?? []) {
     shapes.push(...displayedSumSegments(sum, state, bounds).map(points => straightPiece(sum.id, ...points)));
   }
@@ -257,10 +253,6 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
     const minimum = displayedSketchMinimum(sketch, bounds, state);
     if (minimum) crossings.push({ point:{...minimum}, ids:[sketch.id], sourceId:sketch.id, kind:'minimum', label:'최저점 맞춤' });
   }
-  // A trimmed line end is a point target, so another line or point can meet it exactly.
-  for (const line of state.lines) for (const end of lineEndPoints(line)) {
-    if (end && isLinePointVisible(end, bounds, state)) crossings.push({ point:end, ids:[line.id], sourceId:line.id, kind:'endpoint', label:'끝점 맞춤' });
-  }
   // Reconstruct contacts from document geometry, not a previous drag's transient UI state.
   // Every point/endpoint consumer receives them through this one registry.
   crossings.push(...buildCurveContactTargets(state, bounds));
@@ -273,7 +265,7 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
   };
   const exactIndifferences=new Set(state.curves.filter(isIndifference).map(c=>c.id));
   // Exact curve/line solvers consume visible finite straight pieces, regardless of
-  // which tool produced them. A dashed segment must not fall back to display chords
+  // which tool produced them. A segment must not fall back to display chords
   // (which miss tangencies) or be extended into an infinite supporting line.
   const exactStraights=shapes.filter(shape=>shape.linear && !exactSketches.has(shape.id) && !exactIndifferences.has(shape.id));
   const exactStraightIds=new Set(exactStraights.map(shape=>shape.id));
@@ -309,10 +301,19 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
       }
     }
   }
+  // Drawn ends (segment/ray ends, free-curve start and end) are point targets too. They come
+  // last: a contact or crossing that already involves the same stroke at that point says more.
+  const addEnd = (point, id) => {
+    if (!isLinePointVisible(point, bounds, state)) return;
+    if (crossings.some(item => distance(point, item.point) < 1e-7 && item.ids.includes(id))) return;
+    crossings.push({ point: { ...point }, ids: [id], sourceId: id, kind: 'endpoint', label: '끝점 맞춤' });
+  };
+  for (const line of state.lines) for (const end of lineEndPoints(line)) if (end) addEnd(end, line.id);
+  for (const sketch of state.sketches ?? []) for (const end of [sketch.start, sketch.end]) addEnd(end, sketch.id);
   return { shapes, crossings, intercepts, analyticCurves, quadratics };
 }
 
-/** Point/sketch handles and all dashed operations share one cache and source policy. */
+/** Point/sketch handles and all line-tool operations share one cache and source policy. */
 export class SnapTargetCache {
   constructor() { this.clear(); }
   clear() { this.key = null; this.targets = null; }
@@ -373,17 +374,19 @@ function guideSnapCandidates(point, targets, unit, guide, radius) {
   };
   const crossingOf = (id, target) => ['axis-x', 'axis-y'].includes(id)
     ? { point: target, kind: 'intercept', axis: id.slice(-1), ids: [id] } : { point: target, kind: 'intersection', ids: [id] };
-  for (const crossing of targets.crossings) if (Math.abs(offset(crossing.point)) <= EPS)
-    add(crossing, `crossing:${crossing.ids.join(',')}:${crossing.point.x}:${crossing.point.y}`);
+  const registered = targets.crossings.filter(crossing => Math.abs(offset(crossing.point)) <= EPS);
+  for (const crossing of registered) add(crossing, `crossing:${crossing.ids.join(',')}:${crossing.point.x}:${crossing.point.y}`);
+  // A computed guide crossing at a registered target (contact, kink, end…) is the same point: keep the registered meaning.
+  const addComputed = (candidate, key) => { if (!registered.some(c => distance(c.point, candidate.point) < 1e-7)) add(candidate, key); };
   const analyticIds = new Set((targets.analyticCurves ?? []).map(({ curve }) => curve.id));
   for (const { curve, domains } of targets.analyticCurves ?? []) for (const { region } of domains) {
-    for (const { point: target } of curveFamilyOf(curve).lineIntersections(curve, line, region)) add(crossingOf(curve.id, target), `guide:${curve.id}:${target.x}:${target.y}`);
+    for (const { point: target } of curveFamilyOf(curve).lineIntersections(curve, line, region)) addComputed(crossingOf(curve.id, target), `guide:${curve.id}:${target.x}:${target.y}`);
   }
   const quadraticIds = new Set((targets.quadratics ?? []).map(shape => shape.id));
   for (const shape of [...targets.shapes.filter(s => !analyticIds.has(s.id) && !quadraticIds.has(s.id)), ...(targets.quadratics ?? [])]) {
     const coefficients = [offset(shape.a), dot(n, shape.v), dot(n, shape.q)];
     if (coefficients.every(value => Math.abs(value) <= 1e-12)) continue; // A collinear stroke has no single crossing.
-    for (const target of quadraticRoots(coefficients).map(t => at(shape, t))) add(crossingOf(shape.id, target), `guide:${shape.id}:${target.x}:${target.y}`);
+    for (const target of quadraticRoots(coefficients).map(t => at(shape, t))) addComputed(crossingOf(shape.id, target), `guide:${shape.id}:${target.x}:${target.y}`);
   }
   return candidates;
 }

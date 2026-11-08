@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
 import { buildSnapTargets, buildInterceptTargets, SnapTargetCache, snapPoint } from '../src/graph/snap.js';
-import { snapDashedPoint } from '../src/graph/dashed-magnets.js';
+import { snapSegmentPoint } from '../src/graph/segment-magnets.js';
 import { dependentIds, canAttach } from '../src/relations.js';
 
 const bounds = { xMin: 0, xMax: 12, yMin: 0, yMax: 12 };
@@ -45,7 +45,7 @@ test('one target cache serves point and dashed consumers without rebuilding for 
   const cache = new SnapTargetCache(), state = store.getState(), targets = cache.get(state, bounds);
   assert.equal(cache.get({ ...state, mouseSelected: true, dashedSelected: false, selectedId: null, points: [{ id: 'p', anchor: { x: 2, y: 3 } }] }, bounds), targets);
   const pointer = { x: 4.2, y: 4.1 };
-  assert.deepEqual(snapPoint(pointer, targets, 50), snapDashedPoint(pointer, cache.get(state, bounds), 50));
+  assert.deepEqual(snapPoint(pointer, targets, 50), snapSegmentPoint(pointer, cache.get(state, bounds), 50));
   cache.clear(); assert.notEqual(cache.get(state, bounds), targets);
 });
 

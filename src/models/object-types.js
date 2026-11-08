@@ -7,7 +7,6 @@ export const OBJECT_TYPES = Object.freeze({
   sketch: { collection: 'sketches', label: '자유 곡선', duplicatable: true, strokeGeometry: true },
   sum: { collection: 'sums', label: '합', duplicatable: false, strokeGeometry: true },
   point: { collection: 'points', label: '점', duplicatable: true, strokeGeometry: false },
-  dashed: { collection: 'dashedLines', label: '점선', duplicatable: true, strokeGeometry: true },
   fill: { collection: 'fills', label: '구역', duplicatable: false, strokeGeometry: false },
   ruler: { collection: 'rulers', label: '자', duplicatable: false, strokeGeometry: false },
   group: { collection: 'groups', label: '폴더', duplicatable: true, strokeGeometry: false },

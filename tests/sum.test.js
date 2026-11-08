@@ -130,7 +130,7 @@ test('sum identity, history, hierarchy, clear and diagram-local references survi
   store.updateSelected({ name:'ΣD', anchor:{x:20,y:20} });
   assert.equal(sumOf(store).anchor, undefined);
   const doc = serializeDocument(store.getState());
-  assert.equal(doc.schemaVersion,11); assert.deepEqual(doc.sums,doc.diagrams[0].sums);
+  assert.equal(doc.schemaVersion,12); assert.deepEqual(doc.sums,doc.diagrams[0].sums);
   assert.deepEqual(doc.sums[0].sourceIds,[a,b]); assert.equal(doc.sums[0].name,'ΣD');
   assert.ok(!('collapsed' in doc.sums[0])); assert.ok(!('segments' in doc.sums[0]));
   doc.sums[0].sourceIds.push('bad'); assert.deepEqual(sumOf(store).sourceIds,[a,b]);

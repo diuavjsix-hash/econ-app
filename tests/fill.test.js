@@ -8,16 +8,18 @@ import { editorContext } from '../src/editor-ui.js';
 import { diagramState } from '../src/workspace.js';
 import { objectsInRectangle } from '../src/graph/selection.js';
 import { sketchControls, quadraticPoint } from '../src/graph/sketch.js';
+import { segmentLine } from './fixtures/segments.js';
 
 const bounds = { xMin: 0, xMax: 10, yMin: 0, yMax: 10 };
-const base = { lines: [], curves: [], sketches: [], sums: [], dashedLines: [], points: [], axisGapEnabled: false };
+const base = { lines: [], curves: [], sketches: [], sums: [], points: [], axisGapEnabled: false };
 const line = (id, slope, x, y) => ({ id, type: 'line', anchor: { x, y }, slope });
 const polygon = vertices => ({ rings: [vertices.map(([x, y]) => ({ x, y }))] });
 const triangle = polygon([[0, 0], [6, 0], [0, 6]]);
 const close = (a, b, error = 1e-6) => assert.ok(Math.abs(a - b) < error, `${a} != ${b}`);
+// Finite walls are segments drawn with the line tool.
 function edges(vertices, prefix = 'd') {
-  return vertices.map(([x, y], i) => ({ id: `${prefix}-${i}`, type: 'dashed', anchor: { x, y },
-    end: { x: vertices[(i + 1) % vertices.length][0], y: vertices[(i + 1) % vertices.length][1] } }));
+  return vertices.map(([x, y], i) => segmentLine(`${prefix}-${i}`, { x, y },
+    { x: vertices[(i + 1) % vertices.length][0], y: vertices[(i + 1) % vertices.length][1] }));
 }
 
 test('one line and the coordinate axes enclose exactly the intended triangle, even with axis gaps', () => {
@@ -32,10 +34,10 @@ test('one line and the coordinate axes enclose exactly the intended triangle, ev
 test('empty space, grid, open strokes and viewport edges never invent a closed region', () => {
   assert.deepEqual(buildFillRegions(base, bounds), []);
   assert.deepEqual(buildFillRegions({ ...base, showGrid: true, lines: [line('l', 1, 3, 3)] }, bounds), []);
-  const dashedLines = edges([[2, 2], [6, 2], [6, 6], [2, 6]]).slice(0, 3);
-  assert.deepEqual(buildFillRegions({ ...base, dashedLines }, bounds), []);
-  dashedLines.push({ id: 'short', anchor: { x: 2, y: 6 }, end: { x: 2, y: 2.01 } });
-  assert.deepEqual(buildFillRegions({ ...base, dashedLines }, bounds), [], 'visible gaps remain open');
+  const lines = edges([[2, 2], [6, 2], [6, 6], [2, 6]]).slice(0, 3);
+  assert.deepEqual(buildFillRegions({ ...base, lines }, bounds), []);
+  lines.push(segmentLine('short', { x: 2, y: 6 }, { x: 2, y: 2.01 }));
+  assert.deepEqual(buildFillRegions({ ...base, lines }, bounds), [], 'visible gaps remain open');
 });
 
 test('crossing straight lines split adjacent regions without spilling across the boundary', () => {
@@ -45,16 +47,16 @@ test('crossing straight lines split adjacent regions without spilling across the
   assert.ok(a && b && a.key !== b.key); close(a.area + b.area, 18);
 });
 
-test('finite dashed polygons close independently and support concave areas and dangling branches', () => {
-  const dashedLines = edges([[2, 2], [6, 2], [6, 3], [3, 3], [3, 6], [2, 6]]);
-  dashedLines.push({ id: 'tail', anchor: { x: 3, y: 3 }, end: { x: 4, y: 4 } });
-  const regions = buildFillRegions({ ...base, dashedLines }, bounds);
+test('finite segment polygons close independently and support concave areas and dangling branches', () => {
+  const lines = edges([[2, 2], [6, 2], [6, 3], [3, 3], [3, 6], [2, 6]]);
+  lines.push(segmentLine('tail', { x: 3, y: 3 }, { x: 4, y: 4 }));
+  const regions = buildFillRegions({ ...base, lines }, bounds);
   assert.equal(regions.length, 1); close(regions[0].area, 7);
   assert.ok(findFillRegion(regions, { x: 2.5, y: 5 })); assert.equal(findFillRegion(regions, { x: 5, y: 5 }), null);
 });
 
 test('disconnected nested polygons form holes and allow each inner region to be filled separately', () => {
-  const regions = buildFillRegions({ ...base, dashedLines: [...edges([[1, 1], [9, 1], [9, 9], [1, 9]], 'outer'),
+  const regions = buildFillRegions({ ...base, lines: [...edges([[1, 1], [9, 1], [9, 9], [1, 9]], 'outer'),
     ...edges([[3, 3], [7, 3], [7, 7], [3, 7]], 'inner')] }, bounds);
   assert.equal(regions.length, 2);
   const outer = findFillRegion(regions, { x: 2, y: 2 }), inner = findFillRegion(regions, { x: 5, y: 5 });
@@ -65,8 +67,8 @@ test('disconnected nested polygons form holes and allow each inner region to be 
 
 test('coincident and partially overlapping boundaries merge without duplicate fills', () => {
   const square = edges([[2, 2], [6, 2], [6, 6], [2, 6]]);
-  square.push({ id: 'duplicate', anchor: { x: 3, y: 2 }, end: { x: 7, y: 2 } });
-  const regions = buildFillRegions({ ...base, dashedLines: square }, bounds);
+  square.push(segmentLine('duplicate', { x: 3, y: 2 }, { x: 7, y: 2 }));
+  const regions = buildFillRegions({ ...base, lines: square }, bounds);
   assert.equal(regions.length, 1); close(regions[0].area, 16);
 });
 
@@ -104,7 +106,7 @@ test('region geometry is mathematical and stable under reflected axes and viewpo
 });
 
 test('fill tool is exclusive, has a minimal inspector and preferences do not enter history', () => {
-  const store = createStore(), modes = ['handSelected', 'mouseSelected', 'dashedSelected', 'sketchSelected', 'duplicatePanel', 'sumPanel', 'fillSelected'];
+  const store = createStore(), modes = ['handSelected', 'mouseSelected', 'lineSelected', 'sketchSelected', 'duplicatePanel', 'sumPanel', 'fillSelected'];
   for (const mode of modes) {
     store.update({ fillSelected: true }); assert.equal(editorContext(store.getState()).title, '구역 칠하기');
     store.update({ [mode]: true }); const state = store.getState();
@@ -117,7 +119,8 @@ test('fill tool is exclusive, has a minimal inspector and preferences do not ent
 test('fill creation, recoloring, opacity and deletion are separate undo steps without stacking', () => {
   const store = createStore(); store.update({ fillSelected: true });
   const before = serializeDocument(store.getState()), id = store.addFill(triangle);
-  assert.equal(store.getState().fillSelected, true); assert.equal(store.getState().fills.length, 1);
+  // Like every creation, a fill returns to the selection tool with the fill selected.
+  assert.equal(store.getState().fillSelected, false); assert.equal(store.getState().handSelected, true); assert.equal(store.getState().selectedId, id); assert.equal(store.getState().fills.length, 1);
   const first = serializeDocument(store.getState()); store.addFill(triangle);
   assert.equal(store.getState().fills.length, 1);
   store.update({ fillColor: '#e69451' }); assert.equal(store.addFill(triangle), id);
@@ -157,7 +160,7 @@ test('fills participate in object lists, hierarchy, area selection, clear and gr
 test('JSON 10 exports independent deep-copied mathematical rings including holes', () => {
   const store = createStore(), fill = { rings: [...triangle.rings, polygon([[1, 1], [2, 1], [1, 2]]).rings[0]] };
   const id = store.addFill(fill), doc = serializeDocument(store.getState());
-  assert.equal(doc.schemaVersion, 11); assert.deepEqual(doc.fills, doc.diagrams[0].fills);
+  assert.equal(doc.schemaVersion, 12); assert.deepEqual(doc.fills, doc.diagrams[0].fills);
   assert.equal(doc.fills[0].id, id); assert.deepEqual(doc.fills[0].rings, fill.rings);
   assert.equal('fillSelected' in doc, false); assert.equal('collapsed' in doc.fills[0], false);
   doc.fills[0].rings[0][0].x = 123; assert.equal(store.getState().fills[0].rings[0][0].x, 0);

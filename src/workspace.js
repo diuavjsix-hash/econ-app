@@ -30,6 +30,7 @@ export function mountWorkspace(root, store) {
     const columns = Math.max(...state.layout.slots.map(s => s.column)) + 1;
     grid.style.setProperty('--rows', rows);
     grid.style.setProperty('--columns', columns);
+    grid.dataset.count = String(visible.length);
     for (const [index, diagram] of visible.entries()) {
       let card = cards.get(diagram.id);
       if (!card) {
@@ -37,7 +38,7 @@ export function mountWorkspace(root, store) {
         element.className = 'diagram-card';
         element.dataset.diagramId = diagram.id;
         const button = document.createElement('button');
-        button.className = 'diagram-title';
+        button.type = 'button'; button.className = 'diagram-title';
         const graph = document.createElement('div'); graph.className = 'graph-container';
         element.append(button, graph); grid.append(element);
         const activate = () => store.selectDiagram(diagram.id);
@@ -47,7 +48,7 @@ export function mountWorkspace(root, store) {
         const scoped = {
           getState: () => diagramState(store.getState(), diagram.id),
           subscribe: listener => store.subscribe(snapshot => listener(diagramState(snapshot, diagram.id))),
-          ...Object.fromEntries(['beginHistory', 'endHistory', 'addPoint', 'addSketch', 'addDashedLine', 'addFill', 'selectObject', 'selectObjects', 'updateSelected'].map(method => [method, (...args) => store[method](...args)])),
+          ...Object.fromEntries(['beginHistory', 'endHistory', 'addLine', 'addPoint', 'addSketch', 'addDashedLine', 'addFill', 'selectObject', 'selectObjects', 'updateSelected'].map(method => [method, (...args) => store[method](...args)])),
         };
         card = { element, button, dispose: mountGraph(graph, scoped) };
         cards.set(diagram.id, card);

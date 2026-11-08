@@ -190,7 +190,7 @@ export function coincidentCurves(curve, target) {
   return left.length === right.length && (left.every((p, i) => distance(p, right[i]) < 1e-8) || left.every((p, i) => distance(p, right[right.length - 1 - i]) < 1e-8));
 }
 
-/** Shared discrete targets for points, dashed endpoints and other guided consumers. */
+/** Shared discrete targets for points, line ends and other guided consumers. */
 export function buildCurveContactTargets(state, bounds, excludeObjectId = null) {
   state = independentSnapState(state, excludeObjectId);
   const curves = [...(state.curves ?? []), ...(state.sketches ?? [])];

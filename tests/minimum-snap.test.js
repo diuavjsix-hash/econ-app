@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
 import { buildSnapTargets, snapPoint, SnapTargetCache } from '../src/graph/snap.js';
-import { snapDashedPoint, snapMovingDashed } from '../src/graph/dashed-magnets.js';
+import { snapSegmentPoint } from '../src/graph/segment-magnets.js';
+import { snapMovingSegment } from './fixtures/segments.js';
 import { sketchMinimum } from '../src/graph/sketch.js';
 import { snapFeedbackModel } from '../src/graph/snap-feedback.js';
 import { serializeDocument } from '../src/export.js';
@@ -32,7 +33,7 @@ test('a displayed minimum is one shared point target and a hidden one is none', 
 test('point and dashed tools capture, hold and store the exact minimum without a relation', () => {
   const { store, minimum } = setup(), targets = buildSnapTargets(store.getState(), bounds);
   const pointer = { x: minimum.x + 0.12, y: minimum.y + 0.08 };
-  for (const snap of [snapPoint, snapDashedPoint]) {
+  for (const snap of [snapPoint, snapSegmentPoint]) {
     const result = snap(pointer, targets, unit);
     assert.equal(result.kind, 'minimum'); close(result.point, minimum);
     const held = snap({ x: minimum.x + 20 / unit, y: minimum.y }, targets, unit, { previous: result });
@@ -41,7 +42,7 @@ test('point and dashed tools capture, hold and store the exact minimum without a
   }
   for (const endpoint of ['anchor', 'end']) {
     const segment = endpoint === 'anchor' ? { anchor: pointer, end: { x: 1, y: 8 } } : { anchor: { x: 1, y: 8 }, end: pointer };
-    const result = snapMovingDashed(segment, targets, unit, { bounds });
+    const result = snapMovingSegment(segment, targets, unit, { bounds });
     assert.equal(result.kind, 'minimum'); close(result.geometry[endpoint], minimum);
   }
   const before = serializeDocument(store.getState()).sketches;

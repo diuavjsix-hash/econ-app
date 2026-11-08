@@ -36,7 +36,7 @@ test('rectangular hyperbolas keep xy constant with perpendicular axis asymptotes
 test('rectangular hyperbolas share exact point/tangent magnets, retention, Alt and hidden-contact rules',()=>{
   const point=indifferenceContact(curve,-1);close(point.x,Math.sqrt(12));close(point.x,point.y);
   const line={id:'line-1',type:'line',slope:-1,anchor:point};
-  const state={lines:[line],curves:[curve],sketches:[],points:[],dashedLines:[],sums:[],axisGapEnabled:false};
+  const state={lines:[line],curves:[curve],sketches:[],points:[],sums:[],axisGapEnabled:false};
   const targets=buildSnapTargets(state,bounds),snap=snapPoint({x:point.x+0.01,y:point.y+0.01},targets,40);
   assert.equal(snap.kind,'tangent');close(snap.point.x,point.x);close(snap.point.y,point.y);
   const moved={...curve,anchor:{x:3.05,y:4.05}},magnet=snapMovingCurve(moved,state,bounds,40);
@@ -65,7 +65,7 @@ test('hyperbola size, copies, undo, graph isolation and JSON keep the exact curv
   assert.deepEqual(curves[0],original);assert.notDeepEqual(curves[1].anchor,curves[2].anchor);
   for (const c of curves) {assert.equal(c.family,'rectangular-hyperbola');assert.equal(c.shape,1);close(indifferenceValue(c,2)*2,c.anchor.x*c.anchor.y);}
   const json=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(json.schemaVersion,11);assert.equal(json.curves.length,3);
+  assert.equal(json.schemaVersion,12);assert.equal(json.curves.length,3);
   assert.equal(json.curves[0].geometry.domain,'nonnegative');
   assert.equal(json.curves[0].family,'rectangular-hyperbola');
   store.configureLayout('horizontal2');store.selectDiagram(store.getState().diagrams[1].id);

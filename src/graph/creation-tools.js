@@ -1,8 +1,10 @@
+import { ROLE_COLORS } from '../models/palette.js';
 import { SVG_RENDERER } from './svg-renderer.js';
 import { toScreen } from './viewport.js';
 import { directionOf } from './math.js';
+import { displayedLineSegments } from './display.js';
+import { lineFromPoints } from './line-extent.js';
 import { constrainRuler } from './ruler.js';
-import { drawDashedLine } from './dashed-view.js';
 import { drawSketch } from './sketch-view.js';
 import { unitVector, validSketch, distance } from './sketch.js';
 import { snapSketchTangent } from './sketch-magnets.js';
@@ -12,14 +14,14 @@ import { TOOL_MODES, toolModeOf } from '../tool-modes.js';
 const element = (...args) => SVG_RENDERER.element(...args);
 
 /**
- * Pointer behavior of a creation tool (point, dashed, curve, fill). Each canvas keeps
+ * Pointer behavior of a creation tool (line, point, curve, fill). Each canvas keeps
  * one plain session per tool; the canvas owns the shared snap state, history and
  * re-rendering, exactly as for the drag controllers in interactions.js.
  * Handlers return true when they consumed the event.
  */
 export class CreationTool {
   constructor() { if (new.target === CreationTool) throw new TypeError('CreationTool is abstract'); }
-  /** Where the draft layer sits: after 'fills', 'sketches' or 'dashed' in the SVG order. */
+  /** Where the draft layer sits: after 'fills', 'sketches' or 'lines' (above all strokes) in the SVG order. */
   get slot() { return null; }
   layerAttributes() { return null; }
   /** Class toggled on the SVG while the tool is active. */
@@ -48,29 +50,36 @@ export class PointCreation extends CreationTool {
   }
 }
 
-export class DashedCreation extends CreationTool {
-  get slot() { return 'dashed'; }
-  layerAttributes() { return { class: 'dashed-draft-layer', 'pointer-events': 'none' }; }
+/**
+ * Two clicks or one drag between two snapped points, with the Shift axis lock and the
+ * shared segment snap. Subclasses give the mode flag, the preview and the result.
+ */
+export class TwoPointCreation extends CreationTool {
+  get slot() { return 'lines'; }
   createSession() { return { draft: null }; }
+  /** Store flag of the mode. */
+  get flag() { throw new TypeError(`${this.constructor.name} must name its mode flag`); }
+  directionMode() { return 'free'; }
+  /** Without a draft, whether a press on this target should edit the shape instead. */
+  editsTarget() { return false; }
+  commit() { throw new TypeError(`${this.constructor.name} must commit its result`); }
   position(session, event, ctx, anchor = null) {
-    const point = ctx.worldPoint(event), { bounds } = ctx.viewport, mode = ctx.state.dashedMode;
+    const point = ctx.worldPoint(event), { bounds } = ctx.viewport, mode = this.directionMode(ctx.state);
     const clamped = { x: Math.max(bounds.xMin, Math.min(bounds.xMax, point.x)), y: Math.max(bounds.yMin, Math.min(bounds.yMax, point.y)) };
     const constrained = anchor ? constrainRuler(anchor, clamped, mode, event.shiftKey) : clamped;
     const axis = !anchor ? null : mode === 'horizontal' ? 'x' : mode === 'vertical' ? 'y'
       : event.shiftKey ? (Math.abs(clamped.x - anchor.x) >= Math.abs(clamped.y - anchor.y) ? 'x' : 'y') : null;
-    return ctx.dashedPosition(constrained, event, axis);
+    return ctx.segmentPosition(constrained, event, axis);
   }
   finish(session, ctx) {
     const completed = session.draft; session.draft = null;
-    ctx.setDashedSnap(null);
+    ctx.setSegmentSnap(null);
     ctx.releasePointer(completed?.pointerId);
-    if (completed) ctx.store.addDashedLine(completed.anchor, completed.end);
+    if (completed) this.commit(completed, ctx);
     ctx.redraw(this);
   }
   pointerDown(session, event, ctx) {
-    // Without a draft, pressing an existing dashed line edits it like any shape.
-    const target = event.target.closest('[data-id]');
-    if (!session.draft && ctx.state.dashedLines.some(line => line.id === target?.dataset.id)) return false;
+    if (!session.draft && this.editsTarget(event.target.closest('[data-id]'), ctx)) return false;
     event.preventDefault();
     if (session.draft) { session.draft.end = this.position(session, event, ctx, session.draft.anchor); this.finish(session, ctx); return true; }
     if (!ctx.inside(ctx.worldPoint(event))) return true;
@@ -88,7 +97,7 @@ export class DashedCreation extends CreationTool {
   pointerEnd(session, event, ctx) {
     const draft = session.draft;
     if (draft?.pointerId !== event.pointerId) return;
-    if (event.type === 'pointercancel') { session.draft = null; ctx.setDashedSnap(null); ctx.redraw(this); }
+    if (event.type === 'pointercancel') { session.draft = null; ctx.setSegmentSnap(null); ctx.redraw(this); }
     else if (event.type === 'pointerup') {
       // A drag draws in one gesture; a click keeps the draft for a second click.
       if (Math.hypot(event.clientX - draft.clientX, event.clientY - draft.clientY) >= 4) { draft.end = this.position(session, event, ctx, draft.anchor); this.finish(session, ctx); }
@@ -96,18 +105,34 @@ export class DashedCreation extends CreationTool {
     }
   }
   sync(session, next, previous, ctx) {
-    if (session.draft && (!next.dashedSelected || next.historyRevision !== previous.historyRevision)) {
+    if (session.draft && (!next[this.flag] || next.historyRevision !== previous.historyRevision || next.activeDiagramId !== previous.activeDiagramId)) {
       const id = session.draft.pointerId; session.draft = null; ctx.releasePointer(id);
     }
-    if (session.draft && next.dashedMode !== previous.dashedMode) session.draft.end = constrainRuler(session.draft.anchor, session.draft.end, next.dashedMode);
-  }
-  draw(session, layer, ctx) {
-    if (session.draft) layer.append(drawDashedLine(session.draft, ctx.viewport, { preview: true }));
-    ctx.updateSnapFeedback(session.draft?.end);
+    if (session.draft && this.directionMode(next) !== this.directionMode(previous)) session.draft.end = constrainRuler(session.draft.anchor, session.draft.end, this.directionMode(next));
   }
   feedback(session, ctx, position) {
     const point = position ?? session.draft?.end ?? ctx.snappedPosition(ctx.worldPoint(ctx.pointer), ctx.pointer);
-    return { point, candidate: ctx.dashedSnap };
+    return { point, candidate: ctx.segmentSnap };
+  }
+}
+
+/** The line tool: first point → second point, as the chosen kind (line, ray, segment) and style. */
+export class LineCreation extends TwoPointCreation {
+  get flag() { return 'lineSelected'; }
+  layerAttributes(ctx) { return { class: 'line-draft-layer', 'clip-path': `url(#${ctx.clipId})`, 'pointer-events': 'none' }; }
+  commit(draft, ctx) { ctx.store.addLine(draft.anchor, draft.end, { kind: ctx.state.lineKind, style: ctx.state.lineStyle }); }
+  draw(session, layer, ctx) {
+    const { draft } = session, { viewport, state } = ctx;
+    if (draft) {
+      const line = lineFromPoints(draft.anchor, draft.end, state.lineKind);
+      for (const [a, b] of line ? displayedLineSegments(line, viewport.bounds, state) : []) {
+        const p = toScreen(a, viewport), q = toScreen(b, viewport);
+        layer.append(element('line', { x1: p.x, y1: p.y, x2: q.x, y2: q.y, class: `line-draft${state.lineStyle === 'dashed' ? ' is-dashed' : ''}` }));
+      }
+      const p = toScreen(draft.anchor, viewport);
+      layer.append(element('circle', { cx: p.x, cy: p.y, r: 4, class: 'line-draft-start' }));
+    }
+    ctx.updateSnapFeedback(draft?.end);
   }
 }
 
@@ -159,11 +184,11 @@ export class SketchCreation extends CreationTool {
       if (validSketch(curve)) layer.append(drawSketch(curve, viewport, state, { preview: true }));
     } else if (hover && drafted.length === 1) {
       const a = toScreen(drafted[0], viewport), b = toScreen(hover.point, viewport);
-      layer.append(element('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'sketch-guide', stroke: '#4c8e9a' }));
+      layer.append(element('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'sketch-guide', stroke: ROLE_COLORS.sketch }));
     }
     drafted.forEach((point, index) => {
       const p = toScreen(point, viewport);
-      layer.append(element('circle', { cx: p.x, cy: p.y, r: 5, fill: '#4c8e9a' }));
+      layer.append(element('circle', { cx: p.x, cy: p.y, r: 5, fill: ROLE_COLORS.sketch }));
       layer.append(element('text', { x: p.x + 9, y: p.y - 9, class: 'sketch-step-label' }, index === 0 ? '시작' : '끝'));
     });
     if (!state.sketchSelected) return;
@@ -223,9 +248,9 @@ export function assertCreationTools(entries, modes = TOOL_MODES) {
   for (const [mode, tool] of Object.entries(entries)) {
     if (!(tool instanceof CreationTool)) throw new TypeError(`Invalid creation tool: ${mode}`);
     if (tool.pointerDown === CreationTool.prototype.pointerDown) throw new TypeError(`${mode} must implement pointerDown()`);
-    if (tool.slot !== null && !['fills', 'sketches', 'dashed'].includes(tool.slot)) throw new TypeError(`${mode} has an unknown draft slot`);
+    if (tool.slot !== null && !['fills', 'sketches', 'lines'].includes(tool.slot)) throw new TypeError(`${mode} has an unknown draft slot`);
     if (tool.slot !== null && (tool.draw === CreationTool.prototype.draw || tool.layerAttributes === CreationTool.prototype.layerAttributes)) throw new TypeError(`${mode} must draw its draft layer`);
   }
   return Object.freeze(entries);
 }
-export const CREATION_TOOLS = assertCreationTools({ point: new PointCreation(), dashed: new DashedCreation(), sketch: new SketchCreation(), fill: new FillCreation() });
+export const CREATION_TOOLS = assertCreationTools({ line: new LineCreation(), point: new PointCreation(), sketch: new SketchCreation(), fill: new FillCreation() });

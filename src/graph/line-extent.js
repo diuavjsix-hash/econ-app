@@ -8,8 +8,6 @@ import { lineDisplayRegions } from './display.js';
  */
 export const LINE_END_ACTIONS = Object.freeze({ 'line-from': 0, 'line-to': 1 });
 export const MIN_LINE_LENGTH = 1e-6;
-/** An end dragged this close to the drawing edge continues to it again. */
-export const LINE_EDGE_PX = 16;
 const dot = (a, b) => a.x * b.x + a.y * b.y;
 
 export const isTrimmed = line => Array.isArray(line?.extent) && line.extent.some(value => value !== null);
@@ -64,4 +62,53 @@ export function visibleLineEnds(line, bounds, state) {
     { t: low, open: from === null || from < edgeLow, point: linePointAt(line, low) },
     { t: high, open: to === null || to > edgeHigh, point: linePointAt(line, high) },
   ] };
+}
+
+/** The three drawn kinds of a straight line. Stored only as `extent`; the kind is derived. */
+export const LINE_KINDS = Object.freeze(['line', 'ray', 'segment']);
+export const LINE_STYLES = Object.freeze(['solid', 'dashed']);
+export function lineKindOf(line) {
+  if (!isTrimmed(line)) return 'line';
+  return line.extent.every(value => value !== null) ? 'segment' : 'ray';
+}
+/** Slope through two points: exactly null (vertical) when they share x, never a huge finite stand-in. */
+export function slopeThrough(from, to) {
+  const dx = to.x - from.x, dy = to.y - from.y;
+  if (Math.abs(dx) <= 1e-12 * Math.max(1, Math.abs(dy))) return null;
+  const slope = dy / dx;
+  return Object.is(slope, -0) ? 0 : slope;
+}
+/**
+ * Geometry of a line drawn from `from` to `to`: anchored at the first point. A ray starts
+ * there and runs through the second point; a segment ends at the second point.
+ * Returns null for coincident points.
+ */
+export function lineFromPoints(from, to, kind = 'line') {
+  if (Math.hypot(to.x - from.x, to.y - from.y) < MIN_LINE_LENGTH) return null;
+  const line = { anchor: { x: from.x === 0 ? 0 : from.x, y: from.y === 0 ? 0 : from.y }, slope: slopeThrough(from, to), extent: null };
+  const t = lineParameter(line, to);
+  if (kind === 'ray') line.extent = t > 0 ? [0, null] : [null, 0];
+  else if (kind === 'segment') line.extent = normalizeExtent(t > 0 ? [0, t] : [t, 0]) ?? null;
+  return line;
+}
+/**
+ * The extent that shows an existing line as another kind. Ends the line already has are
+ * kept; a missing end is placed inside the visible part (`edge` from visibleLineEnds), so
+ * the change is visible and both ends stay draggable.
+ */
+export function extentForKind(line, kind, edge) {
+  if (kind === 'line') return null;
+  const [from, to] = line.extent ?? [null, null];
+  if (kind === 'ray') {
+    if (from !== null && to !== null) return [from, null];
+    if (from !== null || to !== null) return [from, to];
+    const middle = edge ? (edge[0] + edge[1]) / 2 : 0;
+    return [middle, null];
+  }
+  if (!edge) return from !== null && to !== null ? [from, to] : undefined;
+  // A new end goes halfway to the visible edge (a quarter view length if that edge is behind it).
+  const [low, high] = edge, quarter = (high - low) / 4;
+  const start = from ?? (to === null ? low + quarter : to > low ? (low + to) / 2 : to - quarter);
+  const end = to ?? (from === null ? high - quarter : from < high ? (from + high) / 2 : from + quarter);
+  return normalizeExtent([start, end]);
 }

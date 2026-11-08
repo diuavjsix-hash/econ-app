@@ -1,7 +1,5 @@
-export const FILL_COLORS = [
-  ['#6068e8', '보라'], ['#e69451', '주황'], ['#43a999', '초록'],
-  ['#cf7299', '분홍'], ['#699bd1', '파랑'], ['#849353', '올리브'],
-];
+import { FILL_PALETTE } from '../models/palette.js';
+export const FILL_COLORS = FILL_PALETTE;
 
 export function alphabetLabel(index) {
   let label = '';

@@ -1,4 +1,6 @@
-import { onLineExtent } from './line-extent.js';
+import { onLineExtent, lineEndPoints } from './line-extent.js';
+import { snapMovingEnds } from './segment-magnets.js';
+import { independentSnapState } from './snap-context.js';
 import { buildInterceptTargets } from './snap.js';
 import { directionOf } from './math.js';
 import { canAttach } from '../relations.js';
@@ -38,11 +40,25 @@ export function snapLineToIntercept(line,state,bounds,unit,{previous=null,altKey
   return INTERCEPT_SNAP_POLICY.choose(candidates,previous);
 }
 
-/** Keep a captured magnet stable, then choose the nearest eligible intercept or tangent. */
+/**
+ * A drawn end of a moving segment or ray meets a shared point target (crossing, intercept,
+ * point, contact, another end, or a stroke). The line keeps its slope and length.
+ * `targets` are the shared snap targets without this line and its dependents.
+ */
+export function snapLineEnds(line,state,bounds,unit,{targets=null,previous=null,altKey=false,axis=null}={}) {
+  if (!targets || line.binding) return null;
+  const ends=lineEndPoints(line);
+  if (!ends.some(Boolean)) return null;
+  const hit=snapMovingEnds(ends,targets,unit,{altKey,axis,bounds,previous,points:independentSnapState(state,line.id).points});
+  return hit&&{...hit,anchor:{x:line.anchor.x+hit.delta.x,y:line.anchor.y+hit.delta.y}};
+}
+
+/** Keep a captured magnet stable, then choose the nearest eligible intercept, tangent, point or drawn end. */
 export function snapMovingLine(line,state,bounds,unit,options={}) {
-  const previous=options.previous;
-  const point=snapShapeToPoint(line,state,bounds,unit,{...options,previous:previous?.kind==='point'?previous:null});
-  const intercept=snapLineToIntercept(line,state,bounds,unit,{...options,previous:previous?.kind==='intercept'?previous:null});
-  const tangent=snapLineToTangency(line,state,bounds,unit,{...options,previous:previous?.kind==='tangent'?previous:null});
-  return chooseShapeMagnet([point,intercept,tangent?{...tangent,kind:'tangent'}:null],previous);
+  const previous=options.previous,isEnd=previous?.key?.startsWith('line-end');
+  const point=snapShapeToPoint(line,state,bounds,unit,{...options,previous:!isEnd&&previous?.kind==='point'?previous:null});
+  const intercept=snapLineToIntercept(line,state,bounds,unit,{...options,previous:!isEnd&&previous?.kind==='intercept'?previous:null});
+  const tangent=snapLineToTangency(line,state,bounds,unit,{...options,previous:!isEnd&&previous?.kind==='tangent'?previous:null});
+  const end=snapLineEnds(line,state,bounds,unit,{...options,previous:isEnd?previous:null});
+  return chooseShapeMagnet([point,intercept,tangent?{...tangent,kind:'tangent'}:null,end],previous);
 }

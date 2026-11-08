@@ -1,8 +1,9 @@
+import { ROLE_COLORS } from '../models/palette.js';
 import { clipLine } from './math.js';
 
 export const CURVE_PRESETS = {
-  descending: { label: '우하향', slope: -0.75, color: '#6068e8' },
-  ascending: { label: '우상향', slope: 0.75, color: '#43a999' },
+  descending: { label: '우하향', slope: -0.75, color: ROLE_COLORS.descending },
+  ascending: { label: '우상향', slope: 0.75, color: ROLE_COLORS.ascending },
 };
 export const MAX_BEND = 0.35;
 

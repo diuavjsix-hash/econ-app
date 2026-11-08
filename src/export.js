@@ -13,7 +13,6 @@ function serializeDiagram(state) {
     sums: serializeObjects(state.sums),
     groups: serializeObjects(state.groups),
     points: serializeObjects(state.points),
-    dashedLines: serializeObjects(state.dashedLines),
     rulers: serializeObjects(state.rulers),
     coordinateSystem: { origin, quadrants: [...QUADRANT_MODES[state.quadrantMode].quadrants], xPositive: state.flipX ? 'left' : 'right', yPositive: state.flipY ? 'down' : 'up', axesVisible: true, axisNames: { ...state.axisNames }, lineAxisGap: { enabled: Boolean(state.axisGapEnabled), distance: state.axisGap ?? DEFAULT_AXIS_GAP },
       ...(state.quadrantMode==='edgeworth'?{type:'edgeworth',totals:{...state.boxSize},oppositeOrigin:{x:state.boxSize.width,y:state.boxSize.height},oppositeAxisNames:{...state.boxAxisNames},oppositeXPositive:state.flipX?'right':'left',oppositeYPositive:state.flipY?'up':'down'}:{}) },
@@ -25,7 +24,7 @@ function serializeDiagram(state) {
 
 export function serializeDocument(state) {
   return {
-    schemaVersion: 11,
+    schemaVersion: 12,
     // Retain the active diagram's fields for consumers of the earlier format.
     ...serializeDiagram(state),
     activeDiagramId: state.activeDiagramId,
