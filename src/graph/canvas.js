@@ -7,7 +7,7 @@ import { createViewport, toScreen as projectPoint, toWorld } from './viewport.js
 import { pointCoordinatesLabel } from './point.js';
 import { SnapTargetCache, snapPoint } from './snap.js';
 import { LINE_END_ACTIONS } from './line-extent.js';
-import { geometryKey } from './snap-context.js';
+import { geometryKey, independentSnapState } from './snap-context.js';
 import { objectsOf, selectedIdsOf } from '../objects.js';
 import { distance, displayedSketchMinimum } from './sketch.js';
 import { drawSketch } from './sketch-view.js';
@@ -69,9 +69,13 @@ export function mountGraph(container, store) {
   function segmentTargets() {
     return snapCache.get(currentState, viewport.bounds, drag?.object.id ?? null);
   }
+  // Placed points to snap to, without the dragged shape and the points following it.
+  function snapPoints() {
+    return independentSnapState(currentState, drag?.object.id ?? null).points ?? [];
+  }
   function segmentOptions(event, axis = null, guide = null) {
     return { axis, guide, previous: segmentSnap, enabled: currentState.segmentSnap, altKey: event.altKey,
-      points: currentState.points, bounds: viewport.bounds };
+      points: snapPoints(), bounds: viewport.bounds };
   }
   // A guide ({anchor, slope}) keeps the snapped point on that line, as for a line end handle.
   function segmentPosition(point, event, axis = null, guide = null) {
@@ -88,7 +92,7 @@ export function mountGraph(container, store) {
     if (currentState.lineSelected) return segmentPosition(point, event);
     const snapping = currentState.pointSnap;
     if (!snapping || event.altKey || point.x < bounds.xMin || point.x > bounds.xMax || point.y < bounds.yMin || point.y > bounds.yMax) return point;
-    snapTarget = snapPoint(point, snapCache.get(currentState, bounds, drag?.object.id ?? null), viewport.unit,{previous,axis});
+    snapTarget = snapPoint(point, snapCache.get(currentState, bounds, drag?.object.id ?? null), viewport.unit,{previous,axis,points:snapPoints(),bounds});
     return snapTarget?.point ?? point;
   }
 

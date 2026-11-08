@@ -79,6 +79,8 @@ export class TwoPointCreation extends CreationTool {
     }
     const constrained = constrainRuler(anchor, clamped, mode, event.shiftKey);
     const axis = mode === 'horizontal' ? 'x' : mode === 'vertical' ? 'y' : lock?.axis ?? null;
+    // The Shift axis lock shows like the tangent lock: marker at the start, no highlighted shape.
+    if (lock?.axis) session.draft.lock = { point: { ...anchor }, kind: 'direction', label: lock.axis === 'x' ? '수평 맞춤' : '수직 맞춤', ids: [], key: `shift-axis:${lock.axis}` };
     return ctx.segmentPosition(constrained, event, axis);
   }
   /**
@@ -165,6 +167,10 @@ export class SketchCreation extends CreationTool {
     return snapSketchTangent(point, ctx.state, ctx.viewport.bounds, ctx.viewport.unit, { previous: session.hover?.target,
       altKey: event.altKey, enabled: ctx.state.pointSnap, directId: event.target?.closest?.('[data-id]')?.dataset.id });
   }
+  /** The pass-through point touches a line, unless a placed point was just snapped: **점 맞춤** comes first. */
+  passTarget(raw, event, ctx, session) {
+    return ctx.snapTarget?.kind === 'point' ? null : this.tangentTarget(raw, event, ctx, session);
+  }
   pointerDown(session, event, ctx) {
     event.preventDefault();
     const raw = ctx.worldPoint(event);
@@ -174,14 +180,14 @@ export class SketchCreation extends CreationTool {
       if (session.points.length && distance(session.points[0], point) < 1e-6) return true;
       session.points.push(point); session.hover = null; ctx.redraw(this); return true;
     }
-    const target = this.tangentTarget(raw, event, ctx, session);
+    const target = this.passTarget(raw, event, ctx, session);
     const id = ctx.store.addSketch(session.points[0], session.points[1], target?.point ?? point, { lineId: target?.line.id });
     if (id) { session.points = []; session.hover = null; ctx.redraw(this); }
     return true;
   }
   pointerMove(session, event, ctx) {
     const raw = ctx.worldPoint(event);
-    session.hover = { point: ctx.snappedPosition(raw, event), target: session.points.length === 2 ? this.tangentTarget(raw, event, ctx, session) : null };
+    session.hover = { point: ctx.snappedPosition(raw, event), target: session.points.length === 2 ? this.passTarget(raw, event, ctx, session) : null };
     ctx.redraw(this); ctx.updateSnapFeedback(session.hover.target?.point ?? session.hover.point);
     return true;
   }

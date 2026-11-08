@@ -20,9 +20,10 @@ export class SnapPolicy {
 export class PrioritySnapPolicy extends SnapPolicy {
   compare(a, b) { return (a.priority ?? 0) - (b.priority ?? 0) || a.distance - b.distance; }
   retained(candidates, previous) { return previous && candidates.filter(candidate => candidate.key === previous.key).sort((a, b) => a.distance - b.distance)[0]; }
+  // A placed point inside capture always takes over: **점 맞춤** comes first.
   promote(retained, preferred) {
     return preferred && (retained.kind === 'shape' && preferred.priority < retained.priority
-      || preferred.kind === 'point' && retained.kind !== 'point' && preferred.distance < retained.distance);
+      || preferred.kind === 'point' && retained.kind !== 'point');
   }
 }
 

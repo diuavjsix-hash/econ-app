@@ -392,6 +392,24 @@ function guideSnapCandidates(point, targets, unit, guide, radius) {
 }
 
 /** Crossings retain priority; all pointer magnets share capture/release and axis constraints. */
-export function snapPoint(point, targets, unit, { previous=null, axis=null }={}) {
-  return chooseSnapCandidate(guidedSnapCandidates(point,targets,unit,axis),previous);
+const inBounds = (point, bounds) => !bounds || (point.x >= bounds.xMin && point.x <= bounds.xMax && point.y >= bounds.yMin && point.y <= bounds.yMax);
+
+/**
+ * Placed points as candidates (**점 맞춤**, priority 0: first among captured targets).
+ * Shift's locked axis or a guide line keeps only points on it. Every point consumer shares this.
+ */
+export function pointSnapCandidates(point, points, unit, { axis = null, guide = null, bounds = null, radius = SNAP_RELEASE_PX } = {}) {
+  const locked = axis === 'x' ? 'y' : 'x', normal = guide && (d => ({ x: -d.y, y: d.x }))(directionOf(guide.slope)), result = [];
+  for (const target of points ?? []) {
+    if (!inBounds(target.anchor, bounds) || (axis && Math.abs(target.anchor[locked] - point[locked]) > EPS)) continue;
+    if (guide && Math.abs((target.anchor.x - guide.anchor.x) * normal.x + (target.anchor.y - guide.anchor.y) * normal.y) > EPS) continue;
+    const aligned = axis ? { ...target.anchor, [locked]: point[locked] } : { ...target.anchor };
+    const pixels = distance(point, aligned) * unit;
+    if (pixels <= radius) result.push({ point: aligned, kind: 'point', ids: [target.id], key: `point:${target.id}`, priority: 0, distance: pixels });
+  }
+  return result;
+}
+
+export function snapPoint(point, targets, unit, { previous=null, axis=null, points=[], bounds=null }={}) {
+  return chooseSnapCandidate([...guidedSnapCandidates(point,targets,unit,axis), ...pointSnapCandidates(point,points,unit,{axis,bounds})],previous);
 }

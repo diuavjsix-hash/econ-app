@@ -85,6 +85,23 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   store.setToolMode('line');click(pointerAt(on,slope,0,3));const flat={x:on.x+120/view().unit,y:on.y+0.05};
   send('pointerdown',flat,{shiftKey:true});send('pointerup',flat,{shiftKey:true});
   check(store.getState().lines.at(-1).slope===0,`${name}: a heading near horizontal still locks horizontal`);
+  const label=()=>svg.querySelector('.snap-feedback .snap-feedback-label')?.textContent??'';
+  store.undo();store.undo();check(!store.getState().lines.length,`${name}: the drawn lines are undone before the axis checks`);
+  store.setToolMode('line');click(pointerAt(on,slope,0,3));send('pointermove',flat,{shiftKey:true});
+  check(label().includes('수평 맞춤')&&svg.querySelector('.snap-feedback[data-snap-kind="direction"]')&&!svg.querySelector('[data-snap-source]'),`${name}: the Shift axis lock shows 수평 맞춤 without a highlighted shape`);
+  const up={x:on.x+0.05,y:on.y+120/view().unit};send('pointermove',up,{shiftKey:true});
+  check(label().includes('수직 맞춤'),`${name}: and 수직 맞춤 when the heading is vertical`);
+  send('pointermove',flat);check(!label().includes('맞춤'),`${name}: releasing Shift clears the lock feedback`);
+  store.setToolMode('hand');
+  // A placed point within reach wins over the curve body under the pointer, for every point consumer.
+  const placed={x:on.x+6/view().unit,y:on.y+6/view().unit};store.addPoint(placed);
+  for(const mode of ['sketch','line','point']){
+   store.setToolMode(mode);send('pointermove',on);
+   check(label().includes('점 맞춤'),`${name}: ${mode} hover on the curve prefers the nearby point`);
+  }
+  store.setToolMode('sketch');click(on);click({x:on.x+2.5,y:on.y+2.5});click({x:on.x+1.4,y:on.y+0.7});
+  const sketch=store.getState().sketches.at(-1);
+  check(sketch&&near(sketch.start,placed),`${name}: the free curve starts exactly on the placed point`);
  }
  dispose?.();out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
 }catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};

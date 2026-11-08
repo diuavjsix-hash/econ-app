@@ -50,15 +50,13 @@ export function snapShapeToPoint(shape,state,bounds,unit,{previous=null,referenc
   return SHAPE_SNAP_POLICY.choose(candidates,previous);
 }
 
-/** An explicit point can take over from a farther computed magnet; keep point capture stable. */
+/** A placed point inside capture comes first (**점 맞춤**) over computed magnets; keep point capture stable. */
 export function chooseShapeMagnet(candidates,previous) {
   const available=candidates.filter(Boolean);
   const captured=previous && available.find(candidate=>candidate.kind===previous.kind && candidate.key===previous.key);
-  if (captured) {
-    const point=available.find(candidate=>candidate.kind==='point' && candidate.distance<=TANGENT_CAPTURE_PX && candidate.distance<=captured.distance);
-    return captured.kind!=='point' && point?point:captured;
-  }
-  return available.sort((a,b)=>a.distance-b.distance)[0]??null;
+  const point=available.filter(candidate=>candidate.kind==='point' && candidate.distance<=TANGENT_CAPTURE_PX).sort((a,b)=>a.distance-b.distance)[0];
+  if (captured) return captured.kind!=='point' && point?point:captured;
+  return point??available.sort((a,b)=>a.distance-b.distance)[0]??null;
 }
 
 export function snapMovingCurve(curve,state,bounds,unit,options={}) {

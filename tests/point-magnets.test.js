@@ -109,9 +109,12 @@ test('points remain usable inside axis gaps while offscreen points and display-o
   assert.equal(other.lineThroughSelectedPoint(),null);assert.equal(other.getState().points.length,0);
 });
 
-test('explicit closer points take over from a captured origin or tangent rather than getting stuck',()=>{
-  const store=createStore(),moving=line(store,1);target(store,{x:5,y:5.2});
+test('a placed point in range comes first, also over a nearer or captured origin and tangent',()=>{
+  const store=createStore(),moving=line(store,1);
   const origin=snapMovingLine(moving,store.getState(),bounds,56);assert.equal(origin.kind,'intercept');
+  target(store,{x:5,y:5.2});
+  assert.equal(snapMovingLine(moving,store.getState(),bounds,56).kind,'point','a point in range beats a nearer origin');
+  assert.equal(snapMovingLine(moving,store.getState(),bounds,56,{previous:origin}).kind,'point','and takes over a captured origin');
   const point=snapMovingLine({...moving,anchor:{x:3,y:3.2}},store.getState(),bounds,56,{previous:origin});assert.equal(point.kind,'point');
   const other=createStore(),curve=cup(other);line(other,0,{x:4,y:2.1});
   const tangent=snapMovingCurve(curve,other.getState(),bounds,56);assert.equal(tangent.kind,'tangent');

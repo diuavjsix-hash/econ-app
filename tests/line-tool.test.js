@@ -228,8 +228,11 @@ test('the line tool: Shift after a start on a curve locks its tangent, Alt drops
   assert.equal(candidate.label, '접선 맞춤'); assert.deepEqual(candidate.ids, [ppcId]); close(candidate.point, on);
   tool.pointerMove(session, event(heading.x, heading.y, { shiftKey: true, altKey: true }), ctx);
   assert.ok(Math.abs(session.draft.end.y - on.y) < 1e-12 || Math.abs(session.draft.end.x - on.x) < 1e-12, 'Alt+Shift keeps only the axis lock');
-  assert.equal(tool.feedback(session, ctx).candidate, null);
+  const axisFeedback = tool.feedback(session, ctx).candidate;
+  assert.ok(['수평 맞춤', '수직 맞춤'].includes(axisFeedback.label) && axisFeedback.ids.length === 0, 'the axis lock shows too, without a shape');
+  close(axisFeedback.point, on);
   tool.pointerMove(session, event(heading.x, heading.y), ctx);
+  assert.equal(tool.feedback(session, ctx).candidate, null, 'no Shift, no lock feedback');
   close(session.draft.end, heading); assert.equal(session.draft.lock, null, 'without Shift the end is free');
   tool.pointerDown(session, event(heading.x, heading.y, { shiftKey: true }), ctx);
   const drawn = added.pop();

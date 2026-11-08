@@ -196,3 +196,50 @@ test('axis-gap-hidden tangencies and coincident straight free pieces create no p
   flat.addLine();flat.updateSelected({slope:0,anchor:{x:4,y:3}});
   assert.equal(buildSnapTargets(flat.getState(),bounds).crossings.some(c=>c.ids.includes('sketch-1')&&c.ids.includes('line-1')),false);
 });
+
+test('placed points come first for every point consumer: in range they beat crossings and lines, and take over a captured one', async () => {
+  const { pointSnapCandidates } = await import('../src/graph/snap.js');
+  const store = createStore();
+  store.addLine({ x: 0, y: 2 }, { x: 10, y: 2 });
+  store.addLine({ x: 3, y: 0 }, { x: 3, y: 10 });
+  const placed = { id: 'point-a', anchor: { x: 3.2, y: 2.1 } };
+  const targets = buildSnapTargets(store.getState(), bounds), unit = 50;
+  const crossing = snapPoint({ x: 3.02, y: 2.02 }, targets, unit);
+  assert.equal(crossing.kind, 'intersection', 'without points the crossing is chosen');
+  const hit = snapPoint({ x: 3.02, y: 2.02 }, targets, unit, { points: [placed], bounds });
+  assert.equal(hit.kind, 'point', 'a point inside 16px beats a nearer crossing');
+  assert.deepEqual(hit.point, placed.anchor);
+  assert.equal(snapPoint({ x: 3.1, y: 2.05 }, targets, unit, { points: [placed], bounds, previous: crossing }).kind, 'point', 'and takes over a captured crossing');
+  assert.equal(snapPoint({ x: 3.6, y: 2.02 }, targets, unit, { points: [placed], bounds }).kind, 'shape', 'outside 16px the line stays');
+  assert.equal(snapPoint({ x: 3.02, y: 2.02 }, targets, unit, { points: [{ ...placed, anchor: { x: 11, y: 2.1 } }], bounds }).kind, 'intersection', 'a point out of view is no target');
+  // Shift's axis and a guide keep only the points on them.
+  assert.equal(pointSnapCandidates({ x: 3, y: 2.1 }, [placed], unit, { axis: 'x' }).length, 1);
+  assert.equal(pointSnapCandidates({ x: 3, y: 2 }, [placed], unit, { axis: 'x' }).length, 0);
+  assert.equal(pointSnapCandidates({ x: 3, y: 2 }, [placed], unit, { guide: { anchor: { x: 0, y: 0 }, slope: 2.1 / 3.2 } }).length, 1);
+});
+
+test('a free curve pass-through point snaps to a placed point before touching a line', async () => {
+  const { CREATION_TOOLS } = await import('../src/graph/creation-tools.js');
+  const tool = CREATION_TOOLS.sketch, added = [];
+  const s = createStore(), lineId = s.addLine({ x: 0, y: 4 }, { x: 10, y: 4 });
+  const base = { ...s.getState(), sketchSelected: true, pointSnap: true, sketchMode: 'free' };
+  const ctx = {
+    state: base, viewport: { bounds, unit: 50 }, snapTarget: null,
+    worldPoint: event => ({ x: event.x, y: event.y }), inside: () => true,
+    snappedPosition(point) { this.snapTarget = this.placed ? { point: this.placed, kind: 'point', ids: ['p'] } : null; return this.placed ?? point; },
+    store: { addSketch: (start, end, anchor, options) => (added.push({ anchor, options }), 'sketch-1') },
+    redraw() {}, updateSnapFeedback() {},
+  };
+  const event = (x, y) => ({ x, y, target: { closest: () => null }, preventDefault() {} });
+  const session = tool.createSession();
+  tool.pointerDown(session, event(1, 6), ctx); tool.pointerDown(session, event(7, 6), ctx);
+  tool.pointerDown(session, event(4, 4.05), ctx);
+  assert.equal(added.pop().options.lineId, lineId, 'near a line the curve touches it');
+  tool.pointerDown(session, event(1, 6), ctx); tool.pointerDown(session, event(7, 6), ctx);
+  ctx.placed = { x: 4.1, y: 4 };
+  tool.pointerMove(session, event(4, 4.05), ctx);
+  assert.equal(session.hover.target, null, 'hover shows the point, not the line');
+  tool.pointerDown(session, event(4, 4.05), ctx);
+  const result = added.pop();
+  assert.deepEqual(result.anchor, { x: 4.1, y: 4 }); assert.equal(result.options.lineId, undefined, 'a snapped point passes through it without a line binding');
+});

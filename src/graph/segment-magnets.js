@@ -1,24 +1,15 @@
-import { guidedSnapCandidates } from './snap.js';
+import { guidedSnapCandidates, pointSnapCandidates } from './snap.js';
 import { translateRuler } from './ruler.js';
-import { directionOf } from './math.js';
 import { SNAP_CAPTURE_PX, SNAP_RELEASE_PX, chooseSnapCandidate } from './snap-policy.js';
 
 export const SEGMENT_CAPTURE_PX = SNAP_CAPTURE_PX;
 export const SEGMENT_RELEASE_PX = SNAP_RELEASE_PX;
-const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const visible = (point, bounds) => !bounds || (point.x >= bounds.xMin && point.x <= bounds.xMax && point.y >= bounds.yMin && point.y <= bounds.yMax);
 
 function candidates(point, targets, unit, { axis = null, guide = null, points = [], bounds } = {}) {
   if (!guide && !visible(point, bounds)) return [];
-  const result = guidedSnapCandidates(point, targets, unit, axis, SEGMENT_RELEASE_PX, guide);
-  const locked = axis === 'x' ? 'y' : 'x', normal = guide && (d => ({ x: -d.y, y: d.x }))(directionOf(guide.slope));
-  for (const target of points) {
-    if (!visible(target.anchor, bounds) || (axis && Math.abs(target.anchor[locked] - point[locked]) > 1e-9)) continue;
-    if (guide && Math.abs((target.anchor.x - guide.anchor.x) * normal.x + (target.anchor.y - guide.anchor.y) * normal.y) > 1e-9) continue;
-    const aligned = axis ? { ...target.anchor, [locked]: point[locked] } : { ...target.anchor };
-    const pixels = distance(point, aligned) * unit;
-    if (pixels <= SEGMENT_RELEASE_PX) result.push({ point: aligned, kind: 'point', ids: [target.id], key: `point:${target.id}`, priority: 0, distance: pixels });
-  }
+  const result = [...guidedSnapCandidates(point, targets, unit, axis, SEGMENT_RELEASE_PX, guide),
+    ...pointSnapCandidates(point, points, unit, { axis, guide, bounds, radius: SEGMENT_RELEASE_PX })];
   return result.filter(candidate => visible(candidate.point, bounds));
 }
 

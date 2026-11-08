@@ -1,5 +1,13 @@
 # 구현 구조
 
+## 점 맞춤 우선·Shift 수평/수직 표시 · 2026-11-08
+
+- `snap.js`의 `pointSnapCandidates(point,points,unit,{axis,guide,bounds,radius})`가 찍어 둔 점 후보(`kind:'point'`, priority 0)를 만듭니다. 직선 도구의 `segment-magnets.js`에 있던 코드를 옮겼고, `snapPoint`도 `points`·`bounds`를 받아 같은 후보를 씁니다. 그래서 점 도구·자유 곡선 생성·점 이동·자유 곡선 손잡이(canvas의 `snappedPosition`)도 찍어 둔 점에 붙습니다.
+- canvas의 `snapPoints()`가 `independentSnapState(state, 드래그 중인 도형)`의 점 목록을 `snappedPosition`과 `segmentOptions`에 넘깁니다. 움직이는 도형과 그것을 따라가는 점은 대상이 아닙니다.
+- 우선순위: `PrioritySnapPolicy.promote`는 16px 안의 점이 유지 중인 다른 후보를 거리와 상관없이 넘겨받게 합니다. 도형 전체 이동의 `chooseShapeMagnet`도 16px 안의 점을 먼저 고르고, 붙어 있던 다른 후보를 넘겨받습니다.
+- `SketchCreation.passTarget`: 지나는 점이 점 맞춤(`ctx.snapTarget.kind==='point'`)이면 직선 접하기(`snapSketchTangent`)를 하지 않습니다.
+- `TwoPointCreation.position`: Shift가 수평·수직으로 잠기면 `draft.lock`에 `kind:'direction'`·`수평 맞춤`/`수직 맞춤`·빈 ids를 넣어 접선과 같은 `feedback()` 경로로 표시합니다.
+
 ## Shift 방향 잠금의 접선 후보 · 2026-11-08
 
 직선 도구의 Shift를 "가까운 방향으로 잠금"으로 넓혔습니다. 새 도형·관계·버튼·저장 필드는 없습니다.
