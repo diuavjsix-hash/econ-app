@@ -159,3 +159,84 @@ test('a free curve start and end are shared endpoint targets, excluded while edi
   store.addLine(hit.point, { x: 9, y: 2 });
   close(lineEndPoints(store.getState().lines.at(-1))[0], { x: 7, y: 6 });
 });
+
+test('Shift picks the nearest of horizontal, vertical and the given tangents', async () => {
+  const { directionLock, alongDirection } = await import('../src/graph/ruler.js');
+  const anchor = { x: 2, y: 2 }, diagonal = { direction: { x: Math.SQRT1_2, y: -Math.SQRT1_2 }, ids: ['c1'] };
+  assert.deepEqual(directionLock(anchor, { x: 6, y: 2.4 }), { axis: 'x' }, 'without tangents it stays the axis lock');
+  assert.deepEqual(directionLock(anchor, { x: 2.3, y: 6 }, [diagonal]), { axis: 'y' });
+  assert.deepEqual(directionLock(anchor, { x: 6, y: 2.4 }, [diagonal]), { axis: 'x' });
+  assert.deepEqual(directionLock(anchor, { x: 5, y: -0.6 }, [diagonal]).ids, ['c1'], 'a heading near the tangent locks the tangent');
+  assert.deepEqual(directionLock(anchor, { x: 0, y: 4.4 }, [diagonal]).ids, ['c1'], 'either side of the start');
+  // A horizontal tangent (a minimum) replaces the horizontal axis and keeps its curve.
+  assert.deepEqual(directionLock(anchor, { x: 6, y: 2.4 }, [{ direction: { x: 1, y: 0 }, ids: ['m'] }]).ids, ['m']);
+  assert.deepEqual(directionLock(anchor, { x: 2.1, y: 6 }, [{ direction: { x: -1, y: 0 }, ids: ['m'] }]), { axis: 'y' });
+  close(alongDirection(anchor, { x: 5, y: -0.6 }, diagonal.direction), { x: 4.8, y: -0.8 });
+  close(alongDirection(anchor, { x: 9, y: -5 }, diagonal.direction, bounds), { x: 4, y: 0 }, 1e-12);
+  const vertical = alongDirection(anchor, { x: 2.4, y: 7 }, { x: 0, y: 1 }, bounds);
+  assert.equal(vertical.x, 2, 'a vertical lock keeps the exact x');
+});
+
+test('curve tangents at a point on PPC, free curves and contacts; none at kinks or off the curve', async () => {
+  const { curveTangentsAt } = await import('../src/graph/curve-contacts.js');
+  const { curveFamilyOf } = await import('../src/models/curve-families.js');
+  const store = createStore(), ppcId = store.addIndifference('ppc', { anchor: { x: 3, y: 3 } });
+  const state = store.getState(), ppc = state.sketches.find(curve => curve.id === ppcId) ?? state.curves.find(curve => curve.id === ppcId);
+  const family = curveFamilyOf(ppc), on = family.nearestPoint(ppc, { x: 2, y: 4 }, bounds);
+  const [found] = curveTangentsAt(state, bounds, on, [ppcId]);
+  const expected = family.tangentVector(ppc, on);
+  assert.ok(found && Math.abs(found.direction.x * expected.y - found.direction.y * expected.x) < 1e-9, 'PPC tangent from its family');
+  assert.deepEqual(found.ids, [ppcId]);
+  assert.deepEqual(curveTangentsAt(state, bounds, { x: on.x + 0.3, y: on.y }, [ppcId]), [], 'a point off the curve has no tangent');
+  assert.deepEqual(curveTangentsAt(state, bounds, on, []), []);
+  const kinkId = store.addIndifference('complements', { anchor: { x: 3, y: 3 } });
+  assert.deepEqual(curveTangentsAt(store.getState(), bounds, { x: 3, y: 3 }, [kinkId]), [], 'a kink has no single tangent');
+  // A free curve: the original quadratic piece, here its horizontal bottom.
+  const sketchId = store.addSketch({ x: 1, y: 6 }, { x: 7, y: 6 }, { x: 4, y: 2 });
+  const [bottom] = curveTangentsAt(store.getState(), bounds, { x: 4, y: 2 }, [sketchId]);
+  assert.ok(bottom && Math.abs(bottom.direction.y) < 1e-6, 'free curve tangent at its bottom is horizontal');
+});
+
+test('the line tool: Shift after a start on a curve locks its tangent, Alt drops it, feedback names it', async () => {
+  const { curveFamilyOf } = await import('../src/models/curve-families.js');
+  const store = createStore(), ppcId = store.addIndifference('ppc', { anchor: { x: 3, y: 3 } });
+  const state = { ...store.getState(), lineSelected: true, lineKind: 'segment', lineStyle: 'solid' };
+  const ppc = [...state.curves, ...state.sketches].find(curve => curve.id === ppcId), family = curveFamilyOf(ppc);
+  const on = family.nearestPoint(ppc, { x: 2, y: 4 }, bounds), t = family.tangentVector(ppc, on), slope = t.y / t.x;
+  const tool = CREATION_TOOLS.line, added = [], guides = [];
+  const ctx = {
+    state, viewport: { bounds }, segmentSnap: null,
+    worldPoint: event => ({ x: event.x, y: event.y }),
+    segmentPosition(point, event, axis, guide) { guides.push(guide ?? null); return point; },
+    inside: point => point.x >= 0 && point.x <= 10 && point.y >= 0 && point.y <= 10,
+    store: { selectObject() {}, addLine: (from, to) => added.push({ from, to }) },
+    setSegmentSnap(value) { this.segmentSnap = value; }, capturePointer() {}, releasePointer() {}, redraw() {}, updateSnapFeedback() {},
+  };
+  const event = (x, y, extra = {}) => ({ x, y, clientX: x * 50, clientY: -y * 50, pointerId: 1, target: { closest: () => null }, preventDefault() {}, ...extra });
+  const session = tool.createSession();
+  // The first click landed on the PPC body (as the shared segment snap reports it).
+  ctx.segmentSnap = { point: on, kind: 'shape', ids: [ppcId] };
+  tool.pointerDown(session, event(on.x, on.y), ctx); ctx.segmentSnap = null;
+  tool.pointerEnd(session, { ...event(on.x, on.y), type: 'pointerup' }, ctx);
+  assert.equal(session.draft.tangents.length, 1);
+  const heading = { x: on.x + 2, y: on.y + 2 * slope + 0.3 };
+  tool.pointerMove(session, event(heading.x, heading.y, { shiftKey: true }), ctx);
+  const end = session.draft.end;
+  assert.ok(Math.abs((end.y - on.y) / (end.x - on.x) - slope) < 1e-9, 'the end lies on the tangent');
+  assert.ok(Math.abs(guides.at(-1).slope - slope) < 1e-12 && guides.at(-1).anchor === session.draft.anchor, 'snapping stays on the tangent guide');
+  const { candidate } = tool.feedback(session, ctx);
+  assert.equal(candidate.label, '접선 맞춤'); assert.deepEqual(candidate.ids, [ppcId]); close(candidate.point, on);
+  tool.pointerMove(session, event(heading.x, heading.y, { shiftKey: true, altKey: true }), ctx);
+  assert.ok(Math.abs(session.draft.end.y - on.y) < 1e-12 || Math.abs(session.draft.end.x - on.x) < 1e-12, 'Alt+Shift keeps only the axis lock');
+  assert.equal(tool.feedback(session, ctx).candidate, null);
+  tool.pointerMove(session, event(heading.x, heading.y), ctx);
+  close(session.draft.end, heading); assert.equal(session.draft.lock, null, 'without Shift the end is free');
+  tool.pointerDown(session, event(heading.x, heading.y, { shiftKey: true }), ctx);
+  const drawn = added.pop();
+  assert.ok(Math.abs((drawn.to.y - drawn.from.y) / (drawn.to.x - drawn.from.x) - slope) < 1e-9, 'the second click commits the tangent line');
+  // A start off every curve keeps the plain horizontal/vertical lock.
+  tool.pointerDown(session, event(1, 1), ctx); tool.pointerEnd(session, { ...event(1, 1), type: 'pointerup' }, ctx);
+  assert.deepEqual(session.draft.tangents, []);
+  tool.pointerDown(session, event(3, 1.5, { shiftKey: true }), ctx);
+  assert.deepEqual(added.pop().to, { x: 3, y: 1 });
+});

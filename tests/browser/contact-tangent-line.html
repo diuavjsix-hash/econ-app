@@ -8,6 +8,8 @@ import { snapMovingCurve } from '/src/graph/point-magnets.js';
 import { contactTangentSlope } from '/src/graph/curve-contacts.js';
 import { serializeDocument } from '/src/export.js';
 import { CURVE_CONTACT_CASES } from '/tests/fixtures/curve-contact-cases.js';
+import { createStore } from '/src/state.js';
+import { curveFamilyOf } from '/src/models/curve-families.js';
 const stage=document.querySelector('#stage'),out=document.querySelector('#result');let store,svg,dispose;
 const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-7;
 const sameSlope=(a,b)=>a===null||b===null?a===b:Math.abs(Math.atan(a)-Math.atan(b))<1e-6;
@@ -53,6 +55,36 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   store.setToolMode('line');store.update({lineKind:'segment',lineStyle:'dashed'});click(pointerAt(contact.point,found.slope,-3,4));
   const far=pointerAt(contact.point,found.slope,-120,-60);send('pointermove',far);click(far);
   check(near(store.getState().lines.at(-1)?.anchor??{x:NaN,y:NaN},contact.point),`${name}: segment start still snaps to the contact`);
+  // Shift locks the nearest of horizontal, vertical and the contact's common tangent.
+  const count=store.getState().lines.length,toward=pointerAt(contact.point,found.slope,60,5);
+  store.setToolMode('line');click(pointerAt(contact.point,found.slope,-3,4));send('pointermove',toward,{shiftKey:true});
+  check(feedback()?.querySelector('.snap-feedback-label')?.textContent.includes('접선 맞춤'),`${name}: Shift toward the tangent shows the tangent lock`);
+  check(new Set([...svg.querySelectorAll('[data-snap-source]')].map(n=>n.dataset.snapSource)).size===2,`${name}: the Shift lock highlights both touching curves`);
+  send('pointerdown',toward,{shiftKey:true});send('pointerup',toward,{shiftKey:true});
+  const shifted=store.getState().lines.at(-1);
+  check(store.getState().lines.length===count+1&&sameSlope(shifted.slope,found.slope)&&near(shifted.anchor,contact.point),`${name}: Shift click draws the common tangent through the contact`);
+  store.undo();check(store.getState().lines.length===count,`${name}: the Shift line is one undo step`);
+  store.setToolMode('line');click(pointerAt(contact.point,found.slope,-3,4));send('pointermove',toward,{shiftKey:true,altKey:true});
+  check(!feedback(),`${name}: Alt+Shift drops the tangent lock`);
+  send('pointerdown',toward,{shiftKey:true,altKey:true});send('pointerup',toward,{shiftKey:true,altKey:true});
+  const axisLine=store.getState().lines.at(-1);
+  check(store.getState().lines.length===count+1&&(axisLine.slope===0||axisLine.slope===null),`${name}: Alt+Shift keeps the plain axis lock`);
+  store.undo();
+ }
+ // A start on a single PPC: Shift locks its tangent there.
+ for(const size of [800,312]){
+  stage.style.width=size+'px';store=createStore();const id=store.addIndifference('ppc',{anchor:{x:3,y:3}});mount();
+  const ppc=store.getState().curves.find(c=>c.id===id),family=curveFamilyOf(ppc),bounds=view().bounds;
+  const on=family.nearestPoint(ppc,{x:2,y:4},bounds),t=family.tangentVector(ppc,on),slope=t.y/t.x,name=`${size} single PPC`;
+  store.setToolMode('line');store.update({lineKind:'segment',lineStyle:'solid'});
+  click(pointerAt(on,slope,0,3));const toward=pointerAt(on,slope,40,3);send('pointermove',toward,{shiftKey:true});
+  check(feedback()?.querySelector('.snap-feedback-label')?.textContent.includes('접선 맞춤'),`${name}: Shift shows the tangent lock from a point on the curve`);
+  send('pointerdown',toward,{shiftKey:true});send('pointerup',toward,{shiftKey:true});
+  const line=store.getState().lines.at(-1),touch=family.nearestPoint(ppc,line.anchor,bounds),local=family.tangentVector(ppc,line.anchor);
+  check(Math.hypot(touch.x-line.anchor.x,touch.y-line.anchor.y)<1e-7&&sameSlope(line.slope,local.y/local.x),`${name}: the line is tangent to the PPC at its start`);
+  store.setToolMode('line');click(pointerAt(on,slope,0,3));const flat={x:on.x+120/view().unit,y:on.y+0.05};
+  send('pointerdown',flat,{shiftKey:true});send('pointerup',flat,{shiftKey:true});
+  check(store.getState().lines.at(-1).slope===0,`${name}: a heading near horizontal still locks horizontal`);
  }
  dispose?.();out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
 }catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};

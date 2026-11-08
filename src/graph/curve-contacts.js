@@ -30,6 +30,8 @@ class StraightBranch extends ContactBranch {
     return { point: { x: this.a.x + t * v.x, y: this.a.y + t * v.y }, tangent: this.vector };
   }
   contains(p) { return distance(this.contact(this.angle, p).point, p) < 1e-7; }
+  /** How far p is from the branch, and the direction there. */
+  tangentAt(p) { return { distance: distance(this.contact(this.angle, p).point, p), tangent: this.vector }; }
 }
 class QuadraticBranch extends ContactBranch {
   constructor(key, points) {
@@ -45,6 +47,14 @@ class QuadraticBranch extends ContactBranch {
     const u = Math.max(0, Math.min(1, t));
     const tangent = unitVector({ x: this.from.x * (1 - u) + this.to.x * u, y: this.from.y * (1 - u) + this.to.y * u });
     return tangent ? { point: quadraticPoint(this.points, u), tangent, parameter: u } : null;
+  }
+  tangentAt(p) {
+    const gap = u => distance(quadraticPoint(this.points, u), p), steps = 32;
+    let best = 0;
+    for (let i = 1; i <= steps; i++) if (gap(i / steps) < gap(best / steps)) best = i;
+    const u = minimum(gap, Math.max(0, (best - 1) / steps), Math.min(1, (best + 1) / steps));
+    const tangent = unitVector({ x: this.from.x * (1 - u) + this.to.x * u, y: this.from.y * (1 - u) + this.to.y * u });
+    return tangent ? { distance: gap(u), tangent } : null;
   }
 }
 class AnalyticBranch extends ContactBranch {
@@ -206,6 +216,37 @@ export function buildCurveContactTargets(state, bounds, excludeObjectId = null) 
     }
   }
   return targets;
+}
+
+/**
+ * Tangent directions of the listed curves at a point lying on them, from the original
+ * geometry (analytic family or quadratic piece). Parallel directions merge their ids;
+ * a kink or a point off the curve gives none.
+ */
+export function curveTangentsAt(state, bounds, point, ids, tolerance = 1e-6) {
+  const listed = new Set(ids ?? []), found = [];
+  if (!listed.size || !validPoint(point)) return found;
+  const limit = tolerance * Math.max(1, length(point));
+  for (const curve of [...(state.curves ?? []), ...(state.sketches ?? [])]) {
+    if (!listed.has(curve.id)) continue;
+    const family = curveFamilyOf(curve);
+    let tangent = null;
+    if (family) {
+      const nearest = family.contactGeometry === 'kink' ? null : family.nearestPoint(curve, point, bounds);
+      if (nearest && distance(nearest, point) <= limit) tangent = unitVector(family.tangentVector(curve, point) ?? { x: 0, y: 0 });
+    } else {
+      let best = null;
+      for (const branch of contactBranches(curve, bounds)) {
+        const hit = branch.tangentAt(point);
+        if (hit && (!best || hit.distance < best.distance)) best = hit;
+      }
+      if (best && best.distance <= limit) tangent = best.tangent;
+    }
+    if (!tangent) continue;
+    const same = found.find(entry => Math.abs(cross(entry.direction, tangent)) < 1e-9);
+    if (same) same.ids.push(curve.id); else found.push({ direction: tangent, ids: [curve.id] });
+  }
+  return found;
 }
 
 export const slopeOfDirection = d => Math.abs(d.x) < 1e-12 ? null : d.y / d.x;

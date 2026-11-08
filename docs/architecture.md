@@ -1,5 +1,15 @@
 # 구현 구조
 
+## Shift 방향 잠금의 접선 후보 · 2026-11-08
+
+직선 도구의 Shift를 "가까운 방향으로 잠금"으로 넓혔습니다. 새 도형·관계·버튼·저장 필드는 없습니다.
+
+- `TwoPointCreation.pointerDown`이 첫 점의 공통 맞춤(`ctx.segmentSnap`)이 있을 때 `startTangents`로 그 점을 지나는 모든 곡선(`curves`·`sketches`)의 접선을 구해 초안(`draft.tangents`)에 둡니다. 맞춤은 겹친 대상 중 하나(끝점·접점 등)만 알려 주므로 곡선은 위치로 찾습니다.
+- `curve-contacts.js`의 `curveTangentsAt(state,bounds,point,ids)`: 해석 곡선은 종류 클래스의 `nearestPoint`로 곡선 위인지 확인하고 `tangentVector`를 씁니다(`contactGeometry:'kink'`는 제외). 자유·기본 곡선은 `contactBranches`의 이차/직선 구간에 추가한 `tangentAt`(최근접 거리와 방향)으로 가장 가까운 구간을 고릅니다. 평행한 접선은 ids를 합쳐 하나로 반환합니다.
+- `ruler.js`의 `directionLock(anchor,point,tangents)`이 수평·수직·접선 중 anchor→포인터 방향과 가장 가까운 것을 고릅니다. 접선이 없으면 이전 규칙(|dx|≥|dy|이면 수평)과 같습니다. `alongDirection`은 포인터를 잠긴 방향 위로 투영하고 보이는 범위 안에 둡니다(수직이면 x를 정확히 유지).
+- 접선으로 잠기면 `ctx.segmentPosition(point,event,null,guide)`가 canvas의 `segmentOptions`에 `guide`를 넘겨 직선 끝 손잡이와 같은 `guideSnapCandidates` 경로로 접선 위 대상에 붙습니다. 붙을 곳이 없을 때는 `draft.lock`(접점·`kind:'tangent'`·`label:'접선 맞춤'`·곡선 ids)을 `feedback()`이 공통 표시에 넘깁니다. Alt는 접선 후보를 뺍니다.
+- 검사: `tests/line-tool.test.js`(방향 선택·투영·곡선 접선·포인터 흐름), `tests/browser/contact-tangent-line.html`(접점 사례 세 종류 × 두 크기 × 축 반전, 단일 PPC).
+
 ## 두 점 직선 도구 · 2026-11-08
 
 `TOOL_MODES.line`(`lineSelected`)이 생성 도구로 등록됐습니다. 점선 도구의 포인터 흐름을 `creation-tools.js`의 `TwoPointCreation`으로 올리고 `DashedCreation`과 `LineCreation`이 상속합니다. 두 도구는 클릭·클릭/드래그, Shift 축 고정, canvas의 `dashedPosition`(공통 `snapDashedPoint`와 `dashedSnap` 토글)을 공유하며 방향 모드·기존 도형 누르기·미리보기·결과만 다릅니다. 직선 도구는 기존 직선을 눌러도 잡지 않고 그 위치에서 그리기를 시작합니다.

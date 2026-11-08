@@ -69,12 +69,13 @@ export function mountGraph(container, store) {
   function segmentTargets() {
     return snapCache.get(currentState, viewport.bounds, drag?.object.id ?? null);
   }
-  function segmentOptions(event, axis = null) {
-    return { axis, previous: segmentSnap, enabled: currentState.segmentSnap, altKey: event.altKey,
+  function segmentOptions(event, axis = null, guide = null) {
+    return { axis, guide, previous: segmentSnap, enabled: currentState.segmentSnap, altKey: event.altKey,
       points: currentState.points, bounds: viewport.bounds };
   }
-  function segmentPosition(point, event, axis = null) {
-    segmentSnap = snapSegmentPoint(point, segmentTargets(), viewport.unit, segmentOptions(event, axis));
+  // A guide ({anchor, slope}) keeps the snapped point on that line, as for a line end handle.
+  function segmentPosition(point, event, axis = null, guide = null) {
+    segmentSnap = snapSegmentPoint(point, segmentTargets(), viewport.unit, segmentOptions(event, axis, guide));
     snapTarget = segmentSnap;
     return segmentSnap?.point ?? point;
   }

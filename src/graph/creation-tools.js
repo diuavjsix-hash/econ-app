@@ -4,7 +4,8 @@ import { toScreen } from './viewport.js';
 import { directionOf } from './math.js';
 import { displayedLineSegments } from './display.js';
 import { lineFromPoints } from './line-extent.js';
-import { constrainRuler } from './ruler.js';
+import { constrainRuler, directionLock, alongDirection } from './ruler.js';
+import { curveTangentsAt } from './curve-contacts.js';
 import { drawSketch } from './sketch-view.js';
 import { unitVector, validSketch, distance } from './sketch.js';
 import { snapSketchTangent } from './sketch-magnets.js';
@@ -66,10 +67,28 @@ export class TwoPointCreation extends CreationTool {
   position(session, event, ctx, anchor = null) {
     const point = ctx.worldPoint(event), { bounds } = ctx.viewport, mode = this.directionMode(ctx.state);
     const clamped = { x: Math.max(bounds.xMin, Math.min(bounds.xMax, point.x)), y: Math.max(bounds.yMin, Math.min(bounds.yMax, point.y)) };
-    const constrained = anchor ? constrainRuler(anchor, clamped, mode, event.shiftKey) : clamped;
-    const axis = !anchor ? null : mode === 'horizontal' ? 'x' : mode === 'vertical' ? 'y'
-      : event.shiftKey ? (Math.abs(clamped.x - anchor.x) >= Math.abs(clamped.y - anchor.y) ? 'x' : 'y') : null;
+    if (session.draft) session.draft.lock = null;
+    if (!anchor) return ctx.segmentPosition(clamped, event);
+    // Shift locks the nearest of horizontal, vertical and the start's curve tangent; Alt drops the tangent.
+    const lock = mode === 'free' && event.shiftKey ? directionLock(anchor, clamped, event.altKey ? [] : session.draft?.tangents ?? []) : null;
+    if (lock?.direction) {
+      const { direction } = lock, slope = Math.abs(direction.x) < 1e-12 ? null : direction.y / direction.x;
+      const end = ctx.segmentPosition(alongDirection(anchor, clamped, direction, bounds), event, null, { anchor, slope });
+      session.draft.lock = { point: { ...anchor }, kind: 'tangent', label: '접선 맞춤', ids: lock.ids, key: `shift-tangent:${lock.ids.join(',')}` };
+      return end;
+    }
+    const constrained = constrainRuler(anchor, clamped, mode, event.shiftKey);
+    const axis = mode === 'horizontal' ? 'x' : mode === 'vertical' ? 'y' : lock?.axis ?? null;
     return ctx.segmentPosition(constrained, event, axis);
+  }
+  /**
+   * Tangents at a snapped first point of every curve through it. The snap names only one
+   * target (an end, a contact…) where several coincide, so curves are found by position.
+   */
+  startTangents(snap, anchor, ctx) {
+    if (!snap) return [];
+    const ids = [...(ctx.state.curves ?? []), ...(ctx.state.sketches ?? [])].map(curve => curve.id);
+    return curveTangentsAt(ctx.state, ctx.viewport.bounds, anchor, ids);
   }
   finish(session, ctx) {
     const completed = session.draft; session.draft = null;
@@ -84,7 +103,8 @@ export class TwoPointCreation extends CreationTool {
     if (session.draft) { session.draft.end = this.position(session, event, ctx, session.draft.anchor); this.finish(session, ctx); return true; }
     if (!ctx.inside(ctx.worldPoint(event))) return true;
     const anchor = this.position(session, event, ctx);
-    session.draft = { anchor, end: { ...anchor }, pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY };
+    session.draft = { anchor, end: { ...anchor }, pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY,
+      tangents: this.startTangents(ctx.segmentSnap, anchor, ctx), lock: null };
     ctx.store.selectObject(null); ctx.capturePointer(event.pointerId); ctx.redraw(this);
     return true;
   }
@@ -112,7 +132,7 @@ export class TwoPointCreation extends CreationTool {
   }
   feedback(session, ctx, position) {
     const point = position ?? session.draft?.end ?? ctx.snappedPosition(ctx.worldPoint(ctx.pointer), ctx.pointer);
-    return { point, candidate: ctx.segmentSnap };
+    return { point, candidate: ctx.segmentSnap ?? session.draft?.lock ?? null };
   }
 }
 
