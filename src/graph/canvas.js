@@ -3,7 +3,7 @@ import { renderEditingHandles } from './editing-handles.js';
 import { SVG_RENDERER, STROKE_RENDERER } from './svg-renderer.js';
 import { objectModel } from '../models/objects.js';
 import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions } from './display.js';
-import { createViewport, toScreen as projectPoint, toWorld } from './viewport.js';
+import { createViewport, toScreen as projectPoint, toWorld, gridStep, wheelZoom, zoomable } from './viewport.js';
 import { pointCoordinatesLabel } from './point.js';
 import { SnapTargetCache, snapPoint } from './snap.js';
 import { LINE_END_ACTIONS } from './line-extent.js';
@@ -149,12 +149,13 @@ export function mountGraph(container, store) {
     if (currentState.showGrid) {
       const grid = element('g', { class: 'graph-grid', 'aria-hidden': 'true' });
       // Grid stays inside the chosen mathematical domain, with room around it for axis names.
-      for (let i = Math.floor(bounds.xMin); i <= Math.ceil(bounds.xMax); i++) {
-        const x = cx + i * unit * xDirection;
+      const step = gridStep(unit);
+      for (let i = Math.floor(bounds.xMin / step); i <= Math.ceil(bounds.xMax / step); i++) {
+        const x = cx + i * step * unit * xDirection;
         if (x >= plot.left && x <= plot.right) grid.append(element('line', { x1: x, y1: plot.top, x2: x, y2: plot.bottom }));
       }
-      for (let i = Math.floor(bounds.yMin); i <= Math.ceil(bounds.yMax); i++) {
-        const y = cy - i * unit * yDirection;
+      for (let i = Math.floor(bounds.yMin / step); i <= Math.ceil(bounds.yMax / step); i++) {
+        const y = cy - i * step * unit * yDirection;
         if (y >= plot.top && y <= plot.bottom) grid.append(element('line', { x1: plot.left, y1: y, x2: plot.right, y2: y }));
       }
       svg.append(grid);
@@ -465,6 +466,13 @@ export function mountGraph(container, store) {
     creation?.tool.clearHover(creation.session, creationContext);
     updateSnapFeedback();
   });
+  // The mouse wheel zooms this graph's view about its origin; the page does not scroll under it.
+  svg.addEventListener('wheel', (event) => {
+    if (!zoomable(currentState.quadrantMode) || !event.deltaY || !store.setZoom) return;
+    event.preventDefault();
+    const scale = event.deltaMode === 1 ? 33 : event.deltaMode === 2 ? 400 : 1;
+    store.setZoom(wheelZoom(currentState.zoom, event.deltaY * scale));
+  }, { passive: false });
   svg.addEventListener('pointerup', stopDrag);
   svg.addEventListener('pointercancel', stopDrag);
   svg.addEventListener('lostpointercapture', stopDrag);

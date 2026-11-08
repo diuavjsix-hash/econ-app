@@ -83,13 +83,13 @@
   --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   --font-math: 'STIX Two Math', 'Cambria Math', 'Latin Modern Math', 'Times New Roman', serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
-  --text-2xs: 10px;
-  --text-xs: 11px;
-  --text-sm: 12px;
-  --text-md: 13px;
-  --text-lg: 15px;
-  --text-xl: 20px;
-  --text-equation: 17px;
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 22px;
+  --text-equation: 19px;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
@@ -108,14 +108,14 @@
   --space-8: 32px;
 
   /* Sizes. */
-  --control-sm: 26px;
-  --control: 30px;
-  --control-lg: 36px;
+  --control-sm: 28px;
+  --control: 32px;
+  --control-lg: 38px;
   --icon-sm: 14px;
   --icon: 16px;
   --icon-lg: 18px;
   --header-height: 48px;
-  --panel-width: 288px;
+  --panel-width: 304px;
 
   /* Shape. */
   --radius-xs: 4px;

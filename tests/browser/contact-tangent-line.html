@@ -102,6 +102,23 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   store.setToolMode('sketch');click(on);click({x:on.x+2.5,y:on.y+2.5});click({x:on.x+1.4,y:on.y+0.7});
   const sketch=store.getState().sketches.at(-1);
   check(sketch&&near(sketch.start,placed),`${name}: the free curve starts exactly on the placed point`);
+  // The mouse wheel zooms the view about the origin; the document and its history stay untouched.
+  store.setToolMode('hand');
+  const json=JSON.stringify(serializeDocument(store.getState())),unitBefore=view().unit,undoBefore=store.getState().canUndo,r=svg.getBoundingClientRect();
+  const wheel=deltaY=>{const e=new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY,clientX:r.left+r.width/2,clientY:r.top+r.height/2});svg.dispatchEvent(e);return e;};
+  const zoomIn=wheel(-100);
+  check(zoomIn.defaultPrevented&&store.getState().zoom>1&&view().unit>unitBefore,`${name}: wheel up zooms in and keeps the page from scrolling`);
+  check(JSON.stringify(serializeDocument(store.getState()))===json&&store.getState().canUndo===undoBefore,`${name}: zooming changes neither the JSON nor the undo history`);
+  const gridLines=svg.querySelectorAll('.graph-grid line').length;
+  store.setToolMode('point');const target={x:1.5,y:1.2};send('pointerdown',target,{altKey:true});send('pointerup',target,{altKey:true});
+  check(near(store.getState().points.at(-1).anchor,target),`${name}: drawing after zooming lands on the same math coordinates`);
+  store.undo();wheel(100);
+  check(store.getState().zoom===1&&view().unit===unitBefore,`${name}: the same notch back returns exactly to the default view`);
+  for(let i=0;i<12;i++)wheel(100);
+  const columns=[...svg.querySelectorAll('.graph-grid line')].filter(l=>l.getAttribute('x1')===l.getAttribute('x2')).map(l=>Number(l.getAttribute('x1'))).sort((a,b)=>a-b);
+  check(store.getState().zoom<0.5&&gridLines>0&&columns.length>2&&columns[1]-columns[0]>=8,`${name}: zoomed out, grid lines stay at least 8px apart`);
+  for(let i=0;i<40;i++)wheel(-100);check(store.getState().zoom===10,`${name}: zoom stops at its limits`);
+  store.setZoom(1);check(view().unit===unitBefore,`${name}: and returns to the default view`);
  }
  dispose?.();out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);
 }catch(error){out.textContent=JSON.stringify({ok:false,passed,error:error.message,stack:error.stack},null,2)}};

@@ -1,5 +1,12 @@
 # 구현 구조
 
+## 글자 크기·마우스 휠 확대/축소 · 2026-11-08
+
+- 글자: `tokens.css`의 `--text-*`·`--control*`·`--panel-width`만 바꿨습니다. 다른 CSS는 토큰을 쓰므로 그대로입니다.
+- 배율: store가 `zooms`(그래프 id → 배율) Map을 `documentState` 밖에 둡니다. `setDiagramZoom(id, zoom)`/`setZoom(zoom)`은 `emit()`만 하므로 기록이 생기지 않고, `snapshot()`이 각 그래프와 활성 그래프에 `zoom`을 붙입니다. `workspace.js`의 범위 제한 store는 `setZoom`을 자기 그래프 id로 묶습니다. `serializeDocument`는 그래프 필드를 골라 쓰므로 JSON에 배율이 없습니다.
+- `viewport.js`: `createViewport(..., { zoom })`가 기본 단위 길이에 `clampZoom(zoom)`을 곱합니다(원점·plot 고정, bounds가 따라 바뀜). 에지워드 형식은 배율을 쓰지 않습니다(`zoomable`). `wheelZoom(zoom, deltaY)`는 100px당 약 1.16배, `clampZoom`은 0.2~10배와 1배 근처 고정, `gridStep(unit)`은 격자 간격(8px 미만이면 2·5·10…, 120px 초과면 0.5·0.2·0.1)입니다.
+- `canvas.js`: SVG `wheel`(passive:false)이 `store.setZoom(wheelZoom(...))`을 부르고 페이지 스크롤을 막습니다. 다른 도구의 보이는 범위 계산(`tools/*.js`의 `createViewport(...state)`)도 같은 state의 `zoom`을 받습니다. 자석 캐시는 `geometryKey`의 bounds로 새로 계산됩니다.
+
 ## 점 맞춤 우선·Shift 수평/수직 표시 · 2026-11-08
 
 - `snap.js`의 `pointSnapCandidates(point,points,unit,{axis,guide,bounds,radius})`가 찍어 둔 점 후보(`kind:'point'`, priority 0)를 만듭니다. 직선 도구의 `segment-magnets.js`에 있던 코드를 옮겼고, `snapPoint`도 `points`·`bounds`를 받아 같은 후보를 씁니다. 그래서 점 도구·자유 곡선 생성·점 이동·자유 곡선 손잡이(canvas의 `snappedPosition`)도 찍어 둔 점에 붙습니다.
@@ -278,7 +285,6 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/export.js` | `serializeDocument`와 JSON 모달·복사·다운로드 |
 | `src/styles.css` | 앱 배치·캔버스 SVG 표현·반응형 배치(토큰만 사용) |
 | `scripts/dev-server.mjs` | localhost 정적 파일 서버; 앱 자산만 제공 |
-| `server.cmd`, `start-server.cmd`, `stop-server.cmd` | Windows 더블클릭 실행 파일; 작업 폴더와 무관하게 PowerShell 제어 스크립트 호출 |
 | `scripts/server.ps1` | Node 실행 파일 탐색, 서버 시작·종료·상태 확인과 메뉴 |
 | `scripts/build.mjs` | 앱 파일을 `dist/`로 복사; 번들링·압축 없음 |
 | `scripts/check.mjs`, `test.mjs`, `browser-test.mjs`, `.github/workflows/check.yml` | 구문/경계·앱·독립 브라우저 회귀와 CI 진입점; 배포 없음 |

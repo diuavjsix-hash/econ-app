@@ -5,7 +5,25 @@ export const QUADRANT_MODES = {
   edgeworth: { label: '에지워드 상자', quadrants: [1], origin: 'bottom-left' },
 };
 
-export function createViewport(width, height, mode, { flipX = false, flipY = false, boxSize = { width: 10, height: 8 } } = {}) {
+/** View zoom limits; within 3% of 1 it returns to exactly 1 so the default view is reachable. */
+export const ZOOM_MIN = 0.2, ZOOM_MAX = 10;
+export function clampZoom(zoom) {
+  if (!Number.isFinite(zoom)) return 1;
+  const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom));
+  return Math.abs(Math.log(clamped)) < 0.03 ? 1 : clamped;
+}
+/** Mouse wheel → next zoom: one notch (100px) scales by about 1.16; the box format keeps its fit. */
+export function wheelZoom(zoom, deltaY) { return clampZoom((zoom ?? 1) * Math.exp(-deltaY * 0.0015)); }
+export const zoomable = mode => mode !== 'edgeworth';
+
+/** Grid spacing in math units: 1 near the default, coarser zoomed out, finer zoomed in. */
+export function gridStep(unit) {
+  if (unit < 8) return [2, 5, 10, 20, 50, 100].find(step => step * unit >= 8) ?? 100;
+  if (unit > 120) return [0.1, 0.2, 0.5].find(step => step * unit >= 24) ?? 0.5;
+  return 1;
+}
+
+export function createViewport(width, height, mode, { flipX = false, flipY = false, boxSize = { width: 10, height: 8 }, zoom = 1 } = {}) {
   if (mode==='edgeworth') {
     const unit=Math.max(0.01,Math.min((width-96)/boxSize.width,(height-96)/boxSize.height));
     const left=(width-boxSize.width*unit)/2,top=(height-boxSize.height*unit)/2;
@@ -13,7 +31,8 @@ export function createViewport(width, height, mode, { flipX = false, flipY = fal
     return {width,height,unit,plot,cx:flipX?plot.right:plot.left,cy:flipY?plot.top:plot.bottom,
       xDirection:flipX?-1:1,yDirection:flipY?-1:1,bounds:{xMin:0,xMax:boxSize.width,yMin:0,yMax:boxSize.height}};
   }
-  const unit = Math.max(8, Math.min(56, width / 16, height / 11));
+  // Zoom scales about the fixed origin, so the axes and the visible quadrants stay put.
+  const unit = Math.max(8, Math.min(56, width / 16, height / 11)) * clampZoom(zoom);
   const padding = 36;
   const plot = { left: padding, right: width - padding, top: padding, bottom: height - padding };
   const baseCx = mode === 'first' ? plot.left : width / 2;

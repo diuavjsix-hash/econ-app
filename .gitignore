@@ -2,3 +2,8 @@ node_modules/
 dist/
 .local/
 *.log
+
+# Machine-local Windows launchers (removed from the repository 2026-11-08)
+server.cmd
+start-server.cmd
+stop-server.cmd

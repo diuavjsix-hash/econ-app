@@ -7,7 +7,7 @@ import { validPoint, rulerMetrics } from './graph/ruler.js';
 import { LAYOUTS, normalizeSlots } from './layouts.js';
 import { normalizeSlope, directionOf } from './graph/math.js';
 import { LINE_KINDS, LINE_STYLES, lineFromPoints, lineKindOf } from './graph/line-extent.js';
-import { QUADRANT_MODES } from './graph/viewport.js';
+import { QUADRANT_MODES, clampZoom } from './graph/viewport.js';
 import { CURVE_PRESETS } from './graph/curve.js';
 import { canReparent, objectsOf } from './objects.js';
 import { sumError } from './graph/sum.js';
@@ -54,6 +54,7 @@ export function createStore() {
   const emptyDocument = () => ({ ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
+  const zooms = new Map(); // diagram id → view zoom; kept out of documentState on purpose
   let layout = { preset: 'single', slots: structuredClone(LAYOUTS.single.slots) };
   let nextDiagramId = 2;
   const syncDiagram = () => Object.assign(diagrams.find(d => d.id === activeDiagramId), Object.fromEntries(documentKeys.map(key => [key, state[key]])));
@@ -81,7 +82,8 @@ export function createStore() {
     syncDiagram();
     const active = diagrams.find(d => d.id === activeDiagramId);
     return {
-      ...structuredClone(state), diagrams: structuredClone(diagrams), layout: structuredClone(layout),
+      ...structuredClone(state), diagrams: structuredClone(diagrams).map(d => ({ ...d, zoom: zooms.get(d.id) ?? 1 })), layout: structuredClone(layout),
+      zoom: zooms.get(activeDiagramId) ?? 1,
       fillColor: state.fillAutoColor ? nextFillColor(state.fills) : state.fillColor, fillNextLabel: nextFillLabel(state.fills),
       activeDiagramId, flipX: active.flipX, flipY: active.flipY,
       canUndo: past.length > 0 || Boolean(pendingChange()), canRedo: future.length > 0 && !pendingChange(), historyRevision,
@@ -128,8 +130,16 @@ export function createStore() {
     emit();
     return object.id;
   };
+  /** View zoom of one graph: not part of the document, its history or the JSON. */
+  const setDiagramZoom = (id, zoom) => {
+    const next = clampZoom(zoom);
+    if (!diagrams.some(d => d.id === id) || next === (zooms.get(id) ?? 1)) return;
+    zooms.set(id, next); emit();
+  };
   return {
     getState: snapshot,
+    setDiagramZoom,
+    setZoom(zoom) { setDiagramZoom(activeDiagramId, zoom); },
     selectDiagram(id) {
       if (id === activeDiagramId || !diagrams.slice(0, layout.slots.length).some(d => d.id === id)) return;
       if (isOperationMode(state)) enterToolMode('hand');

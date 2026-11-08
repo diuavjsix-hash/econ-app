@@ -14,7 +14,11 @@
 
 ## 로컬 실행
 
-Windows에서는 프로젝트 폴더의 **`server.cmd`를 더블클릭**하면 서버 메뉴가 열립니다.
+Windows에서는 서버 메뉴를 다음 명령으로 엽니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\server.ps1 -Action menu
+```
 
 | 메뉴 | 동작 |
 | --- | --- |
@@ -23,17 +27,25 @@ Windows에서는 프로젝트 폴더의 **`server.cmd`를 더블클릭**하면 �
 | `3` · Status | 실행 여부와 주소를 확인합니다. |
 | `0` · Exit menu | 메뉴만 닫습니다. 서버는 계속 실행됩니다. |
 
-**`start-server.cmd`**는 서버 시작, **`stop-server.cmd`**는 서버 종료를 바로 실행합니다. 파일은 다른 작업 폴더에서 실행해도 동작합니다. PATH의 Node.js 20 이상을 먼저 찾고, 없으면 현재 컴퓨터의 Codex 번들 Node 경로를 자동 확인합니다. 직접 경로를 지정하려면 `ECON_NODE` 환경 변수를 설정합니다.
+`-Action start`는 서버 시작, `-Action stop`은 종료, `-Action status`는 상태 확인입니다. PATH의 Node.js 20 이상을 먼저 찾고, 없으면 현재 컴퓨터의 Codex 번들 Node 경로를 자동 확인합니다. 직접 경로를 지정하려면 `ECON_NODE` 환경 변수를 설정합니다.
+
+더블클릭용 `server.cmd`·`start-server.cmd`·`stop-server.cmd`는 컴퓨터마다 따로 만들어 두는 파일이라 저장소에 없고 `.gitignore`에 들어 있습니다. 필요하면 프로젝트 폴더에 다음 내용으로 만듭니다(`-Action`만 `menu`/`start`/`stop`으로 바꿈).
+
+```bat
+@echo off
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\server.ps1" -Action menu %*
+if errorlevel 1 pause
+```
 
 포트를 바꾸거나 터미널에서 상태를 확인할 수도 있습니다.
 
 ```powershell
-.\start-server.cmd -Port 5174
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\server.ps1 -Action start -Port 5174
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\server.ps1 -Action status
-.\stop-server.cmd
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\server.ps1 -Action stop
 ```
 
-브라우저를 열지 않고 실행하려면 `start-server.cmd -NoBrowser`를 사용합니다. 사용 중인 포트는 오류로 안내하며 기존 프로그램을 종료하지 않습니다. 다른 데스크톱의 세 .cmd 실행 파일에 기기 전용 수정본과 skip-worktree 설정이 있는 경우 이를 유지하고 GitHub에 올리지 않습니다. 현재 실행 파일은 저장소에서 삭제하지 않습니다.
+브라우저를 열지 않고 실행하려면 `-Action start -NoBrowser`를 사용합니다. 사용 중인 포트는 오류로 안내하며 기존 프로그램을 종료하지 않습니다.
 
 서버 기록과 로그는 Git에서 제외된 `.local/server.json`, `.local/server.stdout.log`, `.local/server.stderr.log`에 보관합니다. 아래의 직접 Node 실행 방식으로 켠 서버는 해당 터미널의 Ctrl+C로 종료합니다.
 
@@ -63,6 +75,7 @@ node scripts/dev-server.mjs
 캔버스 위에는 **선택 · 직선 · 곡선 · 점 · 칠하기**를 둡니다. 무엇을 만들거나 복제하면 항상 선택 도구로 돌아가고 결과가 선택됩니다. 점선은 직선 도구에서 고릅니다. 현재 도구만 강조하고 그 아래에 현재 작업을 표시합니다. 오른쪽 위에는 현재 작업 또는 선택한 도형의 설정 하나를, 아래에는 도형 목록을 표시합니다. UI 정리의 근거와 참고 자료는 [사용성 정리](docs/ui-design.md)에 기록했습니다.
 
 - **여러 도형 선택·삭제:** 선택 도구에서 빈 공간을 드래그하면 영역에 닿는 도형을 함께 선택합니다. **Ctrl/Cmd+클릭**으로 추가·해제하고 **Shift+영역 드래그**로 기존 선택에 추가합니다. 도구막대 **삭제 / N개 삭제**, 선택 패널 **선택한 N개 삭제**, **Delete·Backspace**로 지웁니다. 입력란에서는 글자만 편집합니다. 삭제는 한 번에 되돌릴 수 있습니다. 빈 공간 클릭·Esc로 선택을 해제하고 도형 하나를 클릭하면 개별 이동·편집으로 돌아갑니다.
+- 그래프 위에서 **마우스 휠**로 좌표평면을 확대·축소합니다(원점 고정, 0.2~10배). 배율은 그래프마다 따로 기억하는 보기 상태라 되돌리기·JSON에 들어가지 않습니다. 에지워드 상자는 확대하지 않습니다.
 - **선택**은 기본 도구입니다. 도형을 클릭해 선택하고 드래그하거나 방향키로 옮깁니다. **Shift+드래그**는 마우스를 더 많이 움직인 방향에 따라 수평·수직으로만 이동합니다. 직선·기본/자유 곡선·점·점선 전체와 자유 곡선의 세 점·점선 끝점에 적용하며 회전·휘어짐 조절에는 적용하지 않습니다. Shift+방향키는 더 크게 이동합니다. 빈 평면이나 그래프 제목을 누르면 선택을 해제합니다. 생성·복제·합산 중 **Esc** 또는 오른쪽 닫기 버튼으로 선택에 돌아갑니다.
 - 선택 도구로 **직선을 이동**하면 같은 그래프의 자유 곡선·기본 곡선에 접하는 위치에서 자석처럼 붙고 **접점**이 표시됩니다. 기울기는 유지하며 16px 이내에서 붙고 24px보다 멀어지면 풀립니다. **Alt**를 누른 채 드래그하면 자유롭게 이동합니다. 놓은 뒤에는 독립된 직선이며 곡선의 이후 변경을 따라가는 연결은 만들지 않습니다.
 - 직선의 **x/y절편을 다른 도형의 절편이나 원점에 맞출 때**도 자석 보정을 적용합니다. 기울기·Shift 이동 축을 유지하고 16px 포착/24px 해제·Alt 생략을 사용합니다. 점 찍기는 절편 근처 16px에서 정확한 축 교차 좌표로 붙고 **x절편·y절편·원점**을 표시합니다. 축에서 선을 띄워도 절편은 잡을 수 있습니다.
@@ -167,7 +180,6 @@ node scripts/browser-test.mjs
 - `src/axes.js`: 수평축·수직축 이름 입력
 - `src/export.js`: JSON 스키마와 미리보기·다운로드
 - `src/styles.css`: 앱 배치·캔버스·데스크톱과 모바일 화면
-- `server.cmd`, `start-server.cmd`, `stop-server.cmd`: Windows 서버 메뉴·시작·종료 실행 파일
 - `scripts/server.ps1`: Node 탐색, 백그라운드 서버 시작·종료·상태 확인
 - `scripts/check.mjs`, `test.mjs`, `browser-test.mjs`: 구문/경계·앱·실제 headless Chrome 검사
 - `tests/browser/`, `tests/fixtures/`: 캔버스 통합과 단위/브라우저가 공유하는 곡선별 연속 사례
