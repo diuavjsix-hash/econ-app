@@ -384,7 +384,7 @@ node scripts/generate-doc-example.mjs
 git diff --check
 ```
 
-현재 데스크톱은 2026-11-07부터 PATH의 `node`로 위 명령을 바로 실행합니다. `node`를 찾지 못하고 Codex가 설치된 환경에서만 다음 번들 경로를 대체 수단으로 사용합니다.
+데스크톱(2026-11-07부터)과 노트북(2026-11-09부터)은 PATH의 `node`로 위 명령을 바로 실행합니다. `node`를 찾지 못하고 Codex가 설치된 환경에서만 다음 번들 경로를 대체 수단으로 사용합니다.
 
 ```powershell
 & "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/check.mjs

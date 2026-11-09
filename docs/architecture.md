@@ -412,7 +412,7 @@ axisGapEnabled는 기본 false, axisGap는 기본 0.75이며 0.25~2 내부 좌�
 
 별도 점선 도형(`type:'dashed'`, `dashedLines`)과 점선 도구·모드·`DashedCreation`·`DashedInteraction`·`dashed-view.js`는 2026-11-08에 제거했습니다. 점선 선분은 직선 도구가 `lines`에 `style:'dashed'`와 extent로 만듭니다. 생성 맞춤 토글은 `segmentSnap`(이전 `dashedSnap`), 캔버스의 후보는 `segmentPosition`/`segmentTargets`입니다.
 
-자 버튼과 ruler 옵션·측정 패널은 기본 화면에서 제외했습니다. main은 mountRulerTool을 호출하지 않으며 store.update의 rulerSelected 활성화 요청도 무시합니다. 이전 rulers 자료와 계산·테스트 구현은 보관하지만, canvas 렌더·생성 입력·스냅 대상에는 연결하지 않습니다. JSON schemaVersion 6에서 추가한 dashedLines와 기존 rulers 자료 보존 배열은 현재 schemaVersion 10에도 유지합니다.
+자 버튼과 ruler 옵션·측정 패널은 기본 화면에서 제외했습니다. main은 mountRulerTool을 호출하지 않으며 store.update의 rulerSelected 활성화 요청도 무시합니다. 이전 rulers 자료와 계산·테스트 구현은 보관하지만, canvas 렌더·생성 입력·스냅 대상에는 연결하지 않습니다. 기존 rulers 자료 보존 배열은 현재 schemaVersion 12에도 유지합니다. schemaVersion 6에서 추가한 dashedLines는 schemaVersion 12에서 제거했습니다.
 
 ## 복제
 

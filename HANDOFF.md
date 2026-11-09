@@ -1,8 +1,10 @@
 # 작업 인계 · Econ Studio
 
-최종 정리: 2026-11-08 (Asia/Seoul). 현재 구현은 이 문서를 기준으로 읽습니다. 반복된 요청·중간 검증·미커밋 표현은 [11월 공통 기반 작업 이력](docs/history/foundation-work-2026-11-04.md)에 보존했습니다.
+최종 정리: 2026-11-09 (Asia/Seoul). 현재 구현은 이 문서를 기준으로 읽습니다. 반복된 요청·중간 검증·미커밋 표현은 [11월 공통 기반 작업 이력](docs/history/foundation-work-2026-11-04.md)에 보존했습니다.
 
 ## 최신 요청과 반영 범위
+
+**2026-11-09 (노트북에서 이어받음):** 노트북 작업 폴더(`C:\Users\htt06\Desktop\econ-app`)를 GitHub 최신 `v4`(`2db06d4`)로 fast-forward 풀하고 태그 `v1`~`v4`를 받았습니다. 노트북에는 Node가 없어 winget으로 Node.js 26.13.0 LTS를 설치했고 구문/경계 120개 모듈·앱 406개가 통과했습니다(브라우저 검사는 재실행하지 않음). 사용자가 실행 파일 세 개를 다시 넣었고 `.gitignore`로 제외되는 것과 `scripts/server.ps1` 시작·상태·종료(HTTP 200)를 확인했습니다. 이어서 문서의 오래된 표현(제거된 점선 도구, 컴퓨터별 폴더·Node, 원격 CI 상태, skip-worktree 안내)을 정리했습니다. 앱 코드는 바꾸지 않았습니다. 사용자 요청으로 커밋하고 `v5` 태그를 붙여 main에 푸시했습니다.
 
 **커밋 상태:** 2026-11-07 Claude Code 세션의 작업(공통화 점검·반대 방향 무차별곡선·생성 도구 공통화·최저점 맞춤·접점 통과 직선·직선 끝 자르기/점선 스타일·후속 작업 문서)은 사용자 요청으로 main에 한 커밋으로 커밋·푸시했습니다. 2026-11-08 작업(두 점 직선 도구·점선 도형 제거와 schemaVersion 12·끝점/선분 자석·디자인 개편)도 사용자 요청으로 main에 한 커밋으로 커밋·푸시했습니다. 2026-11-08 다섯~일곱 번째 요청은 `v2`·`v3`·`v4` 커밋으로 남기고, 사용자 요청으로 태그와 함께 main에 푸시했습니다. 아래 각 요청의 '커밋·푸시하지 않습니다' 문구는 작업 당시 상태입니다. 서버 실행 파일 세 개(`server.cmd`·`start-server.cmd`·`stop-server.cmd`)는 `v4`에서 저장소에서 지우고 `.gitignore`에 넣었습니다.
 
@@ -46,18 +48,19 @@
 | 항목 | 현재 기준 |
 | --- | --- |
 | 저장소 | https://github.com/diuavjsix-hash/econ-app |
-| 현재 데스크톱 작업 폴더 | `C:\Users\htt06\Desktop\codex_project\econ-app` (상위 폴더 이름은 이전 Codex 환경의 이름이며 바꾸지 않음) |
+| 데스크톱 작업 폴더 | `C:\Users\htt06\Desktop\codex_project\econ-app` (상위 폴더 이름은 이전 Codex 환경의 이름이며 바꾸지 않음) |
+| 노트북 작업 폴더 | `C:\Users\htt06\Desktop\econ-app` (2026-11-09 확인) |
 | 주 작업 도구 | 2026-11-06부터 Claude Code |
 | 브랜치 | `main`; `git log -1 --oneline`으로 최신 커밋 확인 |
 | 동기화 확인 | `git fetch origin`, `git status --short --branch`, `git rev-list --left-right --count HEAD...origin/main` |
 | 앱 런타임 | Node.js 20 이상, 별도 패키지 설치 없음 |
 | 브라우저 검사 | Node.js 22 이상과 설치된 Chrome/Chromium/Edge |
-| 이 컴퓨터의 Node | 2026-11-07부터 PATH의 Node.js 26.13.0 (`C:\Program Files\nodejs`); 예전 Codex 번들 경로는 대체 수단 |
+| 컴퓨터별 Node | 데스크톱 2026-11-07부터, 노트북 2026-11-09부터 PATH의 Node.js 26.13.0 (`C:\Program Files\nodejs`); Codex 번들 경로는 `node`가 없을 때의 대체 수단 |
 | 로컬 주소 | http://127.0.0.1:5173/ |
 | 저장 형식 | JSON schemaVersion 12 (`dashedLines` 제거); 메모리 상태와 JSON 내보내기 |
-| 버전 태그 | `git tag -n1`로 확인; `v1` = 2026-11-08 디자인 개편 커밋, `v2` = 2026-11-08 Shift 접선 잠금 커밋, `v3` = 2026-11-08 점 맞춤 우선 커밋, `v4` = 2026-11-08 글자 크기·휠 확대/축소·실행 파일 제외 커밋. `v1`~`v4` 모두 GitHub에 푸시함. 규칙은 [변경 기록](docs/CHANGELOG.md) 머리말 |
+| 버전 태그 | `git tag -n1`로 확인; `v1` = 2026-11-08 디자인 개편 커밋, `v2` = 2026-11-08 Shift 접선 잠금 커밋, `v3` = 2026-11-08 점 맞춤 우선 커밋, `v4` = 2026-11-08 글자 크기·휠 확대/축소·실행 파일 제외 커밋, `v5` = 2026-11-09 노트북 이어받기·문서 정리 커밋(앱 코드 변경 없음). `v1`~`v5` 모두 GitHub에 푸시함. 규칙은 [변경 기록](docs/CHANGELOG.md) 머리말 |
 
-현재 데스크톱은 PATH의 `node`를 사용합니다. `node`가 없는 환경은 [README 실행 방법](README.md#로컬-실행)을 따릅니다. 다른 컴퓨터에서는 해당 환경의 Node와 실행 파일을 사용합니다.
+데스크톱과 노트북 모두 PATH의 `node`를 사용합니다. 새로 설치한 직후에는 PowerShell·Claude Code를 다시 열어야 `node`가 인식됩니다. `node`가 없는 환경은 [README 실행 방법](README.md#로컬-실행)을 따릅니다. 다른 컴퓨터에서는 해당 환경의 Node와 실행 파일을 사용합니다.
 
 ### 다른 컴퓨터에서 이어받기
 
@@ -74,7 +77,7 @@
 - PPC는 원점 중심 양의 ¼타원입니다. 기본 원호에서 가로/세로 반지름·양 축 끝점·비율/모양 손잡이로 조절합니다. 몸체는 원점 기준 확대/축소합니다.
 - 첫 작업 영역의 **포맷 → 에지워드 상자**에서 총량을 정합니다. A/B 원점과 반대 방향 네 축·총량/축 이름 편집·경계 맞춤/칠하기를 지원합니다. 모든 도형 좌표는 A 기준 수학 좌표입니다. B 방향 곡선은 세 점 자유 곡선으로 그립니다.
 - 에지워드 새 직선은 상자 중앙에 놓고 비율에 맞는 기울기를 사용합니다. 비어 있는 상자의 첫 직선은 A/B 원점을 잇습니다. 이동·기울기 손잡이는 양 원점을 공통 보정 대상으로 잡고, 이미 지나는 원점은 반대 원점으로 회전할 때 유지합니다. Alt는 보정을 생략하며 정확한 수직선과 큰 유한 기울기를 구분합니다.
-- 자유 곡선의 최저점은 표시 토글만 제공합니다. 표시가 곡선 편집에 맞춰 갱신되지만 별도 점/통과 직선·최저점 binding·연결 해제는 만들지 않습니다. 마커는 선택할 수 없고 곡선과 함께 삭제됩니다. 2026-11-07부터 표시 중인 최저점은 점·점선·곡선 생성의 맞춤 대상입니다(**최저점 맞춤**). 일반 점의 통과 직선은 기존 기능입니다.
+- 자유 곡선의 최저점은 표시 토글만 제공합니다. 표시가 곡선 편집에 맞춰 갱신되지만 별도 점/통과 직선·최저점 binding·연결 해제는 만들지 않습니다. 마커는 선택할 수 없고 곡선과 함께 삭제됩니다. 2026-11-07부터 표시 중인 최저점은 점·선분(직선 도구)·곡선 생성의 맞춤 대상입니다(**최저점 맞춤**). 일반 점의 통과 직선은 기존 기능입니다.
 - 곡선끼리 몸체를 가까이 이동하면 원본 기하의 위치와 접선 방향이 일치하는 곳에 붙습니다. 기본/자유 곡선은 평행이동하고 해석 곡선은 기존 원점 확대/축소·준선형 축 이동을 유지합니다. 모양을 강제로 바꾸거나 경제적 의미/영구 연결을 부여하지 않습니다.
 - 직선 도구의 두 번째 점에서 Shift는 수평·수직·시작점의 곡선 접선 중 마우스 방향에 가까운 쪽으로 잠급니다(**접선 맞춤**). 접선 후보는 맞춤으로 정한 시작점이 곡선 위일 때만 생기고 Alt+Shift는 수평·수직만 잠급니다. 수평·수직 잠금은 **수평 맞춤 / 수직 맞춤**으로 표시합니다. 관계는 만들지 않습니다.
 - 찍어 둔 점은 16px 안에서 모든 맞춤보다 먼저입니다(**점 맞춤 우선**). 모든 점 소비자가 `pointSnapCandidates`를 공유하고 움직이는 도형과 그 종속 점은 제외합니다.
@@ -90,39 +93,39 @@
 | --- | --- |
 | 편집·복제·선택/강조 기하·직렬화 | `models/graph-object.js`, `models/objects.js`, `object-types.js`, `contracts.js` |
 | 도구 모드 배타·선택 유지·패널 문구 | `tool-modes.js`의 `TOOL_MODES`; store `setToolMode`/`toggleToolMode` |
-| 생성 도구 포인터·초안 레이어·맞춤 피드백 | `graph/creation-tools.js`의 `CREATION_TOOLS`; 두 점 도구(직선·점선)는 `TwoPointCreation` 공유 |
+| 생성 도구 포인터·초안 레이어·맞춤 피드백 | `graph/creation-tools.js`의 `CREATION_TOOLS`; 직선 도구는 두 점 입력 기반 `TwoPointCreation`을 상속 |
 | 곡선 반대 방향 | `curve-families.js`의 `OppositeCurveFamily`·`orientCurve`, `axes.js`의 `followBoxOrigin` |
 | 컬렉션 목록·획 도형 캐시 키 | `OBJECT_TYPES`의 `OBJECT_COLLECTIONS`/`STROKE_GEOMETRY_COLLECTIONS`; `registry-contract` 검사 |
 | 곡선 종류 계산·고유 이동·모양/끝점 편집 | `models/curve-families.js`의 상속 계층과 등록 검사 |
 | 포인터/키보드 조작·손잡이 | `graph/interactions.js`, `editing-handles.js`; canvas가 기록/피드백 수명 관리 |
 | 도구 버튼·숫자/슬라이더 | `ui/controls.js`의 생성 함수와 NumberControl/RangeControl |
 | 원본 곡선 접점 기하 | `graph/curve-contacts.js`; 이동과 정지 접점 발견이 공유 |
-| 대상 제외·기하 키·점/점선 캐시 | `graph/snap-context.js`, `snap.js`의 SnapTargetCache |
+| 대상 제외·기하 키·점/선분 캐시 | `graph/snap-context.js`, `snap.js`의 SnapTargetCache |
 | 포착/유지·맞춤 표시 | `graph/snap-policy.js`, `snap-feedback.js/.css` |
 | SVG 획·히트 영역·접근성 | `graph/svg-renderer.js`의 SvgRenderer/StrokeRenderer |
 
 새 도형은 모델·컬렉션·조작을 등록하고 새 곡선은 가장 가까운 종류 클래스를 상속해 `contactGeometry`와 필수 구현을 등록 검사에 통과시킵니다. 클래스 인스턴스·화면 픽셀·자석 캐시는 문서/undo/JSON에 넣지 않습니다. 수직선은 slope null과 방향 벡터를 사용합니다.
 
-**통일성은 표시뿐 아니라 계산·대상 등록·다른 도구의 연속 동작까지 포함합니다.** 새 자석은 맞춤 → 놓기 → 점/점선 재포착, Shift/Alt·설정 OFF·반전·모바일 크기·취소/기록까지 검사합니다. 도구별 필터·캐시 키·SVG/문구를 복제하지 않습니다. 세부 기준은 [공통 UI 규칙](docs/ui-consistency.md)과 [구조 문서](docs/architecture.md)에 있습니다.
+**통일성은 표시뿐 아니라 계산·대상 등록·다른 도구의 연속 동작까지 포함합니다.** 새 자석은 맞춤 → 놓기 → 점/선분 재포착, Shift/Alt·설정 OFF·반전·취소/기록까지 검사합니다. 모바일은 서비스 대상이 아니지만 기존 좁은 화면 배치 검사는 깨뜨리지 않습니다. 도구별 필터·캐시 키·SVG/문구를 복제하지 않습니다. 세부 기준은 [공통 UI 규칙](docs/ui-consistency.md)과 [구조 문서](docs/architecture.md)에 있습니다.
 
 ## 최신 검증과 재현
 
 | 검사 | 결과/범위 |
 | --- | --- |
-| 앱 자동 검사 | **406개 통과** (2026-11-08; 확대/축소 3개 추가); Windows 서버 3개 제외 |
+| 앱 자동 검사 | **406개 통과** (2026-11-08; 확대/축소 3개 추가, 2026-11-09 노트북 재실행 통과); Windows 서버 3개 제외 |
 | 브라우저 검사 | **2,587개 통과** (2026-11-08; 휠 확대/축소 14개 추가); 실제 별도 headless Chrome, 합성 포인터/키/터치 입력 |
-| 구문/의존 경계 | **120개 모듈 통과** (2026-11-08; zoom 검사 추가) |
+| 구문/의존 경계 | **120개 모듈 통과** (2026-11-08; zoom 검사 추가, 2026-11-09 노트북 재실행 통과) |
 | 정적 빌드 | 통과; 앱 자산만 dist에 복사 |
-| 기하/저장 호환 | JSON 10 유지·전체 기존 회귀 통과; 리팩터링 전 기준 결과 일치는 이전 작업 기록 |
+| 기하/저장 호환 | JSON schemaVersion 12·전체 기존 회귀 통과; 리팩터링 전 기준 결과 일치는 이전 작업 기록 |
 | 문서 검증 | 문서 14개·로컬 링크 86개·제목 링크 5개·JSON 블록 6개·JSON 예시 3개 통과; 현재 전체 예시 재생성 일치 |
 
-`node scripts/check.mjs`, `node scripts/test.mjs`, `node scripts/build.mjs`, `node scripts/browser-test.mjs`로 재현합니다. 상세 사례·이전 실제 조작과 합성 검사의 구분은 [검증 문서](docs/testing.md)를 따릅니다. 이번 결과는 `.local/minimum-edgeworth-node-result.txt`, `.local/minimum-edgeworth-browser-result.txt`에 있습니다. 상자 회귀 5개를 추가하고 기존 최저점 관계 회귀를 표시 계약으로 변경했습니다. `tests/browser/edgeworth-minimum.html`과 전체 앱의 최저점 토글 검사도 기존 CI 진입점에 포함됩니다. 현재 JSON 전체 예시는 생성 스크립트로 갱신했습니다.
+`node scripts/check.mjs`, `node scripts/test.mjs`, `node scripts/build.mjs`, `node scripts/browser-test.mjs`로 재현합니다. 상세 사례·이전 실제 조작과 합성 검사의 구분은 [검증 문서](docs/testing.md)를 따릅니다. 2026-11-04 보수 결과는 당시 작업한 데스크톱의 `.local/minimum-edgeworth-node-result.txt`, `.local/minimum-edgeworth-browser-result.txt`에 있습니다(Git 제외, 노트북에는 없음). 상자 회귀 5개를 추가하고 기존 최저점 관계 회귀를 표시 계약으로 변경했습니다. `tests/browser/edgeworth-minimum.html`과 전체 앱의 최저점 토글 검사도 기존 CI 진입점에 포함됩니다. 현재 JSON 전체 예시는 생성 스크립트로 갱신했습니다.
 
-커밋 전 문서 감사는 `.local/maintenance-document-audit.json`에 기록했습니다. 개발 당시 통과한 앱/브라우저·구문/빌드 결과와 별개로 이번 문서화에서 전체 로컬 링크·제목 링크·JSON 구문·현재 예시의 serializer 재생성 일치를 다시 확인했습니다. 이 로컬 자료는 Git에서 제외하며 문서만 바꾼 후 앱/브라우저 검사를 불필요하게 반복하지 않았습니다.
+2026-11-04 커밋 전 문서 감사는 데스크톱의 `.local/maintenance-document-audit.json`에 기록했습니다. 개발 당시 통과한 앱/브라우저·구문/빌드 결과와 별개로 이번 문서화에서 전체 로컬 링크·제목 링크·JSON 구문·현재 예시의 serializer 재생성 일치를 다시 확인했습니다. 이 로컬 자료는 Git에서 제외하며 문서만 바꾼 후 앱/브라우저 검사를 불필요하게 반복하지 않았습니다.
 
 `.github/workflows/check.yml`은 push/PR/수동 실행에서 같은 검사를 수행하며 배포 단계가 없습니다. 로컬 통과와 원격 Actions 결과를 구분하고 원격 실행 상태는 해당 커밋의 Actions에서 확인합니다.
 
-앱/기반 변경 커밋 `2328d3f`는 origin/main에 반영됐고 [원격 Check](https://github.com/diuavjsix-hash/econ-app/actions/runs/41757848785)가 성공했습니다. 별도 배포 명령/설정 변경은 하지 않았으나 기존 저장소 Pages 설정으로 main 푸시가 GitHub 관리형 `pages build and deployment`도 자동 시작했습니다. 이 자동 동작과 실제 사이트 검증은 별개입니다. 현재 최종 커밋은 위 Git 명령으로 확인합니다.
+2026-11-09에 GitHub 공개 API로 확인한 결과, 최신 원격 커밋 `2db06d4`(`v4`)의 `Check`와 GitHub 관리형 `pages build and deployment`가 모두 success였고 https://diuavjsix-hash.github.io/econ-app/ 가 HTTP 200을 반환했습니다. 게시 사이트의 화면·동작은 검증하지 않았습니다. Pages 자동 실행은 기존 저장소 설정으로 main 푸시 때 시작되며 별도 배포 명령이나 설정 변경은 하지 않았습니다. 현재 최종 커밋은 위 Git 명령으로 확인합니다.
 
 ## 알려진 제한
 
@@ -147,4 +150,4 @@
 
 ## 커밋·푸시 인계
 
-이번 사용자 요청으로 앱·회귀·문서를 main에 커밋·푸시하는 범위입니다. 컴퓨터 전용 실행 파일 세 개의 내용과 skip-worktree를 유지하고 로컬 생성물은 제외합니다. 강제 푸시는 사용하지 않으며 HEAD와 origin/main의 일치를 확인합니다. 아래 검증 이력의 ‘커밋·푸시하지 않음’은 구현 당시 상태입니다. 저장소의 기존 main 푸시 연동 Pages 자동 실행은 별도 배포 명령과 구분합니다. 원격 CI 결과는 푸시한 커밋의 Actions에서 확인합니다.
+커밋·태그·푸시는 사용자가 요청할 때만 합니다. 컴퓨터 전용 실행 파일 세 개는 `.gitignore`로 제외되므로 다시 커밋하지 않고, 각 컴퓨터의 로컬 파일은 지우거나 덮어쓰지 않습니다(skip-worktree는 더 쓰지 않음). `.local/`·`dist/`·로그 같은 로컬 생성물도 제외합니다. 강제 푸시는 사용하지 않으며 푸시 후 HEAD와 origin/main의 일치를 확인합니다. 커밋할 때 [변경 기록](docs/CHANGELOG.md)의 **커밋 전** 항목을 새 커밋 절로 옮깁니다. 위 이력의 ‘커밋·푸시하지 않음’은 구현 당시 상태입니다. main 푸시에 연동된 Pages 자동 실행은 별도 배포 명령과 구분하고, 원격 CI 결과는 푸시한 커밋의 Actions에서 확인합니다.
