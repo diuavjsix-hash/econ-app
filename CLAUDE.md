@@ -15,8 +15,10 @@
 - 통일성은 표시뿐 아니라 기하 계산·공통 대상 등록·모든 소비 도구의 연속 동작까지 포함합니다. 접점 계산은 `graph/curve-contacts.js`, 점·선분 대상 등록은 `buildSnapTargets`를 공유합니다. 새 도형/자석을 이동 기능에만 연결하고 완료하지 않습니다. `tests/snap-contact-contract.test.js`와 공통 사례 기반 브라우저 검사의 ‘맞춤 → 조작 종료 → 점 생성/이동·선분(직선 도구) 생성/끝 손잡이/전체 이동에서 재포착’을 확인하고, 곡선 종류를 추가할 때 검사 사례 또는 명시적인 제외 사유도 등록합니다.
 - 자석 대상 필터와 캐시 키를 도구별로 복제하지 않습니다. `independentSnapState`·`SnapTargetCache`·`geometryKey`를 사용하고 자기 도형과 계산 종속 도형의 제외·포맷/상자 총량·축 간격·기록/그래프 전환을 검사합니다. 새 곡선 종류는 `contactGeometry`와 `registerCurveFamilies`의 필수 구현 검사를 통과해야 합니다.
 - 좌표축은 현재 요구사항에 따라 표시합니다. 이전의 축 숨기기 요청보다 나중의 축 표시·이름 편집 요청이 우선합니다.
-- 2026-11-06부터 주 작업 도구는 Claude Code입니다. 데스크톱 작업 폴더의 상위 폴더 이름 `codex_project`는 이전 작업 환경의 이름일 뿐이며, 경로를 유지하기 위해 바꾸지 않습니다. 노트북에서도 Claude Code로 작업하며 노트북 작업 폴더는 `C:\Users\htt06\Desktop\econ-app`입니다. 컴퓨터마다 폴더 경로와 Node 위치가 다를 수 있으므로 실제 경로를 확인합니다.
-- 프로젝트는 현재 의존성 없는 JavaScript ES module과 Node.js 기본 기능으로 구성되어 있습니다. 데스크톱(2026-11-07부터)과 노트북(2026-11-09부터)에는 Node.js 26.13.0이 PATH에 설치되어 일반 PowerShell·Claude Code에서 `node`를 바로 사용합니다. `node`가 없는 환경에서만 README의 Codex 번들 경로를 대체 수단으로 안내합니다. 의존성 설치 없이 직접 Node로 실행할 수 있게 유지합니다.
+- 작업 도구는 Claude Code입니다(2026-11-06 전환, 2026-11-12 Codex 흔적 정리). 저장소 규칙은 이 `CLAUDE.md`에 둡니다(이전 이름 `AGENTS.md`). 컴퓨터마다 작업 폴더와 Node 위치가 다르므로 실제 경로를 확인합니다. 데스크톱은 `C:\Users\htt06\Desktop\claude_project_old\econ-app`(2026-11-12 확인), 노트북은 `C:\Users\htt06\Desktop\econ-app`입니다.
+- 프로젝트는 현재 의존성 없는 JavaScript ES module과 Node.js 기본 기능으로 구성되어 있습니다. 데스크톱(2026-11-07부터)과 노트북(2026-11-09부터)에는 Node.js 26.13.0이 PATH에 설치되어 일반 PowerShell·Claude Code에서 `node`를 바로 사용합니다. `node`가 없는 컴퓨터는 Node.js 20 이상(브라우저 검사는 22 이상)을 설치하도록 안내합니다. 의존성 설치 없이 직접 Node로 실행할 수 있게 유지합니다.
+- `.claude/launch.json`은 Claude Code 미리보기 서버 설정(`node scripts/dev-server.mjs`, 포트 5173)이며 저장소에 둡니다. 개인 설정 `.claude/settings.local.json`과 `.claude/worktrees/`는 커밋하지 않습니다. 개인 메모리는 컴퓨터 사이에 옮겨지지 않으므로 계속 지켜야 할 규칙은 이 문서에 적습니다.
+- frontend-design 스킬은 화면을 새로 만들거나 크게 바꿀 때 참고합니다. 스킬의 '대담하고 독특한 미감' 지침보다 위의 미니멀 원칙과 [디자인 시스템](docs/design-system.md)이 우선합니다. 새 글꼴·색·크기는 `src/ui/tokens.css`에서만 바꾸고, 작은 수정이나 디자인과 무관한 작업에는 스킬을 쓰지 않습니다.
 - 그래프 상태는 내부 수학 좌표로 보관합니다. 화면 픽셀을 저장하거나 수직선을 큰 유한 기울기로 대체하지 않습니다.
 - 결과를 보고할 때 구현한 기능과 검증한 범위를 구분합니다. 현재 상태와 알려진 제한은 HANDOFF.md에 갱신합니다.
 - 기능을 바꾸면 [변경 기록](docs/CHANGELOG.md)의 **커밋 전** 절에 항목을 추가합니다. 커밋할 때 그 항목들을 새 커밋 절로 옮깁니다.

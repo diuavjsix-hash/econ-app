@@ -1,8 +1,10 @@
 # 작업 인계 · Econ Studio
 
-최종 정리: 2026-11-09 (Asia/Seoul). 현재 구현은 이 문서를 기준으로 읽습니다. 반복된 요청·중간 검증·미커밋 표현은 [11월 공통 기반 작업 이력](docs/history/foundation-work-2026-11-04.md)에 보존했습니다.
+최종 정리: 2026-11-12 (Asia/Seoul). 현재 구현은 이 문서를 기준으로 읽습니다. 반복된 요청·중간 검증·미커밋 표현은 [11월 공통 기반 작업 이력](docs/history/foundation-work-2026-11-04.md)에 보존했습니다.
 
 ## 최신 요청과 반영 범위
+
+**2026-11-12 (Codex → Claude Code 문서 정리):** 저장소 규칙 파일 `AGENTS.md`를 Claude Code가 자동으로 읽는 [CLAUDE.md](CLAUDE.md)로 옮기고, 현재 문서의 Codex 번들 Node 대체 경로 안내와 `scripts/server.ps1`의 Codex 경로 후보를 지웠습니다. 데스크톱 작업 폴더가 `claude_project_old\econ-app`으로 바뀐 것을 반영하고, 미리보기 설정 `.claude/launch.json`을 저장소에 두도록 했습니다(개인 설정은 `.gitignore`). frontend-design 스킬 사용 기준을 CLAUDE.md에 적었습니다. 앱 동작은 바뀌지 않았습니다. 이력 문서(`docs/history/`, 변경 기록의 지난 절)의 `AGENTS`·Codex 표현은 당시 기록으로 남겼습니다. 사용자 요청으로 커밋하고 `v6` 태그를 붙여 main에 푸시했습니다. 노트북에서 풀하기 전에 Git이 관리하지 않는 `.claude\launch.json`이 있으면 지우거나 옮깁니다(같은 파일이 저장소로 들어옴).
 
 **2026-11-09 (노트북에서 이어받음):** 노트북 작업 폴더(`C:\Users\htt06\Desktop\econ-app`)를 GitHub 최신 `v4`(`2db06d4`)로 fast-forward 풀하고 태그 `v1`~`v4`를 받았습니다. 노트북에는 Node가 없어 winget으로 Node.js 26.13.0 LTS를 설치했고 구문/경계 120개 모듈·앱 406개가 통과했습니다(브라우저 검사는 재실행하지 않음). 사용자가 실행 파일 세 개를 다시 넣었고 `.gitignore`로 제외되는 것과 `scripts/server.ps1` 시작·상태·종료(HTTP 200)를 확인했습니다. 이어서 문서의 오래된 표현(제거된 점선 도구, 컴퓨터별 폴더·Node, 원격 CI 상태, skip-worktree 안내)을 정리했습니다. 앱 코드는 바꾸지 않았습니다. 사용자 요청으로 커밋하고 `v5` 태그를 붙여 main에 푸시했습니다.
 
@@ -12,7 +14,7 @@
 
 **2026-11-08 두 번째 요청:** (1) 툴바의 **점선** 버튼과 패널을 없앴습니다. 점선은 직선 도구의 "실선/점선"으로 그립니다. 내부 점선 도형·모드와 그 검사는 아직 남아 있습니다(아래 다음 작업). (2) 끝 손잡이로 직선을 자르거나 다시 잇는 동작을 없앴습니다. 끝 손잡이는 선분·반직선의 그려진 끝에만 있고 그 끝을 옮기기만 합니다. 종류는 설정 버튼으로만 바꿉니다. (3) **모든 생성·복제 뒤 선택 도구로 돌아가고 결과를 선택**하도록 통일했습니다(직선·점·곡선·칠하기·복제·합산·빠른 곡선 추가). 로컬 확인만 하며 커밋·푸시하지 않습니다.
 
-**2026-11-08 세 번째 요청:** 남은 후속 작업을 모두 진행했습니다. (1) 자유 곡선의 시작점·끝점을 **끝점 맞춤** 대상으로 등록했습니다. (2) 선분·반직선을 통째로 옮길 때 그려진 끝이 공통 대상(교점·절편·점·접점·다른 끝·선)에 붙습니다(길이·기울기 유지, Shift·Alt·16/24px 공유). (3) 내부 점선 도형·모드·코드를 모두 제거하고 JSON을 schemaVersion 12로 올렸습니다(`dashedLines` 없음). AGENTS의 공통 계약 검사(맞춤 → 조작 종료 → 재포착)는 직선 도구의 선분 생성/끝 손잡이/전체 이동으로 옮겼습니다. 로컬 확인만 하며 커밋·푸시하지 않습니다.
+**2026-11-08 세 번째 요청:** 남은 후속 작업을 모두 진행했습니다. (1) 자유 곡선의 시작점·끝점을 **끝점 맞춤** 대상으로 등록했습니다. (2) 선분·반직선을 통째로 옮길 때 그려진 끝이 공통 대상(교점·절편·점·접점·다른 끝·선)에 붙습니다(길이·기울기 유지, Shift·Alt·16/24px 공유). (3) 내부 점선 도형·모드·코드를 모두 제거하고 JSON을 schemaVersion 12로 올렸습니다(`dashedLines` 없음). CLAUDE.md(당시 AGENTS)의 공통 계약 검사(맞춤 → 조작 종료 → 재포착)는 직선 도구의 선분 생성/끝 손잡이/전체 이동으로 옮겼습니다. 로컬 확인만 하며 커밋·푸시하지 않습니다.
 
 **2026-11-08 네 번째 요청:** 사용자는 기존 디자인이 'AI 슬롭' 같다며 참고할 만한 레퍼런스를 정하고, 향후 기능 추가를 고려해 통일성·중심화를 지키면서 디자인을 대규모로 개편해 달라고 요청했습니다. [디자인 시스템](docs/design-system.md)에 레퍼런스와 규칙을 정리하고 그에 맞춰 화면을 다시 만들었습니다. 원시 값은 `src/ui/tokens.css`, 컴포넌트는 `src/ui/components.css`와 `controls.js` 생성기, 배치는 `src/ui/shell.js`, 아이콘은 `src/ui/icons.js`, 도형 기본색은 `src/models/palette.js`에 모았습니다. `editor.css`는 삭제했습니다. 모든 ID·data 속성과 JSON 형식(schemaVersion 12)은 그대로이고, 새 도형의 기본색만 바뀝니다. 알려진 제한은 어두운 테마 없음, Pretendard CDN 의존(오프라인은 시스템 글꼴)입니다. 로컬 확인만 하며 커밋·푸시하지 않습니다.
 
@@ -48,17 +50,17 @@
 | 항목 | 현재 기준 |
 | --- | --- |
 | 저장소 | https://github.com/diuavjsix-hash/econ-app |
-| 데스크톱 작업 폴더 | `C:\Users\htt06\Desktop\codex_project\econ-app` (상위 폴더 이름은 이전 Codex 환경의 이름이며 바꾸지 않음) |
+| 데스크톱 작업 폴더 | `C:\Users\htt06\Desktop\claude_project_old\econ-app` (2026-11-12 확인; 이전 경로 `codex_project\econ-app`) |
 | 노트북 작업 폴더 | `C:\Users\htt06\Desktop\econ-app` (2026-11-09 확인) |
-| 주 작업 도구 | 2026-11-06부터 Claude Code |
+| 주 작업 도구 | 2026-11-06부터 Claude Code; 규칙은 [CLAUDE.md](CLAUDE.md) |
 | 브랜치 | `main`; `git log -1 --oneline`으로 최신 커밋 확인 |
 | 동기화 확인 | `git fetch origin`, `git status --short --branch`, `git rev-list --left-right --count HEAD...origin/main` |
 | 앱 런타임 | Node.js 20 이상, 별도 패키지 설치 없음 |
 | 브라우저 검사 | Node.js 22 이상과 설치된 Chrome/Chromium/Edge |
-| 컴퓨터별 Node | 데스크톱 2026-11-07부터, 노트북 2026-11-09부터 PATH의 Node.js 26.13.0 (`C:\Program Files\nodejs`); Codex 번들 경로는 `node`가 없을 때의 대체 수단 |
+| 컴퓨터별 Node | 데스크톱 2026-11-07부터, 노트북 2026-11-09부터 PATH의 Node.js 26.13.0 (`C:\Program Files\nodejs`) |
 | 로컬 주소 | http://127.0.0.1:5173/ |
 | 저장 형식 | JSON schemaVersion 12 (`dashedLines` 제거); 메모리 상태와 JSON 내보내기 |
-| 버전 태그 | `git tag -n1`로 확인; `v1` = 2026-11-08 디자인 개편 커밋, `v2` = 2026-11-08 Shift 접선 잠금 커밋, `v3` = 2026-11-08 점 맞춤 우선 커밋, `v4` = 2026-11-08 글자 크기·휠 확대/축소·실행 파일 제외 커밋, `v5` = 2026-11-09 노트북 이어받기·문서 정리 커밋(앱 코드 변경 없음). `v1`~`v5` 모두 GitHub에 푸시함. 규칙은 [변경 기록](docs/CHANGELOG.md) 머리말 |
+| 버전 태그 | `git tag -n1`로 확인; `v1` = 2026-11-08 디자인 개편 커밋, `v2` = 2026-11-08 Shift 접선 잠금 커밋, `v3` = 2026-11-08 점 맞춤 우선 커밋, `v4` = 2026-11-08 글자 크기·휠 확대/축소·실행 파일 제외 커밋, `v5` = 2026-11-09 노트북 이어받기·문서 정리 커밋(앱 코드 변경 없음), `v6` = 2026-11-12 Codex → Claude Code 문서 정리 커밋(앱 코드 변경 없음). `v1`~`v6` 모두 GitHub에 푸시함. 규칙은 [변경 기록](docs/CHANGELOG.md) 머리말 |
 
 데스크톱과 노트북 모두 PATH의 `node`를 사용합니다. 새로 설치한 직후에는 PowerShell·Claude Code를 다시 열어야 `node`가 인식됩니다. `node`가 없는 환경은 [README 실행 방법](README.md#로컬-실행)을 따릅니다. 다른 컴퓨터에서는 해당 환경의 Node와 실행 파일을 사용합니다.
 
@@ -69,7 +71,7 @@
 1. **풀하기 전에** 그 컴퓨터에 `server.cmd`·`start-server.cmd`·`stop-server.cmd`가 있으면 다른 폴더에 복사해 둡니다. `v4`가 이 파일들을 저장소에서 지우므로, 풀하면 Git이 그 컴퓨터의 파일도 지웁니다(로컬 수정이나 skip-worktree가 있으면 풀이 멈출 수 있음). skip-worktree가 걸려 있으면 `git update-index --no-skip-worktree server.cmd start-server.cmd stop-server.cmd`로 먼저 풉니다.
 2. `git pull`로 main과 태그를 받은 뒤 복사해 둔 파일을 다시 넣습니다. `.gitignore`에 있어 변경 목록에 나오지 않습니다. 파일이 없으면 [README](README.md#로컬-실행)의 `scripts/server.ps1` 명령이나 예시 내용으로 만듭니다.
 3. `node --version`으로 Node.js 20 이상(브라우저 검사는 22 이상)을 확인하고 `node scripts/test.mjs`를 실행합니다.
-4. Claude Code는 이 저장소의 [AGENTS.md](AGENTS.md)와 이 문서를 기준으로 이어받습니다. 이전 컴퓨터의 Claude Code 개인 메모리와 `.claude/`(미리보기 설정)는 저장소에 없으므로 필요한 규칙은 AGENTS.md에 둡니다.
+4. Claude Code는 이 저장소의 [CLAUDE.md](CLAUDE.md)를 자동으로 읽고 이 문서를 기준으로 이어받습니다. 미리보기 설정 `.claude/launch.json`은 저장소에 있고, 개인 메모리와 `.claude/settings.local.json`은 컴퓨터마다 따로 있으므로 계속 지켜야 할 규칙은 CLAUDE.md에 둡니다. 플러그인(frontend-design 등)도 컴퓨터마다 설치합니다.
 
 ## 현재 기능과 이동 규칙
 

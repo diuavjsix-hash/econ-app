@@ -21,7 +21,6 @@ function Find-ServerNode {
         $nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
         $candidates = @(
             $(if ($nodeCommand) { $nodeCommand.Source }),
-            (Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'),
             $(if ($env:ProgramFiles) { Join-Path $env:ProgramFiles 'nodejs\node.exe' }),
             $(if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Programs\nodejs\node.exe' })
         )

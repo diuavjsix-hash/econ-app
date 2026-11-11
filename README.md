@@ -2,7 +2,7 @@
 
 여러 경제 그래프를 배치하고 직접 그려보는 웹 작업 공간입니다. 직선(직선·반직선·선분, 실선·점선), 곡선, 점을 그리고 구역을 칠할 수 있습니다. 좌표축 이름 편집, 마우스 이동·형태 조절, JSON 출력을 지원합니다.
 
-개발을 이어받으실 때는 [작업 인계](HANDOFF.md)를 먼저 읽어 주세요. 앱 소스·문서·테스트·실행 스크립트는 이 저장소에서 함께 관리합니다. [구조 문서](docs/architecture.md)와 [JSON 형식](docs/json-format.md)에 구현 기준을 정리했습니다.
+개발을 이어받으실 때는 [작업 인계](HANDOFF.md)를 먼저 읽어 주세요. Claude Code 작업 규칙은 [CLAUDE.md](CLAUDE.md)에 있습니다. 앱 소스·문서·테스트·실행 스크립트는 이 저장소에서 함께 관리합니다. [구조 문서](docs/architecture.md)와 [JSON 형식](docs/json-format.md)에 구현 기준을 정리했습니다.
 
 공통 편집·복제·선택·직렬화는 `GraphObject` 상속 계층을 사용합니다. 곡선 종류의 계산, 자석 포착 정책, SVG 렌더링도 기반 클래스와 하위 클래스에서 공유합니다. [클래스 관계와 확장 방법](docs/architecture.md#공통-클래스와-상속--2026-11-03)에 책임과 등록 절차를 정리했습니다.
 
@@ -27,7 +27,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\server.ps1 -Action
 | `3` · Status | 실행 여부와 주소를 확인합니다. |
 | `0` · Exit menu | 메뉴만 닫습니다. 서버는 계속 실행됩니다. |
 
-`-Action start`는 서버 시작, `-Action stop`은 종료, `-Action status`는 상태 확인입니다. PATH의 Node.js 20 이상을 먼저 찾고, 없으면 현재 컴퓨터의 Codex 번들 Node 경로를 자동 확인합니다. 직접 경로를 지정하려면 `ECON_NODE` 환경 변수를 설정합니다.
+`-Action start`는 서버 시작, `-Action stop`은 종료, `-Action status`는 상태 확인입니다. PATH의 Node.js 20 이상을 먼저 찾고, 없으면 일반 설치 경로(`Program Files\nodejs`, `AppData\Local\Programs\nodejs`)를 확인합니다. 직접 경로를 지정하려면 `ECON_NODE` 환경 변수를 설정합니다.
 
 더블클릭용 `server.cmd`·`start-server.cmd`·`stop-server.cmd`는 컴퓨터마다 따로 만들어 두는 파일이라 저장소에 없고 `.gitignore`에 들어 있습니다. 필요하면 프로젝트 폴더에 다음 내용으로 만듭니다(`-Action`만 `menu`/`start`/`stop`으로 바꿈).
 
@@ -55,14 +55,9 @@ Node.js 20 이상에서 별도의 의존성 설치 없이 실행합니다.
 node scripts/dev-server.mjs
 ```
 
-데스크톱(2026-11-07부터)과 노트북(2026-11-09부터)에는 Node.js 26.13.0이 PATH에 설치되어 있어 일반 PowerShell·Claude Code에서 `node`를 바로 사용합니다. 새로 설치한 직후에는 터미널을 다시 열어야 인식됩니다. 새 컴퓨터에서는 `winget install OpenJS.NodeJS.LTS`로 설치할 수 있습니다. `node`를 찾지 못하는 환경에서 Codex가 설치되어 있다면 Codex에 포함된 실행 파일을 직접 사용할 수 있습니다(Node.js 24.22.1 확인).
+데스크톱(2026-11-07부터)과 노트북(2026-11-09부터)에는 Node.js 26.13.0이 PATH에 설치되어 있어 일반 PowerShell·Claude Code에서 `node`를 바로 사용합니다. 새로 설치한 직후에는 터미널을 다시 열어야 인식됩니다. 새 컴퓨터에서는 `winget install OpenJS.NodeJS.LTS`로 설치할 수 있습니다.
 
-```powershell
-# 저장소를 받은 프로젝트 폴더에서 실행합니다.
-& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/dev-server.mjs
-```
-
-이 경로는 Codex를 설치한 Windows 컴퓨터의 런타임 경로입니다. 다른 환경에서는 Node.js 20 이상을 준비한 뒤 `node` 명령을 사용합니다. 데스크톱과 노트북의 작업 폴더를 서로 복사할 필요는 없고 각자 GitHub에서 풀합니다. 서버를 종료할 때는 실행한 PowerShell 창에서 Ctrl+C를 누릅니다. `EADDRINUSE` 오류는 이미 같은 포트의 서버가 실행 중이라는 뜻입니다.
+데스크톱과 노트북의 작업 폴더를 서로 복사할 필요는 없고 각자 GitHub에서 풀합니다. 서버를 종료할 때는 실행한 PowerShell 창에서 Ctrl+C를 누릅니다. `EADDRINUSE` 오류는 이미 같은 포트의 서버가 실행 중이라는 뜻입니다.
 
 브라우저에서 [앱 열기](http://127.0.0.1:5173/)로 접속합니다.
 

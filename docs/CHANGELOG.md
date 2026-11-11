@@ -8,6 +8,7 @@
 
 | 버전 | 날짜 | 포함 범위 |
 | --- | --- | --- |
+| v6 | 2026-11-12 | Codex → Claude Code 문서 정리(앱 코드 변경 없음) |
 | v5 | 2026-11-09 | 노트북 이어받기·문서 정리(앱 코드 변경 없음) |
 | v4 | 2026-11-08 | 글자 크기·마우스 휠 확대/축소·실행 파일 제외 |
 | v3 | 2026-11-08 | 점 맞춤 우선·Shift 수평/수직 표시 |
@@ -19,6 +20,16 @@
 ## 커밋 전
 
 (없음)
+
+## v6 · 2026-11-12 · Codex → Claude Code 문서 정리
+
+### Codex → Claude Code 문서 정리
+
+- 저장소 규칙 파일 `AGENTS.md`를 Claude Code가 자동으로 읽는 `CLAUDE.md`로 옮겼습니다. 현재 문서의 참조를 바꾸고, 지난 기록(`docs/history/`, 이 변경 기록의 지난 절)의 `AGENTS` 표현은 그대로 두었습니다.
+- README·검증 문서·구조 문서에서 Codex 번들 Node 대체 경로를 지우고, `scripts/server.ps1`의 Node 후보에서 Codex 경로를 뺐습니다(`ECON_NODE`·PATH·일반 설치 경로는 그대로).
+- 데스크톱 작업 폴더 경로(`claude_project_old\econ-app`)를 갱신했습니다. 미리보기 설정 `.claude/launch.json`을 저장소에 두고 `.claude/settings.local.json`·`.claude/worktrees/`는 `.gitignore`에 넣었습니다.
+- CLAUDE.md에 frontend-design 스킬 사용 기준(미니멀 원칙·디자인 시스템 우선, 토큰으로만 변경)을 적었습니다.
+- 앱 406개·구문/경계 120개 모듈·문서 링크 점검 통과(데스크톱). 브라우저 검사는 재실행하지 않았습니다.
 
 ## v5 · 2026-11-09 · 노트북 이어받기·문서 정리
 

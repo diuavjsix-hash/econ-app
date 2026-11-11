@@ -384,15 +384,7 @@ node scripts/generate-doc-example.mjs
 git diff --check
 ```
 
-데스크톱(2026-11-07부터)과 노트북(2026-11-09부터)은 PATH의 `node`로 위 명령을 바로 실행합니다. `node`를 찾지 못하고 Codex가 설치된 환경에서만 다음 번들 경로를 대체 수단으로 사용합니다.
-
-```powershell
-& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/check.mjs
-& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/test.mjs
-& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/build.mjs
-& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/browser-test.mjs
-& "C:\Users\htt06\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" scripts/generate-doc-example.mjs
-```
+데스크톱(2026-11-07부터)과 노트북(2026-11-09부터)은 PATH의 `node`로 위 명령을 바로 실행합니다. `node`가 없는 컴퓨터는 Node.js를 설치한 뒤(`winget install OpenJS.NodeJS.LTS`) 터미널을 다시 엽니다.
 
 Windows 서버 테스트는 .local/server-test-* 안에 임시 서버를 만들고 정리합니다. 실제 실행 중인 프로젝트 서버를 테스트 서버로 사용하지 않습니다. 제한 환경에서는 Win32_Process CIM 조회가 차단될 수 있습니다. 이 경우 서버 테스트 2개가 권한 오류로 실패할 수 있으므로 해당 권한을 갖춘 환경에서 다시 실행하고, 이를 앱 계산 실패와 구분합니다. 테스트를 중단했다면 남은 프로세스는 PID·시작 시각·정확한 스크립트 경로를 대조한 후 정리합니다. 이 검증에서 일반 작업 서버를 임의 종료하지 않습니다.
 

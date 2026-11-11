@@ -291,7 +291,7 @@ Git 상태 확인 시 untracked 파일도 함께 확인하십시오. 일반 `git
 - [README.md](../../README.md): 실행과 조작 방법
 - [docs/architecture.md](../architecture.md): 모듈, 상태 흐름, 좌표와 조작 원칙
 - [docs/json-format.md](../json-format.md): JSON 필드와 복원에 필요한 수식
-- [AGENTS.md](../../AGENTS.md): 작업 시 유지할 사용자 지시
+- [CLAUDE.md](../../CLAUDE.md) (당시 이름 AGENTS.md): 작업 시 유지할 사용자 지시
 
 새 작업에 전달할 문장 예시:
 

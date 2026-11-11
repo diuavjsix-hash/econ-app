@@ -7,3 +7,7 @@ dist/
 server.cmd
 start-server.cmd
 stop-server.cmd
+
+# Claude Code personal settings and worktrees (.claude/launch.json is shared)
+.claude/settings.local.json
+.claude/worktrees/
