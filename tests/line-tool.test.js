@@ -244,16 +244,27 @@ test('the line tool: Shift after a start on a curve locks its tangent, Alt drops
   assert.deepEqual(added.pop().to, { x: 3, y: 1 });
 });
 
-test('every new straight line is the same gray, whatever its kind, style or source', async () => {
-  const { ROLE_COLORS, INK } = await import('../src/models/palette.js');
-  assert.equal(ROLE_COLORS.line, INK.pencil);
+test('dashed lines are one gray; solid lines take turns through the stroke colors', async () => {
+  const { ROLE_COLORS, INK, STROKE_CYCLE, lineColor } = await import('../src/models/palette.js');
+  assert.equal(ROLE_COLORS.dashedLine, INK.pencil);
+  assert.equal(lineColor(7, 'dashed'), INK.pencil);
+  assert.equal(lineColor(7, 'solid'), STROKE_CYCLE[1]);
   const store = createStore();
-  store.addLine({ x: 0, y: 0 }, { x: 1, y: 1 });
-  store.addLine({ x: 0, y: 1 }, { x: 2, y: 1 }, { kind: 'segment', style: 'dashed' });
-  store.addLine({ x: 1, y: 0 }, { x: 1, y: 2 }, { kind: 'ray' });
-  store.addLine(); store.addLine();
-  store.addPoint({ x: 2, y: 3 }); store.lineThroughSelectedPoint({ slope: -1 });
-  const { lines } = store.getState();
-  assert.equal(lines.length, 6);
-  assert.deepEqual(new Set(lines.map(line => line.color)), new Set([ROLE_COLORS.line]));
+  const first = store.addLine({ x: 0, y: 0 }, { x: 1, y: 1 });
+  const dashed = store.addLine({ x: 0, y: 1 }, { x: 2, y: 1 }, { kind: 'segment', style: 'dashed' });
+  const ray = store.addLine({ x: 1, y: 0 }, { x: 1, y: 2 }, { kind: 'ray' });
+  store.addLine();
+  store.addPoint({ x: 2, y: 3 }); const through = store.lineThroughSelectedPoint({ slope: -1 });
+  const color = id => store.getState().lines.find(line => line.id === id).color;
+  assert.equal(color(first), STROKE_CYCLE[0]);
+  assert.equal(color(dashed), INK.pencil);
+  assert.equal(color(ray), STROKE_CYCLE[2], 'solid lines keep the creation-order cycle');
+  assert.equal(color(through), STROKE_CYCLE[4]);
+  // Switching the style switches to that style's color, and back.
+  store.selectObject(first); store.updateSelected({ style: 'dashed' });
+  assert.equal(color(first), INK.pencil);
+  store.updateSelected({ style: 'solid' });
+  assert.equal(color(first), STROKE_CYCLE[0]);
+  store.updateSelected({ style: 'solid', name: '같은 모양' });
+  assert.equal(color(first), STROKE_CYCLE[0]);
 });

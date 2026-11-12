@@ -51,7 +51,7 @@
 | `src/ui/controls.js` | 위 컴포넌트의 마크업 생성기: `button`, `iconButton`, `toolButton`, `segmented`, `switchField`, `checkField`, `selectField`, `textField`, `numberField`, `rangeField`, `hint` |
 | `src/ui/icons.js` | 유일한 아이콘 모음(24px 격자·1.75 선)과 도형 트리용 16px 기호 `objectGlyph` |
 | `src/ui/shell.js` | 정적 화면 배치. 컨트롤 마크업은 직접 쓰지 않고 위 생성기로만 조합합니다. |
-| `src/models/palette.js` | 문서에 저장되는 도형 기본색: `INK`, `STROKE_CYCLE`, `SUM_CYCLE`, `FILL_PALETTE`, `ROLE_COLORS` |
+| `src/models/palette.js` | 문서에 저장되는 도형 기본색: `INK`, `STROKE_CYCLE`, `SUM_CYCLE`, `FILL_PALETTE`, `ROLE_COLORS`, 직선 기본색 `lineColor(번호, 모양)`(점선은 `ROLE_COLORS.dashedLine` 회색, 실선은 `STROKE_CYCLE`) |
 
 `index.html`은 `tokens → components → snap-feedback → styles` 순서로 불러옵니다. 순서가 바뀌면 덮어쓰기 관계가 달라지므로 검사가 실패합니다.
 

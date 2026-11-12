@@ -235,13 +235,14 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/main.js` | `appShell()` 장착, store 생성, 각 기능 mount |
 | `src/ui/tokens.css`, `components.css` | 디자인 토큰(원시 값의 유일한 출처)과 공통 컴포넌트 스타일; [디자인 시스템](design-system.md) |
 | `src/ui/shell.js`, `icons.js` | 정적 화면 배치(공통 생성기만 사용)와 유일한 아이콘·도형 기호 모음 |
-| `src/models/palette.js` | 문서에 저장되는 도형 기본색(`INK`·`STROKE_CYCLE`·`FILL_PALETTE`·`ROLE_COLORS`) |
+| `src/models/palette.js` | 문서에 저장되는 도형 기본색(`INK`·`STROKE_CYCLE`·`FILL_PALETTE`·`ROLE_COLORS`). 직선은 `lineColor`: 점선은 회색(`ROLE_COLORS.dashedLine`), 실선은 생성 번호(`line-N` → N−1)로 `STROKE_CYCLE`을 돌며, `LineObject`가 모양을 바꿀 때 같은 규칙으로 색을 다시 정함 |
 | `src/models/graph-object.js`, `objects.js`, `object-types.js`, `contracts.js` | 공통 행동 상속·도형 어댑터·컬렉션/능력 목록·필수 구현 등록 검사 |
 | `src/models/curve-families.js` | 곡선 종류 상속·고유 이동/편집/접점·기하 능력과 등록 계약 |
 | `src/ui/controls.js` | 버튼·아이콘 버튼·도구·분할 선택·스위치·체크·선택/텍스트/숫자/슬라이더 마크업 생성과 공통 검증·접근성 값/진행 표시 |
 | `src/graph/interactions.js`, `editing-handles.js` | 도형별 조작과 포인터/키보드 훅·선택 손잡이 |
 | `src/graph/curve-contacts.js`, `curve-curve-tangency.js` | 공유 원본 접점 기하와 허용 이동 제약에 맞춘 곡선끼리 자석. 수직합·수평합은 `sumContactBranches`가 꺾임마다 나눈 직선 구간·기울기 단조 함수 구간(`FunctionBranch`, 원본 값의 미분)으로 같은 목록에 들어감(`strokeContactBranches`). 합과 자기 원본, 합끼리는 접점을 찾지 않음. 합의 표시 근사 교차가 같은 합의 등록 접점 0.002 안이면 `buildSnapTargets`·선분 끝 안내선 계산에서 같은 점으로 봄 |
 | `src/graph/snap-context.js` | 자기/계산 종속 도형 공통 제외·캐시용 수학 기하 키 |
+| `src/links.js` | 그래프 사이 연결선: 같은 열/행의 정렬된 그래프 찾기(`alignedPartners`), 구성원 좌표 맞추기(`syncLinks`), 묶인 그래프 확대 공유(`linkedDiagramIds`), 카드 사이 틈 잇기 계산(`linkBridges`), JSON 요약(`describeLinks`) |
 | `src/graph/ppc.js`, `axes.js` | ¼타원 기하와 공통 유한 좌표축 |
 | `src/graph/svg-renderer.js` | SVG 노드·경로와 공통 획/히트 영역·접근성 속성 |
 | `src/editor-ui.js` | 현재 작업별 편집 패널 문맥·그래프 설정 창 열기 |
@@ -470,6 +471,16 @@ binding은 `{kind:'tangent',sourceId:lineId,parameter}`(직선 기준점에서 �
 기본 nonnegative=true는 독립 변수의 범위를 0 이상으로 제한하고 각 기여분을 max(0,value)로 더합니다. false는 음수 좌표를 포함하는 일반적인 수학적 합입니다. 곡선 양 끝·기여분이 0이 되는 위치에서 미리 분할해 경제 그래프의 꺾임을 보존합니다. 결과는 내부 좌표 오차 기준 0.001, 최대 세분 깊이 14의 적응형 선분으로 표시하며, 이 근사 선분은 문서·JSON에 저장하지 않습니다. 극단적인 수치에서는 깊이 제한 때문에 오차 한도가 보장되지 않습니다. 원본 평가와 sumValue 계산 자체에는 표시 근사를 사용하지 않습니다.
 
 렌더와 스냅은 displayedSumSegments의 동일한 선분·축 간격 클리핑을 공유합니다. 합 위 점·교점 스냅은 표시 근사에 기반하며 원본 직선·곡선의 기존 정확한 스냅은 유지합니다. 축 반전은 다른 도형과 동일하게 투영에만 적용합니다. 원본 삭제 시 해당 원본에 의존하는 모든 합을 함께 지우고, 삭제된 항목의 자식은 살아남는 상위 항목으로 올립니다. 이 변경은 하나의 기록이며 undo/redo·전체 삭제·그래프별 숨김/복원에 포함합니다. sums는 JSON 7에서 추가했고 현재 출력은 10입니다.
+
+## 그래프 사이 연결선 (2026-11-12)
+
+연결선은 새 도형 종류가 아니라 **각 그래프에 하나씩 있는 보통 직선**을 `link:{id, axis}`로 묶은 것입니다. `axis:'x'`는 세로선(같은 x), `axis:'y'`는 가로선(같은 y)입니다. 구성원이 보통 직선이므로 그 그래프 안의 자석(교점·선 맞춤)·`relations`·선택·삭제·되돌리기·JSON이 따로 작업 없이 동작합니다.
+
+- **만들기:** 점을 선택하고 **세로 연결선**/**가로 연결선**을 누릅니다. 버튼은 `alignedPartners`가 같은 열(세로)/같은 행(가로)에서 축 위치와 방향이 같은 그래프를 찾을 때만 보입니다. 1사분면끼리, 또는 1·2사분면·전체·대면끼리(가로선은 원점 높이 기준), 같은 반전이어야 하며 에지워드 상자는 제외합니다. 지금 그래프에는 점에서 상대 그래프 쪽으로 뻗는 반직선(양쪽에 있으면 직선)을, 상대 그래프마다 같은 좌표의 직선을 점선·회색으로 한 기록에 만듭니다. **점을 따라가기**가 켜져 있으면 지금 그래프의 선이 점을 따라갑니다.
+- **맞추기:** store의 `emit`이 `resolveRelations` 다음에 `syncLinks(diagrams, activeDiagramId)`를 부릅니다. 점을 따라가는 구성원이 있으면 그 값이, 없으면 방금 편집한(활성 그래프의) 구성원 값이 다른 구성원에 복사됩니다. 점을 따라가는 구성원이 있는 동안 다른 그래프의 구성원은 끌어 옮길 수 없습니다(`linkHeld`). 구성원의 기울기는 고정이며 회전 손잡이와 기울기 조절이 꺼집니다. 종류(직선·반직선·선분)·실선/점선·이름은 각자 바꿉니다. 구성원이 하나만 남으면 `link`가 지워져 보통 직선이 됩니다. 복제본은 `link`가 없는 보통 직선입니다.
+- **축 눈금 공유:** 같은 배치의 칸은 크기가 같아 기본 단위가 같습니다. 연결선으로 묶인 그래프는 확대 배율을 함께 씁니다(`setDiagramZoom`이 `linkedDiagramIds` 전체에 적용). 연결선을 만들 때 상대 그래프는 지금 그래프의 배율을 받습니다. 묶이지 않은 그래프는 지금처럼 따로 확대합니다.
+- **틈 잇기:** `workspace.js`가 그래프 칸 위에 그리기 전용 SVG(`.link-bridges`)를 두고, 그림이 바뀌거나 크기가 바뀔 때마다 `linkBridges`로 다시 그립니다. 두 구성원이 화면에서 0.5px 안에 정렬되고, 각자 마주 보는 그래프 가장자리(축 띄우기 간격 포함)까지 닿을 때만 그 사이를 같은 색·모양으로 잇습니다. 화면 좌표는 저장하지 않습니다.
+- **JSON:** 각 구성원 직선에 `link`가 붙고, 문서 최상위 `links`에 `{id, axis, value, lines:[{diagramId, lineId}]}`, `legend.links`에 설명이 들어갑니다(연결선이 있을 때만).
 
 ## 편집 기록
 

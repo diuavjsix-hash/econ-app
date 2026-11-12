@@ -1,5 +1,7 @@
 import { mountGraph } from './graph/canvas.js';
-import { QUADRANT_MODES } from './graph/viewport.js';
+import { QUADRANT_MODES, createViewport } from './graph/viewport.js';
+import { SVG_RENDERER } from './graph/svg-renderer.js';
+import { linkBridges } from './links.js';
 import { selectedIdsOf } from './objects.js';
 import { toolModeFlags, toolModeOf } from './tool-modes.js';
 
@@ -23,7 +25,32 @@ export function mountWorkspace(root, store) {
   directionX.addEventListener('change', () => store.updateDiagram({ flipX: directionX.value === 'left' }));
   directionY.addEventListener('change', () => store.updateDiagram({ flipY: directionY.value === 'down' }));
 
-  return store.subscribe(state => {
+  // Link lines continue across the gaps between cards on one overlay; it only draws.
+  const bridges = SVG_RENDERER.element('svg', { class: 'link-bridges', 'aria-hidden': 'true' });
+  grid.append(bridges);
+  let frame = 0;
+  const drawBridges = () => {
+    frame = 0;
+    const state = store.getState(), origin = grid.getBoundingClientRect(), placed = [];
+    for (const diagram of state.diagrams.slice(0, state.layout.slots.length)) {
+      const container = cards.get(diagram.id)?.element.querySelector('.graph-container');
+      if (!container?.clientWidth || !container.clientHeight) continue;
+      const scoped = diagramState(state, diagram.id), box = container.getBoundingClientRect();
+      placed.push({ state: scoped, viewport: createViewport(container.clientWidth, container.clientHeight, scoped.quadrantMode, scoped), offset: { x: box.left - origin.left, y: box.top - origin.top } });
+    }
+    bridges.replaceChildren(...linkBridges(placed).map(({ linkId, color, dashed, x1, y1, x2, y2 }) => {
+      const group = SVG_RENDERER.element('g', { class: `graph-line link-bridge${dashed ? ' is-dashed' : ''}`, 'data-link-bridge': linkId, style: `--line-color:${color}` });
+      group.append(SVG_RENDERER.element('line', { x1, y1, x2, y2, class: 'plotted-line' }));
+      return group;
+    }));
+  };
+  // After every card has rendered this change.
+  const scheduleBridges = () => { if (!frame) frame = requestAnimationFrame(drawBridges); };
+  const resized = new ResizeObserver(scheduleBridges);
+  resized.observe(grid);
+
+  const unsubscribe = store.subscribe(state => {
+    scheduleBridges();
     const visible = state.diagrams.slice(0, state.layout.slots.length);
     for (const [id, card] of cards) if (!visible.some(d => d.id === id)) { card.dispose(); card.element.remove(); cards.delete(id); }
     const rows = Math.max(...state.layout.slots.map(s => s.row)) + 1;
@@ -70,4 +97,5 @@ export function mountWorkspace(root, store) {
     directionX.value = active.flipX ? 'left' : 'right';
     directionY.value = active.flipY ? 'down' : 'up';
   });
+  return () => { unsubscribe(); resized.disconnect(); cancelAnimationFrame(frame); bridges.remove(); };
 }

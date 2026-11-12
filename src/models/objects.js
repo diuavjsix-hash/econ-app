@@ -8,6 +8,7 @@ import { displayedSumSegments } from '../graph/sum.js';
 import { clipSegment, validPoint, rulerMetrics } from '../graph/ruler.js';
 import { validFill, fillTouchesRectangle } from '../graph/fill.js';
 import { OBJECT_TYPES } from './object-types.js';
+import { lineColor } from './palette.js';
 import { isTrimmed, lineEndPoints, normalizeExtent, rotatedExtent } from '../graph/line-extent.js';
 
 export const LINE_STYLES = Object.freeze(['solid', 'dashed']);
@@ -19,13 +20,17 @@ export class LineObject extends StrokeObject {
   updateGeometry(patch) {
     const before = { slope: this.data.slope, extent: this.data.extent ?? null };
     super.updateGeometry(patch);
-    if ('slope' in patch) {
+    if ('slope' in patch && !this.data.link) {
       this.data.slope = normalizeSlope(patch.slope);
       // Without an explicit extent, keep the ends on the side nearest their old direction.
       if (!('extent' in patch) && before.extent) this.setExtent(rotatedExtent(before.extent, this.data.slope, directionOf(before.slope)));
     }
     if ('extent' in patch) this.setExtent(patch.extent);
-    if (LINE_STYLES.includes(patch.style)) this.data.style = patch.style;
+    if (LINE_STYLES.includes(patch.style) && patch.style !== (this.data.style ?? 'solid')) {
+      // Switching style also switches to that style's default color: dashed gray, solid by number.
+      this.data.style = patch.style;
+      this.data.color = lineColor(Number(/^line-(\d+)$/.exec(this.data.id)?.[1] ?? 1) - 1, patch.style);
+    }
   }
   setExtent(extent) {
     const value = normalizeExtent(extent);
@@ -41,6 +46,7 @@ export class LineObject extends StrokeObject {
     return Math.abs(d.x * e.y - d.y * e.x) < 1e-10 && Math.abs((a.anchor.x - b.anchor.x) * d.y - (a.anchor.y - b.anchor.y) * d.x) < 1e-8;
   }
   transformDuplicate(object, { slopeFactor }) {
+    delete object.link; // A copy is a plain line of this graph.
     if (object.slope !== null) {
       const slope = object.slope * slopeFactor;
       if (!Number.isFinite(slope) || (object.slope !== 0 && slope === 0)) return { error: '이 기울기는 숫자 범위를 벗어납니다.' };
@@ -53,7 +59,7 @@ export class LineObject extends StrokeObject {
     const [start, end] = lineEndPoints(line);
     return { ...super.serialize(), slope: line.slope, intercept: interceptOf(line), anchor: { ...line.anchor },
       style: line.style ?? 'solid', ...(isTrimmed(line) ? { extent: [...line.extent], segment: { start, end } } : {}),
-      ...(line.binding ? { binding: { ...line.binding } } : {}), vertical: line.slope === null, xIntercept: line.slope === null ? line.anchor.x : null,
+      ...(line.binding ? { binding: { ...line.binding } } : {}), ...(line.link ? { link: { ...line.link } } : {}), vertical: line.slope === null, xIntercept: line.slope === null ? line.anchor.x : null,
       implicit: { a: -direction.y, b: direction.x, c: direction.y * line.anchor.x - direction.x * line.anchor.y } };
   }
 }

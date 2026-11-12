@@ -29,8 +29,8 @@ export const FILL_PALETTE = Object.freeze([
 /** Defaults by object role; new object kinds add a role here instead of a literal. */
 export const ROLE_COLORS = Object.freeze({
   point: INK.graphite,
-  // Every new straight line is one gray, whatever its kind or style.
-  line: INK.pencil,
+  // Dashed lines are guides: always one gray. Solid lines take turns through STROKE_CYCLE.
+  dashedLine: INK.pencil,
   ruler: INK.pencil,
   group: INK.muted,
   sketch: INK.teal,
@@ -46,4 +46,6 @@ export const ROLE_COLORS = Object.freeze({
 });
 
 export const strokeColor = index => STROKE_CYCLE[((index % STROKE_CYCLE.length) + STROKE_CYCLE.length) % STROKE_CYCLE.length];
+/** A straight line's default color: dashed is gray, solid follows its creation number (line-N → N-1). */
+export const lineColor = (index, style) => style === 'dashed' ? ROLE_COLORS.dashedLine : strokeColor(index);
 export const sumColor = index => SUM_CYCLE[((index % SUM_CYCLE.length) + SUM_CYCLE.length) % SUM_CYCLE.length];

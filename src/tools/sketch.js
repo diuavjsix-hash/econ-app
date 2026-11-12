@@ -16,6 +16,8 @@ export function mountSketchTool(root, store) {
     const contact=point&&graph&&contactTangentSlope(state,createViewport(graph.clientWidth,graph.clientHeight,state.quadrantMode,state).bounds,point.anchor);
     store.lineThroughSelectedPoint({follow:root.querySelector('#point-line-follow').checked,...(contact?{slope:contact.slope}:{})});
   });
+  const follow=()=>root.querySelector('#point-line-follow').checked;
+  for (const axis of ['x','y']) root.querySelector(`#point-link-${axis}`).addEventListener('click',()=>store.linkThroughSelectedPoint({axis,follow:follow()}));
   root.querySelector('#detach-binding').addEventListener('click',()=>store.detachSelected());
   for (const button of root.querySelectorAll('[data-sketch-shape]')) button.addEventListener('click',()=>{
     const state=store.getState(), curve=state.sketches.find(curve=>curve.id===state.selectedId);
@@ -32,6 +34,8 @@ export function mountSketchTool(root, store) {
     const object=objectsOf(state).find(object=>object.id===state.selectedId), curve=object?.type==='sketch'?object:null;
     settings.hidden=!curve;
     root.querySelector('#binding-settings').hidden=!object?.binding;
+    // Links appear only where another graph shares that axis.
+    for (const axis of ['x','y']) root.querySelector(`#point-link-${axis}`).hidden=object?.type!=='point'||!store.linkPartners(axis).length;
     if (object?.binding) {
       const source=objectsOf(state).find(source=>source.id===object.binding.sourceId);
       const label={tangent:'접점 유지','through-point':'점 따라가기'}[object.binding.kind];

@@ -2,6 +2,7 @@ import { DEFAULT_AXIS_GAP } from './graph/display.js';
 import { QUADRANT_MODES, faceToFace } from './graph/viewport.js';
 import { objectModel } from './models/objects.js';
 import { describeRelations } from './graph/drawn-relations.js';
+import { describeLinks } from './links.js';
 const serializeObjects = objects => (objects ?? []).map(object => objectModel(object).serialize());
 
 export const SCHEMA_VERSION = 13;
@@ -16,6 +17,8 @@ const LEGEND = Object.freeze({
 });
 // Added only when a face-to-face sheet is exported, so other files keep their legend.
 const FACE_LEGEND = 'coordinateSystem.type이 face-to-face인 그래프는 y축을 공유하는 맞붙은 두 그래프입니다. x<0인 좌표는 맞은편 그래프에 있고, 그 그래프의 수평축 값은 -x입니다.';
+
+const LINKS_LEGEND = 'links는 여러 그래프에 같은 좌표로 놓인 연결선입니다. axis=x는 세로선(같은 x), axis=y는 가로선(같은 y)이고, lines의 각 직선은 그 그래프의 lines에 있으며 link 필드로 같은 연결선임을 표시합니다.';
 
 /** The facing graph on a face-to-face sheet: where it is drawn and how to read its x. */
 const facingSide = state => ({ side: state.flipX ? 'right' : 'left', axisName: state.faceAxisName, xPositive: state.flipX ? 'right' : 'left', ownX: '-x' });
@@ -43,15 +46,17 @@ function serializeDiagram(state) {
 
 /** Every diagram once (no top-level copy of the active one), each with its computed relations. */
 export function serializeDocument(state) {
+  const links = describeLinks(state.diagrams);
   return {
     schemaVersion: SCHEMA_VERSION,
-    legend: state.diagrams.some(diagram => faceToFace(diagram.quadrantMode)) ? { ...LEGEND, faceToFace: FACE_LEGEND } : LEGEND,
+    legend: { ...LEGEND, ...(state.diagrams.some(diagram => faceToFace(diagram.quadrantMode)) ? { faceToFace: FACE_LEGEND } : {}), ...(links.length ? { links: LINKS_LEGEND } : {}) },
     activeDiagramId: state.activeDiagramId,
     layout: {
       preset: state.layout.preset,
       slots: state.layout.slots.map(({ row, column }, index) => ({ diagramId: state.diagrams[index].id, row, column })),
     },
     diagrams: state.diagrams.map(diagram => ({ id: diagram.id, name: diagram.name, ...serializeDiagram(diagram) })),
+    ...(links.length ? { links } : {}),
   };
 }
 

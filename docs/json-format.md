@@ -42,6 +42,10 @@
 
 에지워드 포맷에서 `coordinateSystem.type='edgeworth'`, `totals:{width,height}`, `oppositeOrigin:{x:width,y:height}`, `oppositeAxisNames:{x,y}`, `oppositeXPositive`, `oppositeYPositive`를 추가합니다. 기본 A 원점/축 필드는 그대로이고 B 방향은 A와 반대입니다. 모든 도형은 A 기준 수학 좌표이며 B 기준 좌표가 필요하면 `{x:width-p.x,y:height-p.y}`로 계산할 수 있습니다. 화면 크기·상자 픽셀 크기는 저장하지 않습니다. 복원 구현 시 `[1]` 사분면만으로 일반 그래프와 구분하지 말고 type을 먼저 읽어야 합니다. 현재 앱은 JSON 불러오기를 제공하지 않습니다.
 
+### 그래프 사이 연결선 (2026-11-12, 버전 13 안의 선택 필드)
+
+연결선은 여러 그래프에 같은 좌표로 놓인 보통 직선들입니다. 각 직선에 `link:{id, axis}`가 붙습니다. `axis:'x'`는 세로선(모두 같은 x, `slope:null`), `axis:'y'`는 가로선(모두 같은 y, `slope:0`)입니다. 연결선이 하나라도 있으면 문서 최상위에 `links:[{id, axis, value, lines:[{diagramId, lineId}]}]`와 `legend.links`가 붙습니다. `value`는 공유하는 x 또는 y입니다. 각 직선은 자기 그래프의 `lines`와 `relations`에 보통 직선으로 나옵니다. 버전 번호는 그대로 13입니다.
+
 ### 대면 포맷 (2026-11-12, 버전 13 안의 선택 필드)
 
 **대면** 포맷은 y축 하나를 가운데에 두고 두 그래프를 맞붙인 한 장의 그래프입니다. 원점·사분면은 1·2사분면과 같은 `bottom-center` / `[1,2]`이고, `coordinateSystem`에 `type:'face-to-face'`, `sharedAxis:'y'`, `facing:{side, axisName, xPositive, ownX:'-x'}`를 추가합니다. `facing`은 맞은편 그래프로, 내부 좌표 x<0인 쪽입니다. `side`는 그 그래프가 그려진 쪽(기본 `left`, 좌우 반전 시 `right`), `axisName`은 그 그래프의 수평축 이름, `xPositive`는 그 그래프에서 x가 커지는 방향입니다. 도형 좌표는 한 좌표계에 그대로 저장하며 맞은편 그래프에서 읽는 수평축 값은 `-x`입니다. 대면 그래프가 하나라도 있으면 `legend.faceToFace`에 같은 설명이 붙습니다. 버전 번호는 그대로 13입니다(다른 포맷의 출력은 바뀌지 않음).

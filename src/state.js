@@ -19,7 +19,8 @@ import { followBoxOrigin, defaultOppositeOrigin } from './graph/axes.js';
 import { validFill, fillKey } from './graph/fill.js';
 import { nextFillColor, nextFillLabel } from './graph/fill-style.js';
 
-import { INK, ROLE_COLORS, sumColor } from './models/palette.js';
+import { INK, ROLE_COLORS, lineColor, sumColor } from './models/palette.js';
+import { LINK_AXES, alignedPartners, isLinkAxis, linkedDiagramIds, sourceExtent, syncLinks } from './links.js';
 
 
 /** Internal mathematical coordinates; hierarchy only organizes objects. */
@@ -56,6 +57,7 @@ export function createStore() {
   const zooms = new Map(); // diagram id → view zoom; kept out of documentState on purpose
   let layout = { preset: 'single', slots: structuredClone(LAYOUTS.single.slots) };
   let nextDiagramId = 2;
+  let nextLinkId = 1;
   const syncDiagram = () => Object.assign(diagrams.find(d => d.id === activeDiagramId), Object.fromEntries(documentKeys.map(key => [key, state[key]])));
   const loadDiagram = () => {
     const diagram = diagrams.find(d => d.id === activeDiagramId);
@@ -90,6 +92,8 @@ export function createStore() {
   };
   const emit = () => {
     resolveRelations(state);
+    // Link lines in other graphs follow the one just edited (or the one following a point).
+    syncDiagram(); syncLinks(diagrams, activeDiagramId);
     const next = documentState();
     if (!restoring && different(baseline, next)) {
       if (!transaction) remember(baseline);
@@ -130,10 +134,12 @@ export function createStore() {
     return object.id;
   };
   /** View zoom of one graph: not part of the document, its history or the JSON. */
+  // Graphs joined by a link share one zoom, so the linked coordinate stays lined up on screen.
   const setDiagramZoom = (id, zoom) => {
     const next = clampZoom(zoom);
     if (!diagrams.some(d => d.id === id) || next === (zooms.get(id) ?? 1)) return;
-    zooms.set(id, next); emit();
+    for (const linked of linkedDiagramIds(diagrams, id)) zooms.set(linked, next);
+    emit();
   };
   return {
     getState: snapshot,
@@ -245,7 +251,7 @@ export function createStore() {
         if (!geometry) return null;
         const index = nextId - 1, label = { line: '직선', ray: '반직선', segment: '선분' }[lineKindOf(geometry)];
         const line = { id: `line-${nextId}`, type: 'line', name: `${label} ${String(nextId++).padStart(2, '0')}`,
-          anchor: geometry.anchor, slope: geometry.slope, color: ROLE_COLORS.line };
+          anchor: geometry.anchor, slope: geometry.slope, color: lineColor(index, style) };
         if (geometry.extent) line.extent = geometry.extent;
         if (style === 'dashed') line.style = 'dashed';
         return add('lines', line);
@@ -255,7 +261,7 @@ export function createStore() {
       return add('lines', {
         id: `line-${nextId}`, type: 'line', name: `직선 ${String(nextId++).padStart(2, '0')}`,
         slope: [1, -1, 0.5, -0.5, 0, 2][(box ? state.lines.length : index) % 6] * (box ? box.height / box.width : 1),
-        anchor: box ? { x: box.width / 2, y: box.height / 2 } : { x: state.quadrantMode === 'first' ? 3 : 0, y: (state.quadrantMode === 'all' ? 0 : 3) + (index % 5) * 0.6 }, color: ROLE_COLORS.line,
+        anchor: box ? { x: box.width / 2, y: box.height / 2 } : { x: state.quadrantMode === 'first' ? 3 : 0, y: (state.quadrantMode === 'all' ? 0 : 3) + (index % 5) * 0.6 }, color: lineColor(index, 'solid'),
       });
     },
     addCurve(placement = {}) {
@@ -313,7 +319,36 @@ export function createStore() {
       const point=state.points.find(point=>point.id===state.selectedId);
       if (!point) return null;
       const index=nextId++;
-      return add('lines',{id:`line-${index}`,type:'line',name:`통과 직선 ${index}`,color:ROLE_COLORS.line,anchor:{...point.anchor},slope:normalizeSlope(slope),binding:follow ? {kind:'through-point',sourceId:point.id}:null});
+      return add('lines',{id:`line-${index}`,type:'line',name:`통과 직선 ${index}`,color:lineColor(index-1,'solid'),anchor:{...point.anchor},slope:normalizeSlope(slope),binding:follow ? {kind:'through-point',sourceId:point.id}:null});
+    },
+    /** Graphs a link from the selected point would reach (same column for 'x', same row for 'y'). */
+    linkPartners(axis) {
+      syncDiagram();
+      return alignedPartners(layout, diagrams, activeDiagramId, axis).map(({ diagram }) => diagram.id);
+    },
+    /**
+     * A vertical ('x') or horizontal ('y') link through the selected point: a line here that
+     * reaches toward the partner graphs, and a full line at the same coordinate in each of them.
+     */
+    linkThroughSelectedPoint({ axis = 'x', follow = true } = {}) {
+      const point = state.points.find(point => point.id === state.selectedId);
+      if (!point || !isLinkAxis(axis)) return null;
+      syncDiagram();
+      const partners = alignedPartners(layout, diagrams, activeDiagramId, axis);
+      if (!partners.length) return null;
+      endHistory();
+      const index = nextLinkId++, link = { id: `link-${index}`, axis }, name = `${LINK_AXES[axis].label} ${String(index).padStart(2, '0')}`;
+      const slope = LINK_AXES[axis].slope, zoom = zooms.get(activeDiagramId) ?? 1;
+      const source = { diagram: diagrams.find(d => d.id === activeDiagramId), slot: layout.slots[diagrams.findIndex(d => d.id === activeDiagramId)] };
+      for (const { diagram } of partners) {
+        const anchor = axis === 'x' ? { x: point.anchor.x, y: 0 } : { x: 0, y: point.anchor.y };
+        const line = { id: `line-${nextId++}`, type: 'line', name, color: ROLE_COLORS.dashedLine, anchor, slope, style: 'dashed', link: { ...link }, parentId: null, collapsed: false };
+        diagram.lines.push(line); diagram.objectOrder.push(line.id);
+        zooms.set(diagram.id, zoom);
+      }
+      const extent = sourceExtent(source, partners, axis);
+      return add('lines', { id: `line-${nextId++}`, type: 'line', name, color: ROLE_COLORS.dashedLine, anchor: { ...point.anchor }, slope, style: 'dashed',
+        ...(extent ? { extent } : {}), link, binding: follow ? { kind: 'through-point', sourceId: point.id } : null });
     },
     addSum(sourceIds, { direction = 'vertical', nonnegative = true } = {}) {
       if (!Array.isArray(sourceIds) || new Set(sourceIds).size !== sourceIds.length) return null;

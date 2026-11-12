@@ -145,6 +145,30 @@ async function faceSmoke(width, height) {
   check(doc.querySelector('[aria-label="맞은편 수평축 L₂"]') && exported(doc).coordinateSystem.facing.axisName === 'L₂', `${size}: the facing axis name is drawn and exported`);
   el.remove();
 }
+// Link lines: a point in the upper graph, one button, the same x in the lower graph, joined across the gap.
+async function linkSmoke(width, height) {
+  const el = await frame('/', width, height), doc = el.contentDocument, win = el.contentWindow, size = `${width}x${height} link`;
+  win.addEventListener('error', e => errors.push(`${size}: ${e.message}`));
+  await wait(() => doc.querySelector('#quadrant-dialog[open]'), 'app startup');
+  doc.querySelector('[data-layout="vertical2"]').click(); doc.getElementById('apply-workspace').click();
+  const [upper, lower] = doc.querySelectorAll('.diagram-card');
+  const svg = upper.querySelector('.graph-svg'), r = svg.getBoundingClientRect(), v = createViewport(r.width, r.height, 'first');
+  svg.setPointerCapture = () => {}; svg.hasPointerCapture = () => false; svg.releasePointerCapture = () => {};
+  doc.getElementById('mouse-tool').click();
+  const s = toScreen({ x: 4, y: 3 }, v);
+  for (const type of ['pointerdown', 'pointerup']) svg.dispatchEvent(new win.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 96, pointerType: 'mouse', button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: r.left + s.x, clientY: r.top + s.y, altKey: true }));
+  check(!doc.getElementById('point-link-x').hidden && doc.getElementById('point-link-y').hidden, `${size}: a point offers a vertical link only toward the graph below`);
+  doc.getElementById('point-link-x').click();
+  const json = JSON.parse((doc.getElementById('export-json').click(), doc.getElementById('json-output').value)); doc.getElementById('close-json').click();
+  check(json.links?.length === 1 && json.diagrams.every(d => d.lines.length === 1 && d.lines[0].slope === null && Math.abs(d.lines[0].anchor.x - 4) < 0.05), `${size}: one button draws the same vertical line in both graphs`);
+  await new Promise(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
+  const bridge = doc.querySelector('.link-bridges [data-link-bridge] line'), grid = doc.getElementById('graph').getBoundingClientRect();
+  const upperBox = upper.querySelector('.graph-container').getBoundingClientRect(), lowerBox = lower.querySelector('.graph-container').getBoundingClientRect();
+  check(bridge && Number(bridge.getAttribute('y1')) + grid.top < lowerBox.top && Number(bridge.getAttribute('y2')) + grid.top > upperBox.bottom
+    && Math.abs(Number(bridge.getAttribute('x1')) + grid.left - (upperBox.left + toScreen({ x: json.links[0].value, y: 0 }, v).x)) < 1, `${size}: the link continues across the gap between the cards`);
+  check(!upper.querySelector('.line-handles .rotate-handle:not(.end-handle)'), `${size}: a link line has no rotation handle`);
+  el.remove();
+}
 try {
   const controls = document.createElement('section');
   controls.innerHTML = numberField({id:'check-number',label:'수량 <검사>',min:1,max:10,step:0.5,value:2})
@@ -203,7 +227,7 @@ try {
   check(tangentResult.ok,`contact tangent line fixture: ${tangentResult.error ?? 'completed'}`);
   for (const name of tangentResult.passed) passed.push(`contact tangent line: ${name}`);
   tangentLine.remove();
-  await appSmoke(1280, 800); await appSmoke(390, 844); await faceSmoke(1280, 800);
+  await appSmoke(1280, 800); await appSmoke(390, 844); await faceSmoke(1280, 800); await linkSmoke(1280, 800);
   check(errors.length === 0, `no browser runtime errors: ${errors.join('; ')}`);
 } catch (error) { errors.push(error.stack ?? String(error)); }
 const report = { ok: errors.length === 0, count: passed.length, passed, errors };

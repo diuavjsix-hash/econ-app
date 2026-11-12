@@ -166,6 +166,8 @@ const selectionInspector = () => `
           ${switchField({ id: 'point-show-coordinates', label: '좌표 표시' })}
           ${checkField({ id: 'point-line-follow', label: '점을 따라가기', checked: true })}
           ${button({ id: 'point-through-line', label: '이 점을 지나는 직선', icon: icon('line'), block: true })}
+          ${button({ id: 'point-link-x', label: '세로 연결선', title: '같은 열의 그래프까지 같은 x로 잇기', block: true, hidden: true })}
+          ${button({ id: 'point-link-y', label: '가로 연결선', title: '같은 행의 그래프까지 같은 y로 잇기', block: true, hidden: true })}
         </section></div>`;
 
 const inspector = () => `
