@@ -3,7 +3,11 @@ export const QUADRANT_MODES = {
   upper: { label: '1·2사분면', quadrants: [1, 2], origin: 'bottom-center' },
   all: { label: '전체 사분면', quadrants: [1, 2, 3, 4], origin: 'center' },
   edgeworth: { label: '에지워드 상자', quadrants: [1], origin: 'bottom-left' },
+  // Two graphs back to back on one sheet: a shared y axis, x read as positive on both sides.
+  face: { label: '대면', quadrants: [1, 2], origin: 'bottom-center' },
 };
+/** Face-to-face sheets read internal x < 0 as the facing graph's positive x. */
+export const faceToFace = mode => mode === 'face';
 
 /** View zoom limits; within 3% of 1 it returns to exactly 1 so the default view is reachable. */
 export const ZOOM_MIN = 0.2, ZOOM_MAX = 10;

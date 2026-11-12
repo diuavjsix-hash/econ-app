@@ -60,7 +60,7 @@ test('moving a ruler preserves its length and limits the complete segment to the
 });
 
 test('rulers participate in hierarchy, independent diagrams, deletion and whole-document history', () => {
-  const store=createStore(); store.configureLayout('face2');
+  const store=createStore(); store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);
   const id=store.addRuler({x:1,y:2},{x:4,y:6}), group=store.addGroup();
   store.moveObject(id,group); store.selectObject(id);
   const original=serializeActive(store.getState());

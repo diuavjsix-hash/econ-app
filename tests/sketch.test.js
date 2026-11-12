@@ -118,7 +118,7 @@ test('sketches copy independently, preserve hierarchy and export full internal g
 });
 
 test('diagram isolation, hidden layouts, whole-document history, clear and monotone IDs include sketches',()=>{
-  const store=createStore(), id=cup(store);store.configureLayout('face2');const first=store.getState().activeDiagramId;
+  const store=createStore(), id=cup(store);store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);const first=store.getState().activeDiagramId;
   store.selectDiagram(store.getState().diagrams[1].id);assert.equal(store.getState().sketches.length,0);cup(store);
   store.configureLayout('single');assert.equal(sketch(store).id,id);
   assert.equal(serializeActive(store.getState()).diagrams[1].sketches.length,1);

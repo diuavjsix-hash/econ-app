@@ -4,7 +4,7 @@ import { exportJson } from '../src/export.js';
 
 // A deterministic documentation fixture; does not access a running editor's memory.
 const store = createStore();
-store.configureLayout('face2');
+store.configureLayout('horizontal2');
 const [first, second] = store.getState().diagrams;
 store.updateDiagram({ name: '합산과 접점' });
 const budget = store.addLine();

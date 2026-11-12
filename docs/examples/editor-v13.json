@@ -7,7 +7,7 @@
   },
   "activeDiagramId": "diagram-1",
   "layout": {
-    "preset": "face2",
+    "preset": "horizontal2",
     "slots": [
       {
         "diagramId": "diagram-1",
@@ -26,11 +26,11 @@
       "id": "diagram-1",
       "name": "합산과 접점",
       "coordinateSystem": {
-        "origin": "bottom-right",
+        "origin": "bottom-left",
         "quadrants": [
           1
         ],
-        "xPositive": "left",
+        "xPositive": "right",
         "yPositive": "up",
         "axesVisible": true,
         "axisNames": {
@@ -55,7 +55,7 @@
           "id": "line-1",
           "type": "line",
           "name": "예산선",
-          "color": "#2a5db0",
+          "color": "#77776f",
           "parentId": null,
           "slope": -1,
           "intercept": 8,
@@ -315,7 +315,7 @@
           "id": "line-2",
           "type": "line",
           "name": "통과 직선 2",
-          "color": "#c43d32",
+          "color": "#77776f",
           "parentId": "point-1",
           "slope": 1,
           "intercept": -2,
@@ -340,7 +340,7 @@
           "id": "line-3",
           "type": "line",
           "name": "독립 점선",
-          "color": "#2b7a4b",
+          "color": "#77776f",
           "parentId": null,
           "slope": null,
           "intercept": null,
@@ -375,7 +375,7 @@
           "id": "line-4",
           "type": "line",
           "name": "꺾인 선 (왼쪽)",
-          "color": "#b06f12",
+          "color": "#77776f",
           "parentId": null,
           "slope": -2,
           "intercept": 8,
@@ -407,7 +407,7 @@
           "id": "line-5",
           "type": "line",
           "name": "꺾인 선 (오른쪽)",
-          "color": "#7445a8",
+          "color": "#77776f",
           "parentId": null,
           "slope": -0.5,
           "intercept": 5,
@@ -439,7 +439,7 @@
           "id": "line-6",
           "type": "line",
           "name": "점선 반직선",
-          "color": "#17808a",
+          "color": "#77776f",
           "parentId": null,
           "slope": 0,
           "intercept": 4,

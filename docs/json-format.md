@@ -42,6 +42,10 @@
 
 에지워드 포맷에서 `coordinateSystem.type='edgeworth'`, `totals:{width,height}`, `oppositeOrigin:{x:width,y:height}`, `oppositeAxisNames:{x,y}`, `oppositeXPositive`, `oppositeYPositive`를 추가합니다. 기본 A 원점/축 필드는 그대로이고 B 방향은 A와 반대입니다. 모든 도형은 A 기준 수학 좌표이며 B 기준 좌표가 필요하면 `{x:width-p.x,y:height-p.y}`로 계산할 수 있습니다. 화면 크기·상자 픽셀 크기는 저장하지 않습니다. 복원 구현 시 `[1]` 사분면만으로 일반 그래프와 구분하지 말고 type을 먼저 읽어야 합니다. 현재 앱은 JSON 불러오기를 제공하지 않습니다.
 
+### 대면 포맷 (2026-11-12, 버전 13 안의 선택 필드)
+
+**대면** 포맷은 y축 하나를 가운데에 두고 두 그래프를 맞붙인 한 장의 그래프입니다. 원점·사분면은 1·2사분면과 같은 `bottom-center` / `[1,2]`이고, `coordinateSystem`에 `type:'face-to-face'`, `sharedAxis:'y'`, `facing:{side, axisName, xPositive, ownX:'-x'}`를 추가합니다. `facing`은 맞은편 그래프로, 내부 좌표 x<0인 쪽입니다. `side`는 그 그래프가 그려진 쪽(기본 `left`, 좌우 반전 시 `right`), `axisName`은 그 그래프의 수평축 이름, `xPositive`는 그 그래프에서 x가 커지는 방향입니다. 도형 좌표는 한 좌표계에 그대로 저장하며 맞은편 그래프에서 읽는 수평축 값은 `-x`입니다. 대면 그래프가 하나라도 있으면 `legend.faceToFace`에 같은 설명이 붙습니다. 버전 번호는 그대로 13입니다(다른 포맷의 출력은 바뀌지 않음).
+
 ### 공통 필드
 
 | 필드 | 설명 |
@@ -64,13 +68,13 @@
 | `objectOrder` | 모든 종류를 섞은 생성 순서의 ID 배열 |
 | `relations` | 현재 기하에서 계산한 위치 관계(버전 13, [위치 관계](#위치-관계-relations--버전-13)) |
 
-아래 표의 `coordinateSystem`부터 `relations`까지는 `diagrams`의 각 그래프 안에 있는 필드입니다(버전 12까지는 활성 그래프 사본이 최상위에도 있었음). 전체 문서는 `diagrams`와 `layout`으로 읽습니다. 배치를 줄여도 `diagrams`에서 삭제하지 않으며 `layout.slots`에 있는 그래프만 표시합니다. 다음 예시는 좌우 대면 배치입니다.
+아래 표의 `coordinateSystem`부터 `relations`까지는 `diagrams`의 각 그래프 안에 있는 필드입니다(버전 12까지는 활성 그래프 사본이 최상위에도 있었음). 전체 문서는 `diagrams`와 `layout`으로 읽습니다. 배치를 줄여도 `diagrams`에서 삭제하지 않으며 `layout.slots`에 있는 그래프만 표시합니다. 다음 예시는 가로 2개 배치입니다.
 
 ```json
-{"preset":"face2","slots":[{"diagramId":"diagram-1","row":0,"column":0},{"diagramId":"diagram-2","row":0,"column":1}]}
+{"preset":"horizontal2","slots":[{"diagramId":"diagram-1","row":0,"column":0},{"diagramId":"diagram-2","row":0,"column":1}]}
 ```
 
-각 그래프의 기본 `coordinateSystem.origin`과 `quadrants` 조합은 `bottom-left` / `[1]`, `bottom-center` / `[1,2]`, `center` / `[1,2,3,4]`입니다. 좌우 반전 시 `bottom-left`는 `bottom-right`로, 상하 반전 시 `bottom-*`는 `top-*`로 바뀌며 `center`는 유지합니다. `xPositive`는 `right` 또는 `left`, `yPositive`는 `up` 또는 `down`, `axesVisible`은 현재 항상 true입니다. `axisNames`의 x·y는 문자열이며 빈 문자열은 이름만 숨긴다는 뜻입니다.
+각 그래프의 기본 `coordinateSystem.origin`과 `quadrants` 조합은 `bottom-left` / `[1]`, `bottom-center` / `[1,2]`, `center` / `[1,2,3,4]`입니다(대면 포맷은 `bottom-center` / `[1,2]`에 `type:'face-to-face'`). 좌우 반전 시 `bottom-left`는 `bottom-right`로, 상하 반전 시 `bottom-*`는 `top-*`로 바뀌며 `center`는 유지합니다. `xPositive`는 `right` 또는 `left`, `yPositive`는 `up` 또는 `down`, `axesVisible`은 현재 항상 true입니다. `axisNames`의 x·y는 문자열이며 빈 문자열은 이름만 숨긴다는 뜻입니다.
 
 객체 선택 상태(현재 그래프 ID 제외), 다음 ID 카운터, 화면 크기·배율, UI 입력 포커스, 마우스 선택(`mouseSelected`), 되돌리기·다시 실행 기록과 메타데이터(`canUndo`, `canRedo`, `historyRevision`)는 출력하지 않습니다. 복원 기능을 구현할 경우 사분면 조합에서 내부 `quadrantMode`를 결정하고 ID 카운터 충돌을 방지해야 합니다. 파일의 표시 메타데이터와 기하 데이터를 검증 없이 DOM에 삽입해서는 안 됩니다.
 

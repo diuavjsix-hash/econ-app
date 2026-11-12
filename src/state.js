@@ -19,9 +19,8 @@ import { followBoxOrigin, defaultOppositeOrigin } from './graph/axes.js';
 import { validFill, fillKey } from './graph/fill.js';
 import { nextFillColor, nextFillLabel } from './graph/fill-style.js';
 
-import { INK, ROLE_COLORS, STROKE_CYCLE, sumColor } from './models/palette.js';
+import { INK, ROLE_COLORS, sumColor } from './models/palette.js';
 
-const COLORS = STROKE_CYCLE;
 
 /** Internal mathematical coordinates; hierarchy only organizes objects. */
 export function createStore() {
@@ -30,7 +29,7 @@ export function createStore() {
     ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [],
     ...toolModeFlags('hand'), fillColor: INK.blue, fillAutoColor: true, fillOpacity: 0.24,
     selectedId: null, indifferenceOpposite: false, sketchMode: 'auto', activeTool: 'point', rulerSelected: false, segmentSnap: true, lineKind: 'line', lineStyle: 'solid', pointSnap: true, pointCoordinates: false, showGrid: true,
-    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
+    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
   let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1;
   let nextSumId = 1;
@@ -50,8 +49,8 @@ export function createStore() {
     if (spec.keepSelection && !spec.keepSelection(objectsOf(state).filter(object => selected.has(object.id)))) setSelection([]);
   };
   // Each registered collection is part of a diagram document, its history and deletion.
-  const documentKeys = [...OBJECT_COLLECTIONS, 'objectOrder', 'quadrantMode', 'axisNames', 'boxSize', 'boxAxisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
-  const emptyDocument = () => ({ ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
+  const documentKeys = [...OBJECT_COLLECTIONS, 'objectOrder', 'quadrantMode', 'axisNames', 'boxSize', 'boxAxisNames', 'faceAxisName', 'showGrid', 'axisGapEnabled', 'axisGap'];
+  const emptyDocument = () => ({ ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
   const zooms = new Map(); // diagram id → view zoom; kept out of documentState on purpose
@@ -220,6 +219,7 @@ export function createStore() {
         if (typeof patch.axisNames?.[axis] === 'string') state.axisNames[axis] = patch.axisNames[axis].slice(0, 80);
         if (typeof patch.boxAxisNames?.[axis] === 'string') state.boxAxisNames[axis] = patch.boxAxisNames[axis].slice(0, 80);
       }
+      if (typeof patch.faceAxisName === 'string') state.faceAxisName = patch.faceAxisName.slice(0, 80);
       const previousBox={...state.boxSize};
       for (const key of ['width','height']) if (Number.isFinite(patch.boxSize?.[key]) && patch.boxSize[key]>=1 && patch.boxSize[key]<=100) state.boxSize[key]=patch.boxSize[key];
       followBoxOrigin(state,previousBox);
@@ -245,7 +245,7 @@ export function createStore() {
         if (!geometry) return null;
         const index = nextId - 1, label = { line: '직선', ray: '반직선', segment: '선분' }[lineKindOf(geometry)];
         const line = { id: `line-${nextId}`, type: 'line', name: `${label} ${String(nextId++).padStart(2, '0')}`,
-          anchor: geometry.anchor, slope: geometry.slope, color: COLORS[index % COLORS.length] };
+          anchor: geometry.anchor, slope: geometry.slope, color: ROLE_COLORS.line };
         if (geometry.extent) line.extent = geometry.extent;
         if (style === 'dashed') line.style = 'dashed';
         return add('lines', line);
@@ -255,7 +255,7 @@ export function createStore() {
       return add('lines', {
         id: `line-${nextId}`, type: 'line', name: `직선 ${String(nextId++).padStart(2, '0')}`,
         slope: [1, -1, 0.5, -0.5, 0, 2][(box ? state.lines.length : index) % 6] * (box ? box.height / box.width : 1),
-        anchor: box ? { x: box.width / 2, y: box.height / 2 } : { x: state.quadrantMode === 'first' ? 3 : 0, y: (state.quadrantMode === 'all' ? 0 : 3) + (index % 5) * 0.6 }, color: COLORS[index % COLORS.length],
+        anchor: box ? { x: box.width / 2, y: box.height / 2 } : { x: state.quadrantMode === 'first' ? 3 : 0, y: (state.quadrantMode === 'all' ? 0 : 3) + (index % 5) * 0.6 }, color: ROLE_COLORS.line,
       });
     },
     addCurve(placement = {}) {
@@ -313,7 +313,7 @@ export function createStore() {
       const point=state.points.find(point=>point.id===state.selectedId);
       if (!point) return null;
       const index=nextId++;
-      return add('lines',{id:`line-${index}`,type:'line',name:`통과 직선 ${index}`,color:COLORS[(index-1)%COLORS.length],anchor:{...point.anchor},slope:normalizeSlope(slope),binding:follow ? {kind:'through-point',sourceId:point.id}:null});
+      return add('lines',{id:`line-${index}`,type:'line',name:`통과 직선 ${index}`,color:ROLE_COLORS.line,anchor:{...point.anchor},slope:normalizeSlope(slope),binding:follow ? {kind:'through-point',sourceId:point.id}:null});
     },
     addSum(sourceIds, { direction = 'vertical', nonnegative = true } = {}) {
       if (!Array.isArray(sourceIds) || new Set(sourceIds).size !== sourceIds.length) return null;

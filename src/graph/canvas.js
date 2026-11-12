@@ -3,7 +3,7 @@ import { renderEditingHandles } from './editing-handles.js';
 import { SVG_RENDERER, STROKE_RENDERER } from './svg-renderer.js';
 import { objectModel } from '../models/objects.js';
 import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions } from './display.js';
-import { createViewport, toScreen as projectPoint, toWorld, gridStep, wheelZoom, zoomable } from './viewport.js';
+import { createViewport, toScreen as projectPoint, toWorld, gridStep, wheelZoom, zoomable, faceToFace } from './viewport.js';
 import { pointCoordinatesLabel } from './point.js';
 import { SnapTargetCache, snapPoint } from './snap.js';
 import { LINE_END_ACTIONS } from './line-extent.js';
@@ -182,10 +182,12 @@ export function mountGraph(container, store) {
     const axes = element('g', { class: 'graph-axes', 'aria-label': '좌표축' });
     const xEnd = xDirection === 1 ? plot.right : plot.left;
     const yEnd = yDirection === 1 ? plot.top : plot.bottom;
+    // A face-to-face sheet points its x axis both ways from the shared y axis.
+    const faceEnd = faceToFace(currentState.quadrantMode) ? (xDirection === 1 ? plot.left : plot.right) : null;
     axes.append(
       element('line', { x1: plot.left, y1: cy, x2: plot.right, y2: cy }),
       element('line', { x1: cx, y1: plot.bottom, x2: cx, y2: plot.top }),
-      element('path', { d: `M${xEnd - 7 * xDirection} ${cy - 4}l${7 * xDirection} 4 ${-7 * xDirection} 4 M${cx - 4} ${yEnd + 7 * yDirection}l4 ${-7 * yDirection} 4 ${7 * yDirection}`, fill: 'none' }),
+      element('path', { d: `M${xEnd - 7 * xDirection} ${cy - 4}l${7 * xDirection} 4 ${-7 * xDirection} 4 M${cx - 4} ${yEnd + 7 * yDirection}l4 ${-7 * yDirection} 4 ${7 * yDirection}${faceEnd === null ? '' : ` M${faceEnd + 7 * xDirection} ${cy - 4}l${-7 * xDirection} 4 ${7 * xDirection} 4`}`, fill: 'none' }),
     );
     svg.append(axes);
     function axisName(name, attributes, maxWidth) {
@@ -200,7 +202,8 @@ export function mountGraph(container, store) {
         label.firstChild.textContent = `${shortened}…`;
       }
     }
-    axisName(currentState.axisNames.x, { x: xEnd - 10 * xDirection, y: cy + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'end' : 'start', 'aria-label': `수평축 ${currentState.axisNames.x}` }, plot.right - plot.left - 20);
+    axisName(currentState.axisNames.x, { x: xEnd - 10 * xDirection, y: cy + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'end' : 'start', 'aria-label': `수평축 ${currentState.axisNames.x}` }, faceEnd === null ? plot.right - plot.left - 20 : Math.abs(xEnd - cx) - 20);
+    if (faceEnd !== null) axisName(currentState.faceAxisName, { x: faceEnd + 10 * xDirection, y: cy + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'start' : 'end', 'aria-label': `맞은편 수평축 ${currentState.faceAxisName}` }, Math.abs(cx - faceEnd) - 20);
     axisName(currentState.axisNames.y, { x: cx + 13 * xDirection, y: yEnd + (yDirection === 1 ? 5 : -5), 'text-anchor': xDirection === 1 ? 'start' : 'end', 'aria-label': `수직축 ${currentState.axisNames.y}` }, (xDirection === 1 ? plot.right - cx : cx - plot.left) - 13);
     if (currentState.quadrantMode==='edgeworth') {
       const opposite=toScreen({x:bounds.xMax,y:bounds.yMax}),b=element('g',{class:'graph-axes','aria-label':'B 좌표축'});
@@ -283,7 +286,7 @@ export function mountGraph(container, store) {
         label.setAttribute('y', String(Math.max(16, y - 12)));
       }
       if (point.showCoordinates) {
-        const label = element('text', { x: x + 12, y: Math.max(point.name ? 31 : 16, y + (point.name ? 4 : -12)), class: 'point-name point-coordinates', 'data-point-coordinates': point.id }, pointCoordinatesLabel(point.anchor));
+        const label = element('text', { x: x + 12, y: Math.max(point.name ? 31 : 16, y + (point.name ? 4 : -12)), class: 'point-name point-coordinates', 'data-point-coordinates': point.id }, pointCoordinatesLabel(point.anchor, currentState.quadrantMode));
         label.append(element('title', {}, `(${point.anchor.x}, ${point.anchor.y})`));
         group.append(label);
         const length = label.getComputedTextLength();

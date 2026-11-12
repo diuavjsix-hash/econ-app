@@ -29,6 +29,8 @@ export const FILL_PALETTE = Object.freeze([
 /** Defaults by object role; new object kinds add a role here instead of a literal. */
 export const ROLE_COLORS = Object.freeze({
   point: INK.graphite,
+  // Every new straight line is one gray, whatever its kind or style.
+  line: INK.pencil,
   ruler: INK.pencil,
   group: INK.muted,
   sketch: INK.teal,

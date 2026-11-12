@@ -8,13 +8,13 @@ export const SNAP_MARKER = Object.freeze({ ring:11, core:5, free:9, gap:16, offs
 const node=(...args)=>SVG_RENDERER.element(...args);
 
 /** Adapters pass geometry results here; no tool creates its own marker or wording. */
-export function snapFeedbackModel(candidate,{coordinates=false}={}) {
+export function snapFeedbackModel(candidate,{coordinates=false,quadrantMode}={}) {
   if (!candidate?.point) return null;
   const kind=candidate.kind??'tangent';
   const ids=[...new Set([...(candidate.ids??[]),...(candidate.sourceId?[candidate.sourceId]:[])])];
   const label=candidate.label??(kind==='free'?'':kind==='tangent'?'접점 맞춤':kind==='kink'?'꺾임 맞춤':kind==='minimum'?'최저점 맞춤':kind==='endpoint'?'끝점 맞춤':kind==='point'?'점 맞춤':kind==='intersection'?'교점 맞춤'
     :kind==='intercept'?(candidate.axis==='origin'?'원점':['x','y'].includes(candidate.axis)?`${candidate.axis}절편`:'절편 맞춤'):ids.some(id=>id.startsWith('axis-'))?'축 맞춤':'선 맞춤');
-  return {point:candidate.point,kind,ids,label,text:[label,coordinates?pointCoordinatesLabel(candidate.point):''].filter(Boolean).join(' ')};
+  return {point:candidate.point,kind,ids,label,text:[label,coordinates?pointCoordinatesLabel(candidate.point,quadrantMode):''].filter(Boolean).join(' ')};
 }
 
 /** Same visible target geometry for every source of feedback, including flipped axes. */
@@ -40,7 +40,7 @@ export function snapFeedbackTargets(ids,state,viewport) {
 /** A single non-interactive overlay: source highlight, one marker, one bounded label. */
 export function renderSnapFeedback(layer,candidate,{state,viewport,clipId,coordinates=false}={}) {
   layer.replaceChildren();
-  const model=snapFeedbackModel(candidate,{coordinates});
+  const model=snapFeedbackModel(candidate,{coordinates,quadrantMode:state?.quadrantMode});
   if (!model) return;
   const {x,y}=toScreen(model.point,viewport),{width,height}=viewport;
   const root=node('g',{class:'snap-feedback','data-snap-kind':model.kind,'pointer-events':'none','aria-hidden':'true'});

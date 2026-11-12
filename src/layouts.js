@@ -7,8 +7,6 @@ export const LAYOUTS = {
   vertical2: { label: '세로 2개', slots: [slot(0, 0), slot(1, 0)] },
   vertical3: { label: '세로 3개', slots: [slot(0, 0), slot(1, 0), slot(2, 0)] },
   corner3: { label: 'ㄴ자 3개', slots: [slot(0, 0), slot(1, 0), slot(1, 1)] },
-  face2: { label: '좌우 대면', slots: [slot(0, 0, true), slot(0, 1)] },
-  faceVertical2: { label: '상하 대면', slots: [slot(0, 0), slot(1, 0, false, true)] },
   grid4: { label: '격자 4개', slots: [slot(0, 0), slot(0, 1), slot(1, 0), slot(1, 1)] },
 };
 

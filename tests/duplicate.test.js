@@ -98,7 +98,7 @@ test('an entire copied hierarchy is one undo step, redo restores it and branchin
 });
 
 test('copies stay within their active diagram and serialize as normal editable objects', () => {
-  const store=createStore(); store.configureLayout('face2'); store.addLine(); store.updateSelected({slope:-1,name:'D',anchor:{x:4,y:6}});
+  const store=createStore(); store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]); store.addLine(); store.updateSelected({slope:-1,name:'D',anchor:{x:4,y:6}});
   store.update({duplicatePanel:true}); const copy=store.duplicateSelected({slopeFactor:2});
   const doc=serializeActive(store.getState());
   assert.equal(doc.lines.length,2); assert.equal(doc.diagrams[1].lines.length,0);

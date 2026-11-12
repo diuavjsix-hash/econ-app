@@ -7,7 +7,7 @@ import { serializeActive } from './fixtures/document.js';
 import { diagramState } from '../src/workspace.js';
 import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
 
-test('presets cover rows, columns, the requested corner and facing axes', () => {
+test('presets cover rows, columns and the requested corner; facing presets are gone', () => {
   assert.deepEqual(LAYOUTS.corner3.slots.map(({row, column}) => [row, column]), [[0,0], [1,0], [1,1]]);
   for (const preset of Object.keys(LAYOUTS)) {
     const store = createStore();
@@ -16,8 +16,11 @@ test('presets cover rows, columns, the requested corner and facing axes', () => 
     assert.equal(state.diagrams.length, LAYOUTS[preset].slots.length);
     assert.deepEqual(state.layout.slots, LAYOUTS[preset].slots);
   }
-  assert.equal(LAYOUTS.face2.slots[0].flipX, true);
-  assert.equal(LAYOUTS.faceVertical2.slots[1].flipY, true);
+  // Two separate graphs never share an axis; the face-to-face format does that in one graph.
+  assert.equal('face2' in LAYOUTS, false);
+  assert.equal('faceVertical2' in LAYOUTS, false);
+  assert.equal(createStore().configureLayout('face2'), false);
+  for (const layout of Object.values(LAYOUTS)) assert.ok(layout.slots.every(s => !s.flipX && !s.flipY));
 });
 
 test('each diagram owns objects, hierarchy, axes, quadrants and grid', () => {
@@ -60,7 +63,7 @@ test('reducing and restoring a layout retains hidden diagrams and exports them',
 
 test('layout, orientation and cross-diagram edits undo and redo as complete documents', () => {
   const store = createStore(); const original = serializeActive(store.getState());
-  store.configureLayout('face2', null, 'upper');
+  store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }], 'upper');
   const second = store.getState().diagrams[1].id;
   store.selectDiagram(second);
   const configured = serializeActive(store.getState());
@@ -124,7 +127,7 @@ test('mirrored projections round trip every quadrant and preserve mathematical g
 });
 
 test('workspace JSON records real directions, origins, per-diagram geometry and positions', () => {
-  const store = createStore(); store.configureLayout('face2'); store.addLine(); store.updateSelected({slope:null});
+  const store = createStore(); store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]); store.addLine(); store.updateSelected({slope:null});
   const second=store.getState().diagrams[1].id; store.selectDiagram(second); store.addCurve();
   store.updateDiagram({flipY:true});
   const doc=JSON.parse(JSON.stringify(serializeActive(store.getState())));
@@ -141,7 +144,7 @@ test('workspace JSON records real directions, origins, per-diagram geometry and 
 });
 
 test('snap targets stay within a diagram and mirrored mouse input uses the same mathematics', () => {
-  const store=createStore(); store.configureLayout('face2');
+  const store=createStore(); store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);
   store.addLine(); store.updateSelected({slope:1,anchor:{x:0,y:0}});
   const id=store.getState().diagrams[0].id;
   const panel=diagramState(store.getState(),id);

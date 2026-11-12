@@ -134,7 +134,7 @@ test('gap preferences export, undo and group slider changes without modifying ob
 });
 
 test('axis gap settings belong to each diagram and survive selection, layouts and undo', () => {
-  const store = createStore(); store.configureLayout('face2');
+  const store = createStore(); store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);
   store.update({ axisGapEnabled: true, axisGap: 0.5 }); store.addLine();
   const [first, second] = store.getState().diagrams.map(diagram => diagram.id);
   store.selectDiagram(second);

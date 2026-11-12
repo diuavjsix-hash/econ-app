@@ -243,3 +243,17 @@ test('the line tool: Shift after a start on a curve locks its tangent, Alt drops
   tool.pointerDown(session, event(3, 1.5, { shiftKey: true }), ctx);
   assert.deepEqual(added.pop().to, { x: 3, y: 1 });
 });
+
+test('every new straight line is the same gray, whatever its kind, style or source', async () => {
+  const { ROLE_COLORS, INK } = await import('../src/models/palette.js');
+  assert.equal(ROLE_COLORS.line, INK.pencil);
+  const store = createStore();
+  store.addLine({ x: 0, y: 0 }, { x: 1, y: 1 });
+  store.addLine({ x: 0, y: 1 }, { x: 2, y: 1 }, { kind: 'segment', style: 'dashed' });
+  store.addLine({ x: 1, y: 0 }, { x: 1, y: 2 }, { kind: 'ray' });
+  store.addLine(); store.addLine();
+  store.addPoint({ x: 2, y: 3 }); store.lineThroughSelectedPoint({ slope: -1 });
+  const { lines } = store.getState();
+  assert.equal(lines.length, 6);
+  assert.deepEqual(new Set(lines.map(line => line.color)), new Set([ROLE_COLORS.line]));
+});

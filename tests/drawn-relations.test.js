@@ -121,7 +121,7 @@ test('a curve moved onto a sum with the magnet is exported as a contact, with no
 
 test('the export lists each diagram once with its relations, a legend and rounded numbers', () => {
   const store = createStore();
-  store.configureLayout('face2');
+  store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);
   store.addLine({ x: 0, y: 6 }, { x: 6, y: 0 });
   store.addPoint({ x: 1 / 3, y: 6 - 1 / 3 });
   const document = serializeDocument(store.getState());

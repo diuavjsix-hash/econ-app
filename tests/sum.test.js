@@ -134,7 +134,7 @@ test('sum identity, history, hierarchy, clear and diagram-local references survi
   assert.deepEqual(doc.sums[0].sourceIds,[a,b]); assert.equal(doc.sums[0].name,'ΣD');
   assert.ok(!('collapsed' in doc.sums[0])); assert.ok(!('segments' in doc.sums[0]));
   doc.sums[0].sourceIds.push('bad'); assert.deepEqual(sumOf(store).sourceIds,[a,b]);
-  store.configureLayout('face2'); const diagram1 = store.getState().activeDiagramId;
+  store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]); const diagram1 = store.getState().activeDiagramId;
   store.selectDiagram(store.getState().diagrams[1].id);
   assert.equal(store.getState().sums.length,0);
   assert.equal(store.addSum([a,b]),null);

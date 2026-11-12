@@ -26,7 +26,7 @@ test('inspector follows the current task and object, then returns from sum to th
 });
 
 test('changing diagrams exits an operation and preserves drawing preferences and document serialization',()=>{
-  const store=createStore();store.configureLayout('face2');store.addLine();
+  const store=createStore();store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);store.addLine();
   store.update({pointSnap:false,segmentSnap:false});const original=serializeActive(store.getState());
   store.update({sumPanel:true});assert.deepEqual(serializeActive(store.getState()),original);
   const second=store.getState().diagrams[1].id;store.selectDiagram(second);

@@ -122,6 +122,29 @@ async function appSmoke(width, height) {
   doc.getElementById('undo-action').click();check(exported(doc).lines.length===touching.lines.length,`${size}: one undo removes the tangent line`);
   el.remove();
 }
+// Face-to-face: one sheet with a shared y axis; a single line crosses from one graph to the other.
+async function faceSmoke(width, height) {
+  const el = await frame('/', width, height), doc = el.contentDocument, win = el.contentWindow, size = `${width}x${height} face`;
+  win.addEventListener('error', e => errors.push(`${size}: ${e.message}`));
+  await wait(() => doc.querySelector('#quadrant-dialog[open]'), 'app startup');
+  doc.querySelector('[data-quadrants="face"]').click(); doc.getElementById('apply-workspace').click();
+  const svg = doc.querySelector('.graph-svg'), r = svg.getBoundingClientRect(), v = createViewport(r.width, r.height, 'face');
+  check(Math.abs(v.cx - r.width / 2) < 1e-9 && doc.querySelector('[aria-label="수평축 x"]') && doc.querySelector('[aria-label="맞은편 수평축 x′"]'), `${size}: the shared y axis stands in the middle with an x name on each side`);
+  check(doc.querySelector('.graph-axes path').getAttribute('d').match(/M/g).length === 3, `${size}: the x axis has an arrow at both ends`);
+  svg.setPointerCapture = () => {}; svg.hasPointerCapture = () => false; svg.releasePointerCapture = () => {};
+  const pointer = (p, type) => { const s = toScreen(p, v);
+    svg.dispatchEvent(new win.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 95, pointerType: 'mouse', button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: r.left + s.x, clientY: r.top + s.y, altKey: true })); };
+  doc.getElementById('line-tool').click(); doc.querySelector('#line-options [data-line-kind="segment"]').click();
+  pointer({ x: -5, y: 4 }, 'pointerdown'); pointer({ x: 5, y: 4 }, 'pointermove'); pointer({ x: 5, y: 4 }, 'pointerup');
+  const json = exported(doc), [line] = json.lines;
+  check(json.lines.length === 1 && Math.abs(line.slope) < 1e-9 && line.segment.start.x < -4.9 && line.segment.end.x > 4.9, `${size}: one drag draws one straight segment across both graphs`);
+  check(json.coordinateSystem.type === 'face-to-face' && json.coordinateSystem.facing.side === 'left' && json.legend.faceToFace, `${size}: the JSON says the left graph reads -x`);
+  doc.getElementById('graph-settings-action').click();
+  check(!doc.getElementById('face-settings').hidden && doc.getElementById('edgeworth-settings').hidden, `${size}: graph settings offer the facing axis name`);
+  input(doc, 'face-axis-name', 'L₂'); doc.getElementById('done-graph-settings').click();
+  check(doc.querySelector('[aria-label="맞은편 수평축 L₂"]') && exported(doc).coordinateSystem.facing.axisName === 'L₂', `${size}: the facing axis name is drawn and exported`);
+  el.remove();
+}
 try {
   const controls = document.createElement('section');
   controls.innerHTML = numberField({id:'check-number',label:'수량 <검사>',min:1,max:10,step:0.5,value:2})
@@ -180,7 +203,7 @@ try {
   check(tangentResult.ok,`contact tangent line fixture: ${tangentResult.error ?? 'completed'}`);
   for (const name of tangentResult.passed) passed.push(`contact tangent line: ${name}`);
   tangentLine.remove();
-  await appSmoke(1280, 800); await appSmoke(390, 844);
+  await appSmoke(1280, 800); await appSmoke(390, 844); await faceSmoke(1280, 800);
   check(errors.length === 0, `no browser runtime errors: ${errors.join('; ')}`);
 } catch (error) { errors.push(error.stack ?? String(error)); }
 const report = { ok: errors.length === 0, count: passed.length, passed, errors };

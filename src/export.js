@@ -1,5 +1,5 @@
 import { DEFAULT_AXIS_GAP } from './graph/display.js';
-import { QUADRANT_MODES } from './graph/viewport.js';
+import { QUADRANT_MODES, faceToFace } from './graph/viewport.js';
 import { objectModel } from './models/objects.js';
 import { describeRelations } from './graph/drawn-relations.js';
 const serializeObjects = objects => (objects ?? []).map(object => objectModel(object).serialize());
@@ -14,13 +14,19 @@ const LEGEND = Object.freeze({
   relations: '현재 그림에서 계산한 위치 관계입니다. at=위치, points=그 위치의 점, on=그 위치를 지나는 도형과 축, tangent=그 위치에서 방향이 같은(접하는) 두 도형, slopes=곡선의 그 위치 기울기(null은 수직), features=도형의 start·end(시작·끝)·kink(꺾임)·minimum(최저점)',
   axes: 'axis-x·axis-y는 x축·y축, axis-b-x·axis-b-y는 에지워드 상자 B의 축입니다.',
 });
+// Added only when a face-to-face sheet is exported, so other files keep their legend.
+const FACE_LEGEND = 'coordinateSystem.type이 face-to-face인 그래프는 y축을 공유하는 맞붙은 두 그래프입니다. x<0인 좌표는 맞은편 그래프에 있고, 그 그래프의 수평축 값은 -x입니다.';
+
+/** The facing graph on a face-to-face sheet: where it is drawn and how to read its x. */
+const facingSide = state => ({ side: state.flipX ? 'right' : 'left', axisName: state.faceAxisName, xPositive: state.flipX ? 'right' : 'left', ownX: '-x' });
 
 function serializeDiagram(state) {
   const baseOrigin = QUADRANT_MODES[state.quadrantMode].origin;
   const origin = baseOrigin === 'center' ? 'center' : `${state.flipY ? 'top' : 'bottom'}-${baseOrigin.endsWith('center') ? 'center' : state.flipX ? 'right' : 'left'}`;
   return {
     coordinateSystem: { origin, quadrants: [...QUADRANT_MODES[state.quadrantMode].quadrants], xPositive: state.flipX ? 'left' : 'right', yPositive: state.flipY ? 'down' : 'up', axesVisible: true, axisNames: { ...state.axisNames }, lineAxisGap: { enabled: Boolean(state.axisGapEnabled), distance: state.axisGap ?? DEFAULT_AXIS_GAP },
-      ...(state.quadrantMode==='edgeworth'?{type:'edgeworth',totals:{...state.boxSize},oppositeOrigin:{x:state.boxSize.width,y:state.boxSize.height},oppositeAxisNames:{...state.boxAxisNames},oppositeXPositive:state.flipX?'right':'left',oppositeYPositive:state.flipY?'up':'down'}:{}) },
+      ...(state.quadrantMode==='edgeworth'?{type:'edgeworth',totals:{...state.boxSize},oppositeOrigin:{x:state.boxSize.width,y:state.boxSize.height},oppositeAxisNames:{...state.boxAxisNames},oppositeXPositive:state.flipX?'right':'left',oppositeYPositive:state.flipY?'up':'down'}:{}),
+      ...(faceToFace(state.quadrantMode) ? { type: 'face-to-face', sharedAxis: 'y', facing: facingSide(state) } : {}) },
     showGrid: state.showGrid,
     objectOrder: [...state.objectOrder],
     lines: serializeObjects(state.lines),
@@ -39,7 +45,7 @@ function serializeDiagram(state) {
 export function serializeDocument(state) {
   return {
     schemaVersion: SCHEMA_VERSION,
-    legend: LEGEND,
+    legend: state.diagrams.some(diagram => faceToFace(diagram.quadrantMode)) ? { ...LEGEND, faceToFace: FACE_LEGEND } : LEGEND,
     activeDiagramId: state.activeDiagramId,
     layout: {
       preset: state.layout.preset,

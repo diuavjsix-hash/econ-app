@@ -61,7 +61,7 @@ test('each mode keeps or clears the selection through its own registered rule', 
 });
 
 test('inactive diagrams show no tool mode, including operations', () => {
-  const store = createStore(); store.configureLayout('face2');
+  const store = createStore(); store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);
   const [first, second] = store.getState().diagrams;
   for (const mode of Object.keys(TOOL_MODES)) {
     store.setToolMode(mode);
@@ -88,7 +88,7 @@ test('every document collection is part of history, deletion and the JSON docume
     assert.ok(Array.isArray(json[collection]), `${collection} is serialized`);
     assert.ok(json.diagrams.every(diagram => Array.isArray(diagram[collection])), `${collection} per diagram`);
   }
-  store.configureLayout('face2');
+  store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);
   assert.ok(OBJECT_COLLECTIONS.every(collection => Array.isArray(store.getState().diagrams[1][collection])), 'new diagrams start empty');
   store.selectObjects(store.getState().objectOrder); store.removeSelected();
   assert.ok(OBJECT_COLLECTIONS.every(collection => store.getState()[collection].length === 0));

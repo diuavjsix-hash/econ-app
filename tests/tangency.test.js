@@ -123,7 +123,7 @@ test('dependent curves and point-bound lines are excluded; other graphs never co
   assert.equal(snapLineToTangency(moving,store.getState(),bounds,56),null);
   store.selectObject(store.getState().sketches[0].id);store.detachSelected();
   assert.equal(snapLineToTangency({...moving,binding:{kind:'through-point',sourceId:'point-1'}},store.getState(),bounds,56),null);
-  store.configureLayout('face2');store.selectDiagram(store.getState().diagrams[1].id);
+  store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);store.selectDiagram(store.getState().diagrams[1].id);
   const other=line(store);assert.equal(snapLineToTangency(other,store.getState(),bounds,56),null);
 });
 
