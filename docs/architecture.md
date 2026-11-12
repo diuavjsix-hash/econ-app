@@ -231,7 +231,7 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 
 | 파일 | 역할 |
 | --- | --- |
-| `index.html` | Pretendard와 `tokens → components → snap-feedback → styles` 순서의 CSS, ES module 진입점 로드; 경로는 상대 경로 |
+| `index.html` | Google Fonts(IBM Plex Sans KR·STIX Two Text)와 `tokens → components → snap-feedback → styles` 순서의 CSS, ES module 진입점 로드; 경로는 상대 경로 |
 | `src/main.js` | `appShell()` 장착, store 생성, 각 기능 mount |
 | `src/ui/tokens.css`, `components.css` | 디자인 토큰(원시 값의 유일한 출처)과 공통 컴포넌트 스타일; [디자인 시스템](design-system.md) |
 | `src/ui/shell.js`, `icons.js` | 정적 화면 배치(공통 생성기만 사용)와 유일한 아이콘·도형 기호 모음 |

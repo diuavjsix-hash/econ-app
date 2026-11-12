@@ -3,7 +3,8 @@
  * tool composes these classes instead of adding its own button/field/toggle styles.
  * Values come from tokens.css only.
  *
- * Rule of emphasis: ink (gray-900) marks the current mode and the primary action;
+ * Rule of emphasis: the chosen tool or segment is a white sheet with a paper edge;
+ * ink (gray-900) marks only the primary action inside a panel or dialog;
  * the accent marks values (switch on, checkbox, range) and canvas selection/snap.
  */
 
@@ -47,8 +48,8 @@ a { color: inherit; text-decoration: none; }
 .btn-primary:disabled { background: var(--bg-pressed); border-color: var(--bg-pressed); color: var(--text-disabled); }
 .btn-ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
 .btn-ghost:hover { background: var(--bg-hover); color: var(--text); }
-.btn-danger { background: var(--bg-surface); color: var(--danger); border-color: var(--border); }
-.btn-danger:hover { background: var(--danger-wash); border-color: var(--danger-tint); color: var(--danger-strong); }
+.btn-danger { background: transparent; color: var(--danger); border-color: transparent; }
+.btn-danger:hover { background: var(--danger-wash); color: var(--danger-strong); }
 .btn-danger:disabled { background: transparent; }
 .btn-sm { height: var(--control-sm); padding: 0 var(--space-2); font-size: var(--text-xs); }
 .btn-block { display: flex; width: 100%; }
@@ -66,8 +67,7 @@ a { color: inherit; text-decoration: none; }
 /* Toolbar --------------------------------------------------------------- */
 .toolbar {
   display: flex; align-items: center; gap: var(--space-0); flex-wrap: wrap;
-  padding: var(--space-0); border-radius: var(--radius-md);
-  background: var(--bg-surface); box-shadow: var(--shadow-raised);
+  padding: 0; background: transparent;
 }
 .tool {
   display: inline-flex; align-items: center; gap: 6px;
@@ -79,7 +79,7 @@ a { color: inherit; text-decoration: none; }
 .tool-icon { display: grid; place-items: center; }
 .tool-icon .icon { width: var(--icon); height: var(--icon); }
 .tool:hover { background: var(--bg-hover); color: var(--text); }
-.tool[aria-pressed=true] { background: var(--bg-inverse); color: var(--text-inverse); }
+.tool[aria-pressed=true] { background: var(--bg-sheet); color: var(--text); box-shadow: var(--shadow-sheet); }
 .tool:disabled { cursor: default; background: transparent; color: var(--text-disabled); }
 .tool-danger:enabled { color: var(--danger); }
 .tool-danger:enabled:hover { background: var(--danger-wash); color: var(--danger-strong); }
@@ -98,7 +98,7 @@ a { color: inherit; text-decoration: none; }
   transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
 .segment:hover { color: var(--text); }
-.segment[aria-pressed=true] { background: var(--bg-surface); color: var(--text); box-shadow: var(--shadow-raised); }
+.segment[aria-pressed=true] { background: var(--bg-sheet); color: var(--text); box-shadow: var(--shadow-sheet); }
 .segment:disabled { cursor: default; color: var(--text-disabled); }
 .segment-glyph { display: grid; place-items: center; }
 .segment-glyph svg { display: block; width: 30px; height: 12px; }

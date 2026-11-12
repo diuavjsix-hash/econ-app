@@ -34,7 +34,7 @@ const header = () => `
     <div class="document-actions">
       ${button({ id: 'choose-quadrants', label: '배치 · 1개', labelId: 'choose-quadrants-label', icon: icon('layout'), variant: 'ghost', ariaLabel: '작업 영역 설정', popup: 'dialog' })}
       ${button({ id: 'graph-settings-action', label: '그래프 설정', icon: icon('settings'), variant: 'ghost', ariaLabel: '그래프 설정', title: '축·사분면·축 방향 설정', popup: 'dialog' })}
-      ${button({ id: 'export-json', label: '저장', icon: icon('export'), variant: 'primary', popup: 'dialog' })}
+      ${button({ id: 'export-json', label: '저장', icon: icon('export'), popup: 'dialog' })}
     </div>
   </header>`;
 

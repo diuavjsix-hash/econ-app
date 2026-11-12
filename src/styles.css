@@ -7,11 +7,11 @@
 .app-header {
   display: flex; align-items: center; gap: var(--space-3);
   height: var(--header-height); padding: 0 var(--space-3) 0 var(--space-4);
-  background: var(--bg-surface); border-bottom: var(--stroke-hairline) solid var(--border);
+  background: var(--bg-chrome); border-bottom: var(--stroke-hairline) solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: var(--space-2); color: var(--text); font-size: var(--text-md); font-weight: var(--weight-semibold); white-space: nowrap; }
-.brand-mark { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-sm); background: var(--bg-inverse); color: var(--text-inverse); }
-.brand-mark .icon { width: var(--icon-sm); height: var(--icon-sm); }
+.brand-mark { display: grid; place-items: center; width: 24px; height: 24px; color: var(--text); }
+.brand-mark .icon { width: var(--icon-lg); height: var(--icon-lg); }
 .history-actions { display: flex; gap: var(--space-0); padding-left: var(--space-3); margin-left: var(--space-1); border-left: var(--stroke-hairline) solid var(--border-subtle); }
 .document-actions { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
 
@@ -23,7 +23,7 @@
 /* Workspace ----------------------------------------------------------------- */
 .workspace { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; min-height: 0; padding: var(--space-3) var(--space-4) var(--space-4); }
 .workbar { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-.editor-status { display: flex; align-items: baseline; gap: var(--space-2); flex: 1; min-width: 0; color: var(--text-tertiary); font-size: var(--text-xs); white-space: nowrap; }
+.editor-status { display: flex; align-items: baseline; gap: var(--space-2); flex: 1; min-width: 0; overflow: hidden; color: var(--text-tertiary); font-size: var(--text-xs); white-space: nowrap; }
 .status-mode { flex-shrink: 0; color: var(--text-secondary); font-weight: var(--weight-semibold); }
 .status-detail { overflow: hidden; text-overflow: ellipsis; }
 .grid-toggle { margin-left: auto; }
@@ -36,7 +36,7 @@
 }
 .diagram-card {
   position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
-  border-radius: var(--radius-md); background: var(--bg-sheet); box-shadow: var(--shadow-raised);
+  background: var(--bg-sheet); box-shadow: var(--shadow-sheet);
   transition: box-shadow var(--duration) var(--ease);
 }
 .diagram-title {
@@ -46,16 +46,16 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .diagram-title:hover { background: var(--bg-hover); color: var(--text); }
-.diagram-grid:not([data-count="1"]) .diagram-card.is-active { box-shadow: 0 0 0 1.5px var(--accent), var(--shadow-raised); }
+.diagram-grid:not([data-count="1"]) .diagram-card.is-active { box-shadow: 0 0 0 1.5px var(--accent); }
 .diagram-grid:not([data-count="1"]) .diagram-title[aria-pressed=true] { color: var(--accent); }
 .graph-container { position: relative; flex: 1; min-width: 0; min-height: 0; isolation: isolate; }
 
 /* Inspector ------------------------------------------------------------------ */
-.tools-panel { display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: var(--bg-surface); border-left: var(--stroke-hairline) solid var(--border); }
+.tools-panel { display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: var(--bg-chrome); border-left: var(--stroke-hairline) solid var(--border); }
 .inspector { flex: 1; min-height: 140px; overflow: auto; padding: 0 var(--space-4) var(--space-5); scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .inspector-heading {
   position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
-  height: 44px; margin: 0 calc(-1 * var(--space-4)) var(--space-1); padding: 0 var(--space-2) 0 var(--space-4); background: var(--bg-surface);
+  height: 44px; margin: 0 calc(-1 * var(--space-4)) var(--space-1); padding: 0 var(--space-2) 0 var(--space-4); background: var(--bg-chrome);
 }
 .inspector > [id$="-inspector"] > section + section { margin-top: 0; }
 .name-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
@@ -79,14 +79,14 @@
 }
 
 /* Curve library: one list style for every quick-add family. */
-.library { display: grid; grid-template-columns: 1fr; gap: var(--space-1); }
+.library { display: grid; grid-template-columns: 1fr; gap: 0; margin: 0 calc(-1 * var(--space-2)); }
 .library-item {
   display: flex; align-items: center; gap: var(--space-2); min-width: 0; height: var(--control-lg); padding: 0 var(--space-2);
-  border: var(--stroke-hairline) solid var(--border); border-radius: var(--radius-sm); background: var(--bg-surface);
+  border: 0; border-radius: var(--radius-sm); background: transparent;
   color: var(--text-strong); font-size: var(--text-sm); text-align: left;
-  transition: background var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
+  transition: background var(--duration-fast) var(--ease);
 }
-.library-item:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.library-item:hover { background: var(--bg-hover); }
 .library-item .curve-glyph { width: 28px; height: 19px; flex-shrink: 0; stroke: var(--text-secondary); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .library-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .library-add { width: var(--icon-sm); height: var(--icon-sm); color: var(--text-disabled); }
@@ -149,9 +149,11 @@
 .graph-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; touch-action: none; user-select: none; }
 .graph-svg:focus { outline: none; }
 .graph-svg:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-tint); }
-.graph-grid line { stroke: var(--canvas-grid); stroke-width: 1; }
-.graph-axes { stroke: var(--canvas-axis); stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-.axis-name { fill: var(--canvas-label); font: var(--weight-medium) var(--text-md) var(--font-sans); }
+.graph-grid line { stroke: var(--canvas-grid-minor); stroke-width: 1; shape-rendering: crispEdges; }
+.graph-grid line.is-major { stroke: var(--canvas-grid); }
+.graph-axes { stroke: var(--canvas-axis); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+/* Canvas names are set like a textbook figure: serif, true italic for Latin, upright Hangul (no synthetic slant). */
+.axis-name { fill: var(--canvas-label); font: italic var(--weight-regular) var(--text-lg) var(--font-math); font-synthesis: none; }
 
 .plotted-line { stroke: var(--line-color); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .plotted-line.is-selected { stroke-width: 2.75; }
@@ -170,8 +172,8 @@
 .point-selection { fill: none; stroke: var(--point-color); stroke-width: 1; opacity: .3; pointer-events: none; }
 .point-hit { fill: transparent; cursor: move; }
 .point-hit:focus-visible { box-shadow: none; stroke: var(--accent); stroke-width: 1.5; }
-.point-name { fill: var(--canvas-label); stroke: var(--canvas-halo); stroke-width: 3px; paint-order: stroke; font: var(--text-sm) var(--font-sans); pointer-events: none; }
-.point-coordinates { fill: var(--canvas-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.point-name { fill: var(--canvas-label); stroke: var(--canvas-halo); stroke-width: 3px; paint-order: stroke; font: italic var(--text-md) var(--font-math); font-synthesis: none; pointer-events: none; }
+.point-coordinates { font-family: var(--font-sans); font-style: normal; fill: var(--canvas-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
 
 .plotted-fill { cursor: move; }
 .plotted-fill:focus-visible { box-shadow: none; stroke: var(--accent); stroke-width: 2; }

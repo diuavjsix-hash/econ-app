@@ -149,15 +149,22 @@ export function mountGraph(container, store) {
     if (currentState.showGrid) {
       const grid = element('g', { class: 'graph-grid', 'aria-hidden': 'true' });
       // Grid stays inside the chosen mathematical domain, with room around it for axis names.
+      // Graph paper: unit steps are the major rules, subdivided into five minor rules when they stay at least 6px apart.
       const step = gridStep(unit);
-      for (let i = Math.floor(bounds.xMin / step); i <= Math.ceil(bounds.xMax / step); i++) {
-        const x = cx + i * step * unit * xDirection;
-        if (x >= plot.left && x <= plot.right) grid.append(element('line', { x1: x, y1: plot.top, x2: x, y2: plot.bottom }));
+      const divisions = step * unit / 5 >= 6 ? 5 : 1;
+      const minor = step / divisions;
+      const rule = (attributes, i) => element('line', i % divisions === 0 ? { ...attributes, class: 'is-major' } : attributes);
+      const minorLines = [], majorLines = [];
+      for (let i = Math.floor(bounds.xMin / minor); i <= Math.ceil(bounds.xMax / minor); i++) {
+        const x = cx + i * minor * unit * xDirection;
+        if (x >= plot.left && x <= plot.right) (i % divisions === 0 ? majorLines : minorLines).push(rule({ x1: x, y1: plot.top, x2: x, y2: plot.bottom }, i));
       }
-      for (let i = Math.floor(bounds.yMin / step); i <= Math.ceil(bounds.yMax / step); i++) {
-        const y = cy - i * step * unit * yDirection;
-        if (y >= plot.top && y <= plot.bottom) grid.append(element('line', { x1: plot.left, y1: y, x2: plot.right, y2: y }));
+      for (let i = Math.floor(bounds.yMin / minor); i <= Math.ceil(bounds.yMax / minor); i++) {
+        const y = cy - i * minor * unit * yDirection;
+        if (y >= plot.top && y <= plot.bottom) (i % divisions === 0 ? majorLines : minorLines).push(rule({ x1: plot.left, y1: y, x2: plot.right, y2: y }, i));
       }
+      // Major rules draw last so minor rules never cross over them.
+      grid.append(...minorLines, ...majorLines);
       svg.append(grid);
     }
 
