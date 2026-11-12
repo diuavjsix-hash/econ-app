@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
 import { LAYOUTS, normalizeSlots } from '../src/layouts.js';
 import { createViewport, toScreen, toWorld } from '../src/graph/viewport.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { diagramState } from '../src/workspace.js';
 import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
 
@@ -50,7 +50,7 @@ test('reducing and restoring a layout retains hidden diagrams and exports them',
   store.configureLayout('single');
   assert.notEqual(store.getState().activeDiagramId, third);
   store.selectDiagram(third); assert.notEqual(store.getState().activeDiagramId, third);
-  const doc = serializeDocument(store.getState());
+  const doc = serializeActive(store.getState());
   assert.equal(doc.diagrams.length, 3); assert.equal(doc.layout.slots.length, 1);
   assert.equal(doc.diagrams[2].name, '노동시장'); assert.equal(doc.diagrams[2].lines.length, 1);
   store.configureLayout('vertical3'); store.selectDiagram(third);
@@ -59,17 +59,17 @@ test('reducing and restoring a layout retains hidden diagrams and exports them',
 });
 
 test('layout, orientation and cross-diagram edits undo and redo as complete documents', () => {
-  const store = createStore(); const original = serializeDocument(store.getState());
+  const store = createStore(); const original = serializeActive(store.getState());
   store.configureLayout('face2', null, 'upper');
   const second = store.getState().diagrams[1].id;
   store.selectDiagram(second);
-  const configured = serializeDocument(store.getState());
+  const configured = serializeActive(store.getState());
   store.addPoint({ x: 3, y: 2 });
   store.updateDiagram({ flipY: true });
   store.undo(); assert.equal(store.getState().flipY, false);
   store.undo(); assert.equal(store.getState().points.length, 0);
-  store.undo(); assert.deepEqual(serializeDocument(store.getState()), original);
-  store.redo(); assert.deepEqual(serializeDocument(store.getState()), { ...configured, activeDiagramId: second });
+  store.undo(); assert.deepEqual(serializeActive(store.getState()), original);
+  store.redo(); assert.deepEqual(serializeActive(store.getState()), { ...configured, activeDiagramId: second });
   store.redo(); assert.equal(store.getState().points.length, 1);
   store.redo(); assert.equal(store.getState().flipY, true);
 });
@@ -90,9 +90,9 @@ test('switching diagrams adds no history and ends an unfinished editing gesture'
 test('clear deletes only the selected diagram and undo preserves the other graphs', () => {
   const store = createStore(); store.configureLayout('horizontal2'); store.addLine();
   const second = store.getState().diagrams[1].id; store.selectDiagram(second); store.addPoint({ x: 1, y: 2 });
-  const before = serializeDocument(store.getState()); store.clearAll();
+  const before = serializeActive(store.getState()); store.clearAll();
   assert.equal(store.getState().diagrams[0].lines.length, 1); assert.equal(store.getState().points.length, 0);
-  store.undo(); assert.deepEqual(serializeDocument(store.getState()), before);
+  store.undo(); assert.deepEqual(serializeActive(store.getState()), before);
 });
 
 test('custom layouts reject invalid cells, normalize empty margins and remain detached', () => {
@@ -127,8 +127,8 @@ test('workspace JSON records real directions, origins, per-diagram geometry and 
   const store = createStore(); store.configureLayout('face2'); store.addLine(); store.updateSelected({slope:null});
   const second=store.getState().diagrams[1].id; store.selectDiagram(second); store.addCurve();
   store.updateDiagram({flipY:true});
-  const doc=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(doc.schemaVersion,12);
+  const doc=JSON.parse(JSON.stringify(serializeActive(store.getState())));
+  assert.equal(doc.schemaVersion,13);
   assert.equal(doc.diagrams[0].coordinateSystem.origin,'bottom-right');
   assert.equal(doc.diagrams[0].coordinateSystem.xPositive,'left');
   assert.equal(doc.diagrams[1].coordinateSystem.origin,'top-left');

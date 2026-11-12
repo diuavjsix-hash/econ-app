@@ -5,7 +5,7 @@ import { snapSegmentPoint } from '../src/graph/segment-magnets.js';
 import { snapMovingSegment } from './fixtures/segments.js';
 import { snapFeedbackModel } from '../src/graph/snap-feedback.js';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 
 const bounds={xMin:0,xMax:10,yMin:0,yMax:10},unit=50;
 const curve={id:'curve-1',type:'curve',family:'complements',anchor:{x:3,y:4},shape:1};
@@ -16,7 +16,7 @@ test('point placement captures the exact kink instead of sliding on an adjacent 
   assert.equal(result.kind,'kink');assert.deepEqual(result.point,curve.anchor);assert.deepEqual(result.ids,[curve.id]);
   assert.equal(snapFeedbackModel(result).label,'꺾임 맞춤');
   const store=createStore();store.addPoint(result.point);
-  const doc=serializeDocument(store.getState());assert.deepEqual(doc.points[0].anchor,curve.anchor);assert.equal(doc.schemaVersion,12);
+  const doc=serializeActive(store.getState());assert.deepEqual(doc.points[0].anchor,curve.anchor);assert.equal(doc.schemaVersion,13);
 });
 
 test('an approaching kink takes over from a captured arm then holds to the shared release radius',()=>{

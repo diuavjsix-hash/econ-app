@@ -5,7 +5,7 @@ import { alphabetLabel, nextFillColor, FILL_COLORS } from '../src/graph/fill-sty
 const [[FIRST], [SECOND]] = FILL_COLORS;
 import { fillLabelPosition, containsFill } from '../src/graph/fill.js';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 
 const shape = x => ({ rings: [[{x,y:0},{x:x+1,y:0},{x,y:1}]] });
 const polygon = coordinates => coordinates.map(([x,y])=>({x,y}));
@@ -25,20 +25,20 @@ test('new regions automatically get distinct colors and A through Z, AA, AB labe
 });
 
 test('clicking the same region preserves its existing color and alphabet without a new undo step', () => {
-  const store = createStore(), id=store.addFill(shape(0)), first=serializeDocument(store.getState());
+  const store = createStore(), id=store.addFill(shape(0)), first=serializeActive(store.getState());
   assert.notEqual(store.getState().fillColor,store.getState().fills[0].color);
-  assert.equal(store.addFill(shape(0)),id); assert.deepEqual(serializeDocument(store.getState()),first);
+  assert.equal(store.addFill(shape(0)),id); assert.deepEqual(serializeActive(store.getState()),first);
   store.undo(); assert.equal(store.getState().fills.length,0);
 });
 
 test('deletion does not renumber surviving labels; undo and redo preserve colors and letters', () => {
-  const store=createStore();const ids=[0,2,4].map(x=>store.addFill(shape(x))), before=serializeDocument(store.getState());
+  const store=createStore();const ids=[0,2,4].map(x=>store.addFill(shape(x))), before=serializeActive(store.getState());
   store.selectObject(ids[1]);store.removeSelected();
   assert.deepEqual(store.getState().fills.map(fill=>fill.label),['A','C']);
   store.addFill(shape(6));assert.equal(store.getState().fills.at(-1).label,'D');
   assert.equal(new Set(store.getState().fills.map(fill=>fill.color)).size,3);
-  const after=serializeDocument(store.getState());store.undo();store.redo();assert.deepEqual(serializeDocument(store.getState()),after);
-  store.undo();store.undo();assert.deepEqual(serializeDocument(store.getState()),before);
+  const after=serializeActive(store.getState());store.undo();store.redo();assert.deepEqual(serializeActive(store.getState()),after);
+  store.undo();store.undo();assert.deepEqual(serializeActive(store.getState()),before);
 });
 
 test('colors and alphabets start independently in each graph, including hidden graphs', () => {
@@ -58,7 +58,7 @@ test('manual editing preserves the alphabet, and automatic colors avoid manual o
   assert.equal(store.getState().fills[0].label,'A');assert.equal(store.getState().fills[0].name,'내 구역');
   assert.equal(nextFillColor([{color:FIRST.toUpperCase()},{color:SECOND.toUpperCase()}]),FILL_COLORS[2][0]);
   store.addFill(shape(6));assert.notEqual(store.getState().fills[1].color,SECOND);
-  const doc=serializeDocument(store.getState());assert.equal(doc.schemaVersion,12);assert.equal(doc.fills[0].label,'A');
+  const doc=serializeActive(store.getState());assert.equal(doc.schemaVersion,13);assert.equal(doc.fills[0].label,'A');
   assert.deepEqual(doc.fills,doc.diagrams[0].fills);assert.equal('fillNextLabel' in doc,false);assert.equal('fillAutoColor' in doc,false);
 });
 

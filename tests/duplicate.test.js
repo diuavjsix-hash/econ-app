@@ -4,7 +4,7 @@ import { createStore } from '../src/state.js';
 import { prepareDuplicate } from '../src/duplicate.js';
 import { interceptOf } from '../src/graph/math.js';
 import { objectsOf } from '../src/objects.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { drawSegment, segmentEnds } from './fixtures/segments.js';
 
 test('hand, point, dashed and duplicate tabs are exclusive and preserve drawing preferences without history', () => {
@@ -36,9 +36,9 @@ test('slope factors rotate about the original anchor without preserving the vert
 
 test('invalid or overflowing copies leave the complete document and ID sequence unchanged', () => {
   const store=createStore(); store.addLine(); store.updateSelected({slope:Number.MAX_VALUE});
-  const before=serializeDocument(store.getState());
+  const before=serializeActive(store.getState());
   for (const options of [{slopeFactor:2},{slopeFactor:3}]) {
-    assert.equal(store.duplicateSelected(options),null); assert.deepEqual(serializeDocument(store.getState()),before);
+    assert.equal(store.duplicateSelected(options),null); assert.deepEqual(serializeActive(store.getState()),before);
   }
   assert.equal(store.addLine(),'line-2');
   assert.ok(prepareDuplicate({type:'line',slope:Number.MIN_VALUE,anchor:{x:0,y:1}},{slopeFactor:0.5}).error);
@@ -91,16 +91,16 @@ test('the child-copy option can copy a single parent without copying or moving i
 
 test('an entire copied hierarchy is one undo step, redo restores it and branching never reuses IDs', () => {
   const store=createStore(); const folder=store.addGroup(), line=store.addLine(); store.moveObject(line,folder); store.selectObject(folder);
-  const original=serializeDocument(store.getState()); const copied=store.duplicateSelected(); const after=serializeDocument(store.getState());
-  store.undo(); assert.deepEqual(serializeDocument(store.getState()),original);
-  store.redo(); assert.deepEqual(serializeDocument(store.getState()),after); assert.equal(store.getState().selectedId,copied);
+  const original=serializeActive(store.getState()); const copied=store.duplicateSelected(); const after=serializeActive(store.getState());
+  store.undo(); assert.deepEqual(serializeActive(store.getState()),original);
+  store.redo(); assert.deepEqual(serializeActive(store.getState()),after); assert.equal(store.getState().selectedId,copied);
   store.undo(); const fresh=store.duplicateSelected(); assert.notEqual(fresh,copied); assert.equal(store.getState().canRedo,false);
 });
 
 test('copies stay within their active diagram and serialize as normal editable objects', () => {
   const store=createStore(); store.configureLayout('face2'); store.addLine(); store.updateSelected({slope:-1,name:'D',anchor:{x:4,y:6}});
   store.update({duplicatePanel:true}); const copy=store.duplicateSelected({slopeFactor:2});
-  const doc=serializeDocument(store.getState());
+  const doc=serializeActive(store.getState());
   assert.equal(doc.lines.length,2); assert.equal(doc.diagrams[1].lines.length,0);
   assert.ok(Math.abs(doc.lines.find(o=>o.id===copy).intercept-(14+Math.sqrt(5)))<1e-10); assert.equal(doc.lines.find(o=>o.id===copy).slope,-2);
   assert.equal(doc.coordinateSystem.xPositive,'left'); assert.equal('duplicatePanel' in doc,false);
@@ -130,12 +130,12 @@ test('default nearby copies visibly separate horizontal, vertical and oblique li
 
 test('repeated nearby copies of the same source occupy different positions and undo once',()=>{
   const store=createStore(),id=store.addLine();store.updateSelected({slope:0});
-  const original=serializeDocument(store.getState());
-  store.duplicateSelected();store.selectObject(id);const beforeSecond=serializeDocument(store.getState());
+  const original=serializeActive(store.getState());
+  store.duplicateSelected();store.selectObject(id);const beforeSecond=serializeActive(store.getState());
   const second=store.duplicateSelected();assert.equal(new Set(store.getState().lines.map(line=>line.anchor.y)).size,3);
   assert.equal(store.getState().lines.find(line=>line.id===second).anchor.y,5);
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),beforeSecond);
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),original);
+  store.undo();assert.deepEqual(serializeActive(store.getState()),beforeSecond);
+  store.undo();assert.deepEqual(serializeActive(store.getState()),original);
 });
 
 test('nearby copies translate every child together and detach bindings without changing shapes',()=>{

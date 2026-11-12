@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { INDIFFERENCE_FAMILIES, moveIndifference, indifferenceValue, indifferenceContact, indifferenceOnLine, indifferenceThroughPoint, indifferenceLineIntersections, indifferenceShapeHandle, shapeIndifference, clipIndifference } from '../src/graph/indifference.js';
 import { displayedCurveSegments } from '../src/graph/display.js';
 import { snapMovingCurve, snapShapeToPoint } from '../src/graph/point-magnets.js';
@@ -133,7 +133,7 @@ test('creation, preference edits, repeated copies, history, graph isolation, del
     assert.deepEqual(store.getState().curves.find(c=>c.id===id),original);
     assert.equal(before.family,family);
   }
-  const doc=serializeDocument(store.getState());assert.equal(doc.schemaVersion,12);
+  const doc=serializeActive(store.getState());assert.equal(doc.schemaVersion,13);
   assert.equal(doc.curves.length,3*Object.keys(INDIFFERENCE_FAMILIES).length);assert.deepEqual(doc.curves,doc.diagrams[0].curves);
   assert.ok(!JSON.stringify(doc).includes('quadratic-bezier'));
   for (const c of JSON.parse(JSON.stringify(doc)).curves) assert.ok(Number.isFinite(c.anchor.x) && Number.isFinite(c.anchor.y) && Number.isFinite(c.shape));

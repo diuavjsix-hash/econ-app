@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { directionOf } from '../src/graph/math.js';
 import { curvePoint } from '../src/graph/curve.js';
 import { sketchControls, quadraticPoint, translatedSketch } from '../src/graph/sketch.js';
@@ -23,11 +23,11 @@ test('horizontal, true vertical and oblique lines translate through a marked poi
   for(const slope of [0,null,-0.7,1e12]) {
     const store=createStore(),shape=line(store,slope),d=directionOf(slope),n={x:-d.y,y:d.x};
     const point=target(store,{x:shape.anchor.x+2*d.x+0.1*n.x,y:shape.anchor.y+2*d.y+0.1*n.y});
-    const before=serializeDocument(store.getState()),snap=snapShapeToPoint(shape,store.getState(),bounds,56);assert.ok(snap);
+    const before=serializeActive(store.getState()),snap=snapShapeToPoint(shape,store.getState(),bounds,56);assert.ok(snap);
     assert.equal(snap.kind,'point');assert.equal(snap.sourceId,point.id);pointNear(snap.point,point.anchor);
     near((point.anchor.x-snap.anchor.x)*n.x+(point.anchor.y-snap.anchor.y)*n.y,0);
     near((snap.anchor.x-shape.anchor.x)*d.x+(snap.anchor.y-shape.anchor.y)*d.y,0);
-    assert.deepEqual(serializeDocument(store.getState()),before);
+    assert.deepEqual(serializeActive(store.getState()),before);
     store.selectObject(shape.id);store.updateSelected({anchor:snap.anchor});assert.equal(store.getState().lines[0].slope,slope);
     assert.deepEqual(store.getState().points[0],point);
   }
@@ -142,9 +142,9 @@ test('point magnets use only the active graph and keep mathematical coordinates 
 
 test('a curve drag through a marked point is one undo with source points and shape metadata intact',()=>{
   const store=createStore(),curve=cup(store),point=target(store,{x:4,y:2.1});store.selectObject(curve.id);
-  const before=serializeDocument(store.getState()),result=snapMovingCurve(curve,store.getState(),bounds,56);assert.equal(result.kind,'point');
+  const before=serializeActive(store.getState()),result=snapMovingCurve(curve,store.getState(),bounds,56);assert.equal(result.kind,'point');
   store.beginHistory();store.updateSelected({...translatedSketch(curve,{x:result.anchor.x-curve.anchor.x,y:result.anchor.y-curve.anchor.y}),translate:true});store.endHistory();
-  const after=serializeDocument(store.getState());near(distanceToSketch(store.getState().sketches[0],point.anchor),0);
+  const after=serializeActive(store.getState());near(distanceToSketch(store.getState().sketches[0],point.anchor),0);
   assert.deepEqual(store.getState().points[0],point);assert.equal(store.getState().sketches[0].binding,null);
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);store.redo();assert.deepEqual(serializeDocument(store.getState()),after);
+  store.undo();assert.deepEqual(serializeActive(store.getState()),before);store.redo();assert.deepEqual(serializeActive(store.getState()),after);
 });

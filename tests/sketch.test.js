@@ -5,7 +5,7 @@ import { objectsOf } from '../src/objects.js';
 import { sketchControls, sketchMinimum, quadraticPoint, displayedSketchSegments, projectOnLine } from '../src/graph/sketch.js';
 import { directionOf } from '../src/graph/math.js';
 import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { canAttach } from '../src/relations.js';
 
 const near=(actual,expected,tolerance=1e-8)=>assert.ok(Math.abs(actual-expected)<tolerance,`${actual} != ${expected}`);
@@ -75,9 +75,9 @@ test('minimum is a curve display option without generated points, lines or bindi
   assert.equal(store.getState().selectedId,curve);assert.equal(sketch(store).showMinimum,true);
   assert.equal(store.getState().points.length,0);assert.equal(store.getState().lines.length,0);
   assert.equal(store.lineThroughSelectedPoint(),null);assert.equal(store.detachSelected(),false);
-  const before=serializeDocument(store.getState());
+  const before=serializeActive(store.getState());
   store.updateSelected({showMinimum:false});assert.equal(sketch(store).showMinimum,false);
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);
+  store.undo();assert.deepEqual(serializeActive(store.getState()),before);
   store.updateSelected({anchor:{x:3,y:1}});assert.deepEqual(sketchMinimum(sketch(store)),{x:3,y:1});
 });
 
@@ -86,8 +86,8 @@ test('ordinary point-through-line optionally freezes while marked curves do not 
   const frozen=store.lineThroughSelectedPoint({follow:false});
   store.selectObject(point);const following=store.lineThroughSelectedPoint();
   assert.equal(canAttach(store.getState(),point,following),false);
-  store.selectObject(curve);const before=serializeDocument(store.getState());
-  assert.equal(store.attachSelectedToLine('missing-line'),false);assert.deepEqual(serializeDocument(store.getState()),before);
+  store.selectObject(curve);const before=serializeActive(store.getState());
+  assert.equal(store.attachSelectedToLine('missing-line'),false);assert.deepEqual(serializeActive(store.getState()),before);
   assert.equal(store.attachSelectedToLine(frozen),true);
   store.selectObject(point);store.updateSelected({anchor:{x:5,y:3}});
   assert.deepEqual(store.getState().lines.find(l=>l.id===following).anchor,{x:5,y:3});
@@ -97,8 +97,8 @@ test('ordinary point-through-line optionally freezes while marked curves do not 
 test('deleting relation sources freezes surviving geometry and undo restores the full relation chain',()=>{
   const store=createStore(), line=addLine(store), curve=store.addSketch({x:1,y:5},{x:7,y:5},{x:4,y:2},{lineId:line});
   store.markMinimum();const point=store.addPoint({x:4,y:2}), through=store.lineThroughSelectedPoint();
-  store.selectObject(line);const original=serializeDocument(store.getState());store.removeSelected();
-  assert.equal(sketch(store).binding,null);store.undo();assert.deepEqual(serializeDocument(store.getState()),original);
+  store.selectObject(line);const original=serializeActive(store.getState());store.removeSelected();
+  assert.equal(sketch(store).binding,null);store.undo();assert.deepEqual(serializeActive(store.getState()),original);
   store.selectObject(curve);const min={...store.getState().points[0].anchor};store.removeSelected();
   assert.equal(store.getState().points[0].binding,undefined);assert.deepEqual(store.getState().points[0].anchor,min);
   store.selectObject(point);store.removeSelected();assert.equal(store.getState().lines.find(l=>l.id===through).binding,null);
@@ -110,7 +110,7 @@ test('sketches copy independently, preserve hierarchy and export full internal g
   assert.equal(copy,'sketch-2');assert.equal(state.sketches[1].binding,null);
   for(const key of ['start','anchor','end']) near(state.sketches[1][key].x,state.sketches[0][key].x+1);
   const group=store.addGroup();store.moveObject(id,group);
-  const exportedState=store.getState(), doc=serializeDocument(exportedState);assert.equal(doc.schemaVersion,12);assert.deepEqual(doc.sketches,doc.diagrams[0].sketches);
+  const exportedState=store.getState(), doc=serializeActive(exportedState);assert.equal(doc.schemaVersion,13);assert.deepEqual(doc.sketches,doc.diagrams[0].sketches);
   assert.equal(doc.sketches[0].parentId,group);assert.equal(doc.sketches[0].binding.sourceId,source);
   assert.equal(doc.sketches[0].geometry.type,'piecewise-quadratic-bezier');assert.ok(!('collapsed' in doc.sketches[0]));
   doc.sketches[0].start.x=999;assert.equal(sketch(store).start.x,1);
@@ -121,7 +121,7 @@ test('diagram isolation, hidden layouts, whole-document history, clear and monot
   const store=createStore(), id=cup(store);store.configureLayout('face2');const first=store.getState().activeDiagramId;
   store.selectDiagram(store.getState().diagrams[1].id);assert.equal(store.getState().sketches.length,0);cup(store);
   store.configureLayout('single');assert.equal(sketch(store).id,id);
-  assert.equal(serializeDocument(store.getState()).diagrams[1].sketches.length,1);
+  assert.equal(serializeActive(store.getState()).diagrams[1].sketches.length,1);
   store.clearAll();assert.equal(store.getState().sketches.length,0);store.undo();assert.equal(sketch(store).id,id);
   store.selectObject(id);store.removeSelected();assert.equal(cup(store),'sketch-3');
   assert.equal(store.getState().activeDiagramId,first);
@@ -150,11 +150,11 @@ test('visible sketch snapping and axis gaps use the same finite geometry, with n
 
 test('one drag transaction restores the curve and its display option without generating dependent objects',()=>{
   const store=createStore(), id=cup(store);store.markMinimum();store.selectObject(id);
-  const before=serializeDocument(store.getState());
+  const before=serializeActive(store.getState());
   store.beginHistory();store.updateSelected({anchor:{x:5,y:1}});store.updateSelected({anchor:{x:6,y:0}});store.endHistory();
-  const after=serializeDocument(store.getState());
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);
-  store.redo();assert.deepEqual(serializeDocument(store.getState()),after);
+  const after=serializeActive(store.getState());
+  store.undo();assert.deepEqual(serializeActive(store.getState()),before);
+  store.redo();assert.deepEqual(serializeActive(store.getState()),after);
   store.undo();assert.equal(cup(store),'sketch-2');assert.equal(store.getState().canRedo,false);
 });
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
 import { AnalyticCurveFamily, CURVE_FAMILIES, OPPOSITE_CURVE_FAMILIES, OppositeCurveFamily, curveFamilyOf, isOppositeCurve } from '../src/models/curve-families.js';
 import { objectModel } from '../src/models/objects.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { snapMovingCurve } from '../src/graph/point-magnets.js';
 import { buildSnapTargets } from '../src/graph/snap.js';
 import { buildFillRegions } from '../src/graph/fill.js';
@@ -42,7 +42,7 @@ test('Edgeworth curves start from the B origin and stay attached when the totals
   const id = store.addIndifference('cobb-douglas', { anchor: { x: 6, y: 4.8 }, opposite: true });
   let curve = curveOf(store, id);
   assert.ok(isOppositeCurve(curve)); assert.deepEqual(curve.oppositeOrigin, { x: 10, y: 8 });
-  const before = serializeDocument(store.getState());
+  const before = serializeActive(store.getState());
   assert.equal(before.curves[0].orientation, 'opposite'); assert.deepEqual(before.curves[0].oppositeOrigin, { x: 10, y: 8 });
   assert.equal(before.curves[0].geometry.orientation, 'opposite');
   store.update({ boxSize: { width: 12, height: 9 } });
@@ -63,7 +63,7 @@ test('the direction toggle keeps the anchor and round-trips through JSON fields'
   assert.match(curveFamilyOf(curve).movement(curve), /반대 원점|축으로/);
   store.updateSelected({ opposite: false });
   curve = curveOf(store, id);
-  assert.equal(isOppositeCurve(curve), false); assert.equal('oppositeOrigin' in serializeDocument(store.getState()).curves[0], false);
+  assert.equal(isOppositeCurve(curve), false); assert.equal('oppositeOrigin' in serializeActive(store.getState()).curves[0], false);
   store.updateSelected({ opposite: true, oppositeOrigin: { x: 2, y: 1 } });
   assert.equal(isOppositeCurve(curveOf(store, id)), false, 'an origin that does not enclose the anchor is rejected');
   const ppc = store.addIndifference('ppc', { anchor: { x: 2, y: 2 } });

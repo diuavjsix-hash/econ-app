@@ -6,7 +6,7 @@ import { snapSegmentPoint } from '../src/graph/segment-magnets.js';
 import { snapMovingSegment } from './fixtures/segments.js';
 import { sketchMinimum } from '../src/graph/sketch.js';
 import { snapFeedbackModel } from '../src/graph/snap-feedback.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 
 const bounds = { xMin: 0, xMax: 10, yMin: 0, yMax: 10 }, unit = 50;
 const close = (a, b) => assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 1e-9, `${JSON.stringify(a)} != ${JSON.stringify(b)}`);
@@ -45,11 +45,11 @@ test('point and dashed tools capture, hold and store the exact minimum without a
     const result = snapMovingSegment(segment, targets, unit, { bounds });
     assert.equal(result.kind, 'minimum'); close(result.geometry[endpoint], minimum);
   }
-  const before = serializeDocument(store.getState()).sketches;
+  const before = serializeActive(store.getState()).sketches;
   const point = store.addPoint(snapPoint(pointer, targets, unit).point);
   const stored = store.getState().points.find(p => p.id === point);
   close(stored.anchor, minimum); assert.equal(stored.binding ?? null, null);
-  assert.deepEqual(serializeDocument(store.getState()).sketches, before, 'snapping never changes the curve');
+  assert.deepEqual(serializeActive(store.getState()).sketches, before, 'snapping never changes the curve');
   assert.equal(store.getState().lines.length, 0);
 });
 

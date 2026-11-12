@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 
 test('undo and redo restore mixed objects and disable when their stacks are empty', () => {
   const store = createStore();
@@ -12,13 +12,13 @@ test('undo and redo restore mixed objects and disable when their stacks are empt
   const curve = store.addCurve();
   const point = store.addPoint({ x: 1.234567, y: -2 });
   const folder = store.addGroup();
-  const original = serializeDocument(store.getState());
+  const original = serializeActive(store.getState());
   for (let i = 0; i < 4; i++) assert.equal(store.undo(), true);
   assert.equal(store.getState().canUndo, false);
   assert.deepEqual(store.getState().objectOrder, []);
   assert.equal(store.getState().canRedo, true);
   for (let i = 0; i < 4; i++) assert.equal(store.redo(), true);
-  assert.deepEqual(serializeDocument(store.getState()), original);
+  assert.deepEqual(serializeActive(store.getState()), original);
   assert.deepEqual(store.getState().objectOrder, [line, curve, point, folder]);
   assert.equal(store.getState().selectedId, folder);
   assert.equal(store.getState().canRedo, false);
@@ -51,7 +51,7 @@ test('clear all is reversible and retains axes, viewport and mouse preferences',
   store.moveObject(line, folder);
   store.moveObject(point, line);
   store.update({ mouseSelected: true, activeTool: 'point', pointSnap: true });
-  const original = serializeDocument(store.getState());
+  const original = serializeActive(store.getState());
   store.clearAll();
   assert.deepEqual(store.getState().objectOrder, []);
   assert.equal(store.getState().mouseSelected, true);
@@ -59,7 +59,7 @@ test('clear all is reversible and retains axes, viewport and mouse preferences',
   assert.equal(store.getState().quadrantMode, 'all');
   assert.deepEqual(store.getState().axisNames, { x: 'Q', y: 'P' });
   store.undo();
-  assert.deepEqual(serializeDocument(store.getState()), original);
+  assert.deepEqual(serializeActive(store.getState()), original);
   store.redo();
   assert.deepEqual(store.getState().objectOrder, []);
   assert.equal(store.clearAll(), false);
@@ -129,19 +129,19 @@ test('history is bounded and mouse selection controls the cursor independently o
   let count = 0;
   while (store.undo()) count++;
   assert.equal(count, 100);
-  assert.equal('canUndo' in serializeDocument(store.getState()), false);
+  assert.equal('canUndo' in serializeActive(store.getState()), false);
 });
 
 test('point tool clears line and curve selection without editing geometry or history, while retaining point settings', () => {
   const store = createStore();
   const line = store.addLine();
   const curve = store.addCurve();
-  const original = serializeDocument(store.getState());
+  const original = serializeActive(store.getState());
   for (const id of [line, curve]) {
     store.selectObject(id);
     store.update({ mouseSelected: true });
     assert.equal(store.getState().selectedId, null);
-    assert.deepEqual(serializeDocument(store.getState()), original);
+    assert.deepEqual(serializeActive(store.getState()), original);
     store.update({ mouseSelected: false });
   }
   store.undo();

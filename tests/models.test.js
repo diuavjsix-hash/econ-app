@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { objectsOf } from '../src/objects.js';
 import { GraphObject, DrawableObject, MovableObject, StrokeObject } from '../src/models/graph-object.js';
 import { objectModel, objectModelsOf, OBJECT_MODELS, LineObject, CurveObject, AnalyticCurveObject, SegmentObject, RulerObject } from '../src/models/objects.js';
@@ -37,10 +37,10 @@ test('all existing shapes use the shared name-edit contract with one history ste
   const store = populatedStore();
   for (const object of objectsOf(store.getState())) {
     store.selectObject(object.id);
-    const before = serializeDocument(store.getState());
+    const before = serializeActive(store.getState());
     store.beginHistory(); store.updateSelected({ name: '공통 이름 '.repeat(30) }); store.updateSelected({ name: '공통 편집' }); store.endHistory();
     assert.equal(objectsOf(store.getState()).find(item => item.id === object.id).name, '공통 편집');
-    store.undo(); assert.deepEqual(serializeDocument(store.getState()), before);
+    store.undo(); assert.deepEqual(serializeActive(store.getState()), before);
     store.redo(); assert.equal(objectsOf(store.getState()).find(item => item.id === object.id).name, '공통 편집');
   }
 });
@@ -53,7 +53,7 @@ test('models and curve strategies never enter live snapshots, undo snapshots or 
   };
   const before = store.getState();
   for (const data of objectsOf(before)) assert.ok(objectModel(data) instanceof GraphObject);
-  assertPlain(before); assertPlain(structuredClone(before)); assertPlain(serializeDocument(before));
+  assertPlain(before); assertPlain(structuredClone(before)); assertPlain(serializeActive(before));
   store.updateSelected({ anchor: { x: 5, y: 6 } }); store.undo(); assertPlain(store.getState()); store.redo(); assertPlain(store.getState());
 });
 

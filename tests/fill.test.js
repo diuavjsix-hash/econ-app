@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildFillRegions, findFillRegion, containsFill, fillTouchesRectangle, validFill, fillKey } from '../src/graph/fill.js';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { objectsOf } from '../src/objects.js';
 import { editorContext } from '../src/editor-ui.js';
 import { diagramState } from '../src/workspace.js';
@@ -113,19 +113,19 @@ test('fill tool is exclusive, has a minimal inspector and preferences do not ent
     assert.equal(modes.filter(key => state[key]).length, 1); assert.equal(state[mode], true);
   }
   store.update({ fillColor: '#43a999', fillOpacity: 0.4 }); assert.equal(store.getState().canUndo, false);
-  assert.deepEqual(serializeDocument(store.getState()).fills, []);
+  assert.deepEqual(serializeActive(store.getState()).fills, []);
 });
 
 test('fill creation, recoloring, opacity and deletion are separate undo steps without stacking', () => {
   const store = createStore(); store.update({ fillSelected: true });
-  const before = serializeDocument(store.getState()), id = store.addFill(triangle);
+  const before = serializeActive(store.getState()), id = store.addFill(triangle);
   // Like every creation, a fill returns to the selection tool with the fill selected.
   assert.equal(store.getState().fillSelected, false); assert.equal(store.getState().handSelected, true); assert.equal(store.getState().selectedId, id); assert.equal(store.getState().fills.length, 1);
-  const first = serializeDocument(store.getState()); store.addFill(triangle);
+  const first = serializeActive(store.getState()); store.addFill(triangle);
   assert.equal(store.getState().fills.length, 1);
   store.update({ fillColor: '#e69451' }); assert.equal(store.addFill(triangle), id);
-  assert.equal(store.getState().fills.length, 1); store.undo(); assert.deepEqual(serializeDocument(store.getState()), first);
-  store.undo(); assert.deepEqual(serializeDocument(store.getState()), before); store.redo();
+  assert.equal(store.getState().fills.length, 1); store.undo(); assert.deepEqual(serializeActive(store.getState()), first);
+  store.undo(); assert.deepEqual(serializeActive(store.getState()), before); store.redo();
   store.selectObject(id); store.updateSelected({ opacity: 0.5 }); assert.equal(store.getState().fills[0].opacity, 0.5);
   store.removeSelected(); assert.equal(store.getState().fills.length, 0); store.undo(); assert.equal(store.getState().fills[0].opacity, 0.5);
 });
@@ -159,8 +159,8 @@ test('fills participate in object lists, hierarchy, area selection, clear and gr
 
 test('JSON 10 exports independent deep-copied mathematical rings including holes', () => {
   const store = createStore(), fill = { rings: [...triangle.rings, polygon([[1, 1], [2, 1], [1, 2]]).rings[0]] };
-  const id = store.addFill(fill), doc = serializeDocument(store.getState());
-  assert.equal(doc.schemaVersion, 12); assert.deepEqual(doc.fills, doc.diagrams[0].fills);
+  const id = store.addFill(fill), doc = serializeActive(store.getState());
+  assert.equal(doc.schemaVersion, 13); assert.deepEqual(doc.fills, doc.diagrams[0].fills);
   assert.equal(doc.fills[0].id, id); assert.deepEqual(doc.fills[0].rings, fill.rings);
   assert.equal('fillSelected' in doc, false); assert.equal('collapsed' in doc.fills[0], false);
   doc.fills[0].rings[0][0].x = 123; assert.equal(store.getState().fills[0].rings[0][0].x, 0);

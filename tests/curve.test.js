@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { bendFromPoint, clipCurve, clipCurveWithExtensions, CURVE_PRESETS, curveControlPoints, curvePoint, curveTangentRays, MAX_BEND } from '../src/graph/curve.js';
 import { createViewport } from '../src/graph/viewport.js';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 
 test('descending and ascending curves remain monotone across the supported bending range', () => {
   for (const variant of ['descending', 'ascending']) {
@@ -57,7 +57,7 @@ test('mixed drawings edit and delete only the selected curve and export all geom
   store.updateSelected({ bend: 900, slope: null });
   assert.equal(store.getState().curves[0].bend, MAX_BEND);
   assert.equal(store.getState().curves[0].slope, 0.75);
-  const exported = JSON.parse(JSON.stringify(serializeDocument(store.getState())));
+  const exported = JSON.parse(JSON.stringify(serializeActive(store.getState())));
   assert.equal(exported.lines.length, 1);
   assert.equal(exported.curves.length, 2);
   assert.equal(exported.curves[0].geometry.type, 'quadratic-bezier');
@@ -189,7 +189,7 @@ test('exported extensions follow the endpoint derivatives and preserve original 
       store.updateSelected({ variant, bend });
       const curve = store.getState().curves[0];
       const [a, b, c] = curveControlPoints(curve);
-      const geometry = serializeDocument(store.getState()).curves[0].geometry;
+      const geometry = serializeActive(store.getState()).curves[0].geometry;
       assert.deepEqual(geometry.controlPoints, [a, b, c]);
       assert.equal(geometry.extensions.type, 'tangent-rays');
       assert.deepEqual(geometry.extensions.rays, curveTangentRays(curve));

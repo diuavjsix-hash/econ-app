@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { exportJson } from '../src/export.js';
 
 // A deterministic documentation fixture; does not access a running editor's memory.
 const store = createStore();
@@ -42,7 +42,7 @@ store.addLine();
 store.updateSelected({ name: '점선 반직선', slope: 0, anchor: { x: 2, y: 4 }, extent: [0, null], style: 'dashed' });
 store.selectDiagram(first.id);
 
-const output = new URL('../docs/examples/editor-v12.json', import.meta.url);
+const output = new URL('../docs/examples/editor-v13.json', import.meta.url);
 await mkdir(new URL('../docs/examples/', import.meta.url), { recursive: true });
-await writeFile(output, `${JSON.stringify(serializeDocument(store.getState()), null, 2)}\n`);
-console.log('Generated docs/examples/editor-v12.json');
+await writeFile(output, `${exportJson(store.getState())}\n`);
+console.log('Generated docs/examples/editor-v13.json');

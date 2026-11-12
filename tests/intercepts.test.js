@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { buildInterceptTargets, buildSnapTargets, snapPoint } from '../src/graph/snap.js';
 import { snapLineToIntercept, snapMovingLine } from '../src/graph/intercepts.js';
 import { quadraticPoint, sketchControls } from '../src/graph/sketch.js';
@@ -48,10 +48,10 @@ test('moving a line matches another line y or x intercept without rotating or mo
   for(const axis of ['x','y']) {
     const store=createStore(),target=axis==='y'?line(store,-0.5,{x:4,y:4}):line(store,-1,{x:4,y:4});
     const moving=axis==='y'?line(store,-1,{x:3,y:3.1}):line(store,-0.5,{x:2,y:3.05});
-    const before=serializeDocument(store.getState()),snap=snapLineToIntercept(moving,store.getState(),bounds,56);
+    const before=serializeActive(store.getState()),snap=snapLineToIntercept(moving,store.getState(),bounds,56);
     assert.equal(snap.axis,axis);assert.equal(snap.sourceId,target.id);
     if(axis==='y')near(snap.anchor.y-moving.slope*snap.anchor.x,6);else near(snap.anchor.x-snap.anchor.y/moving.slope,8);
-    assert.deepEqual(serializeDocument(store.getState()),before);
+    assert.deepEqual(serializeActive(store.getState()),before);
     store.updateSelected({anchor:snap.anchor});assert.equal(store.getState().lines[1].slope,moving.slope);
     assert.deepEqual(store.getState().lines[0],target);
   }
@@ -116,13 +116,13 @@ test('origin and coincident-axis shapes do not create arbitrary intercept points
 });
 
 test('axis reflection, point creation and undo preserve exact mathematical intercept coordinates',()=>{
-  const store=createStore();line(store,-0.5,{x:4,y:4});const moving=line(store,-1,{x:3,y:3.1}),before=serializeDocument(store.getState());
+  const store=createStore();line(store,-0.5,{x:4,y:4});const moving=line(store,-1,{x:3,y:3.1}),before=serializeActive(store.getState());
   store.beginHistory();
   for(const flipX of [false,true])for(const flipY of [false,true]) {
     const viewport=createViewport(800,600,'first',{flipX,flipY});
     const snap=snapLineToIntercept(moving,store.getState(),viewport.bounds,viewport.unit);store.updateSelected({anchor:snap.anchor});
   }
-  store.endHistory();const after=serializeDocument(store.getState());store.undo();assert.deepEqual(serializeDocument(store.getState()),before);store.redo();assert.deepEqual(serializeDocument(store.getState()),after);
+  store.endHistory();const after=serializeActive(store.getState());store.undo();assert.deepEqual(serializeActive(store.getState()),before);store.redo();assert.deepEqual(serializeActive(store.getState()),after);
   const snapped=snapPoint({x:0.1,y:6.1},buildSnapTargets(store.getState(),bounds),56);store.addPoint(snapped.point);
-  pointNear(serializeDocument(store.getState()).points[0].anchor,{x:0,y:6});
+  pointNear(serializeActive(store.getState()).points[0].anchor,{x:0,y:6});
 });

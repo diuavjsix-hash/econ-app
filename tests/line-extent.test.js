@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { objectModel } from '../src/models/objects.js';
 import { displayedLineSegments } from '../src/graph/display.js';
 import { lineEndPoints, linePointAt, rebasedExtent, visibleLineEnds } from '../src/graph/line-extent.js';
@@ -35,7 +35,7 @@ const dragEnd = (store, id, action, point, event = {}, previous = null) => {
 test('an untrimmed line is unchanged; a trimmed one draws only its stored part, including vertical lines', () => {
   const store = createStore(), id = addLine(store, 1, { x: 2, y: 2 });
   assert.equal(lineOf(store, id).extent, undefined);
-  const json = serializeDocument(store.getState()).lines[0];
+  const json = serializeActive(store.getState()).lines[0];
   assert.equal(json.style, 'solid'); assert.equal('extent' in json, false);
   store.updateSelected({ extent: [0, Math.SQRT2 * 2] });
   const [segment] = displayedLineSegments(lineOf(store, id), bounds, store.getState());
@@ -44,7 +44,7 @@ test('an untrimmed line is unchanged; a trimmed one draws only its stored part, 
   const [piece] = displayedLineSegments(lineOf(store, vertical), bounds, store.getState());
   close(piece[0], { x: 3, y: 2 }); close(piece[1], { x: 3, y: 5 });
   assert.equal(lineOf(store, vertical).slope, null, 'a vertical line stays null, not a large slope');
-  const saved = serializeDocument(store.getState()).lines.find(line => line.id === vertical);
+  const saved = serializeActive(store.getState()).lines.find(line => line.id === vertical);
   assert.deepEqual(saved.extent, [-1, 2]); close(saved.segment.start, { x: 3, y: 2 }); close(saved.segment.end, { x: 3, y: 5 });
   for (const invalid of [[2, 1], [1, 1], ['a', 1], [1]]) { store.updateSelected({ extent: invalid }); assert.deepEqual(lineOf(store, vertical).extent, [-1, 2]); }
   store.updateSelected({ extent: [null, null] }); assert.equal(lineOf(store, vertical).extent, undefined, 'both ends open is an ordinary line');
@@ -156,7 +156,7 @@ test('fills follow the drawn part, sums exclude trimmed lines, and copies keep e
   assert.deepEqual(displayedSumSegments(store.getState().sums.find(s => s.id === sum), store.getState(), fillBounds), [], 'an existing sum stops drawing, like other unsupported sources');
   const { object } = objectModel(lineOf(store, flat)).duplicate();
   assert.deepEqual(object.extent, [0, null]); assert.equal(object.style, 'dashed');
-  assert.equal(serializeDocument(store.getState()).lines.find(l => l.id === flat).style, 'dashed');
+  assert.equal(serializeActive(store.getState()).lines.find(l => l.id === flat).style, 'dashed');
 });
 
 test('the keyboard moves only drawn ends, inside the view, and never trims or reopens a line', () => {

@@ -347,6 +347,7 @@ node scripts/browser-test.mjs
 | segment-magnets.test.js | 14 | 직선 도구 두 점·끝 손잡이·선분 전체 이동 끝 맞춤·Shift 교차·Alt·포착/해제 (2026-11-08 dashed-magnets에서 이전) |
 | snap-feedback.test.js | 8 | 공통 거리·표시 계약·후보 정규화·대상 강조·곡선 생성 유지/기록 |
 | kink-snap.test.js | 6 | 꼭짓점 우선·팔에서 꺾임 전환·Shift/Alt·점선 길이·숨긴 대상 제외 |
+| drawn-relations.test.js | 6 | JSON 13 `relations`: 실제 사용자 그림의 접점/교점·기울기·원점 시작, 손으로 찍은 점·옮긴 뒤 사라지는 관계, 점 없는 접점·무차별곡선 접점·선분 끝, 수평합 접점·합 모서리, 자석으로 합에 붙인 곡선의 접점과 근사 교점 중복 없음·선분 끝 재포착, 최상위 사본 없음·legend·소수 6자리 (2026-11-12) |
 | fill.test.js | 15 | 닫힌 구역/구멍·독립 편집·계층·기록·그래프·JSON |
 | fill-style.test.js | 7 | 자동 색/A…Z/AA·글자 위치·복원·수동 편집 |
 | objects.test.js | 7 | 점·이름·계층·삭제·JSON |
@@ -365,7 +366,7 @@ node scripts/browser-test.mjs
 | tangency.test.js | 14 | 자유/기본 곡선 접선·수직/사선·포착/해제·Alt·표시 범위·종속 제외·기록·Shift 축 제한 |
 | curve-tangency.test.js | 12 | 복제 곡선 자체 이동·변경 기울기·수직/사선·Shift/Alt·해제·표시 영역·종속 제외·모양/기록 보존 |
 | curve-curve-tangency.test.js | 10 | 곡선끼리 원본 위치/미분 일치·기본/자유/해석 곡선·제약 이동·공통 표시·포착/해제·제외·기록 |
-| snap-contact-contract.test.js | 14 | 전체 곡선 종류 등록 계약·공통 9사례의 이동→점/점선 재포착·단일 기하/표시·기록·제외/변경 |
+| snap-contact-contract.test.js | 16 | 전체 곡선 종류 등록 계약·공통 11사례(2026-11-12 직선의 수평합·곡선이 든 수직합 추가)의 이동→점/점선 재포착·단일 기하/표시·기록·제외/변경 |
 | snap-targets.test.js | 8 | 공통 자기/종속 제외·합/계층 구분·10,000단계 의존 순회·캐시 공유/무효화·기록/그래프 |
 | movement.test.js | 4 | Shift 축 선택·경계·스냅 제한·반전·기록 |
 | server.test.js | 3 | 동시 시작·포트 충돌·다른 프로세스 보호 |

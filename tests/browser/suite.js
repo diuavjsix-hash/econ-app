@@ -20,7 +20,9 @@ function input(doc, id, value) {
 }
 function exported(doc) {
   doc.getElementById('export-json').click();
-  const result = JSON.parse(doc.getElementById('json-output').value); doc.getElementById('close-json').click(); return result;
+  const result = JSON.parse(doc.getElementById('json-output').value); doc.getElementById('close-json').click();
+  // Most checks read one graph: spread the active diagram's fields over the document.
+  return { ...result, ...result.diagrams.find(diagram => diagram.id === result.activeDiagramId) };
 }
 async function appSmoke(width, height) {
   const el = await frame('/', width, height), doc = el.contentDocument, win = el.contentWindow, size = `${width}x${height}`;

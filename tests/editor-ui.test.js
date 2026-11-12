@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
 import { editorContext } from '../src/editor-ui.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 
 test('only one drawing or operation mode remains active, including sum; navigation adds no history',()=>{
   const store=createStore(), modes=['handSelected','mouseSelected','lineSelected','sketchSelected','duplicatePanel','sumPanel'];
@@ -27,8 +27,8 @@ test('inspector follows the current task and object, then returns from sum to th
 
 test('changing diagrams exits an operation and preserves drawing preferences and document serialization',()=>{
   const store=createStore();store.configureLayout('face2');store.addLine();
-  store.update({pointSnap:false,segmentSnap:false});const original=serializeDocument(store.getState());
-  store.update({sumPanel:true});assert.deepEqual(serializeDocument(store.getState()),original);
+  store.update({pointSnap:false,segmentSnap:false});const original=serializeActive(store.getState());
+  store.update({sumPanel:true});assert.deepEqual(serializeActive(store.getState()),original);
   const second=store.getState().diagrams[1].id;store.selectDiagram(second);
   assert.equal(store.getState().sumPanel,false);assert.equal(store.getState().handSelected,true);
   store.update({duplicatePanel:true});store.selectDiagram(store.getState().diagrams[0].id);

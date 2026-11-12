@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
 import { rulerMetrics, constrainRuler, clipSegment, translateRuler } from '../src/graph/ruler.js';
 import { createViewport, toScreen, toWorld } from '../src/graph/viewport.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { objectsOf } from '../src/objects.js';
 
 test('ruler activation is disabled and point creation preference survives line-tool switches', () => {
@@ -63,9 +63,9 @@ test('rulers participate in hierarchy, independent diagrams, deletion and whole-
   const store=createStore(); store.configureLayout('face2');
   const id=store.addRuler({x:1,y:2},{x:4,y:6}), group=store.addGroup();
   store.moveObject(id,group); store.selectObject(id);
-  const original=serializeDocument(store.getState());
+  const original=serializeActive(store.getState());
   store.beginHistory(); store.updateSelected({end:{x:5,y:7}}); store.updateSelected({end:{x:7,y:9}}); store.endHistory();
-  store.undo(); assert.deepEqual(serializeDocument(store.getState()),original);
+  store.undo(); assert.deepEqual(serializeActive(store.getState()),original);
   const second=store.getState().diagrams[1].id; store.selectDiagram(second);
   assert.equal(store.getState().rulers.length,0);
   store.selectDiagram('diagram-1'); store.selectObject(id); store.removeSelected();
@@ -79,8 +79,8 @@ test('rulers participate in hierarchy, independent diagrams, deletion and whole-
 test('JSON exports both endpoints and styles per diagram, without point guides or UI tool state', () => {
   const store=createStore(); store.addPoint({x:1,y:2});
   const id=store.addRuler({x:1,y:2},{x:4,y:6});
-  const document=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(document.schemaVersion,12); assert.equal(document.rulers[0].id,id);
+  const document=JSON.parse(JSON.stringify(serializeActive(store.getState())));
+  assert.equal(document.schemaVersion,13); assert.equal(document.rulers[0].id,id);
   assert.deepEqual(document.rulers[0].end,{x:4,y:6});
   assert.equal(document.rulers[0].showMeasurement,true); assert.equal('guides' in document.points[0],false);
   assert.deepEqual(document.rulers,document.diagrams[0].rulers);

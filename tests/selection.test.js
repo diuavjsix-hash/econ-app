@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { objectsOf, selectedIdsOf } from '../src/objects.js';
 import { objectsInRectangle, selectionRectangle } from '../src/graph/selection.js';
 import { createViewport, toScreen, toWorld } from '../src/graph/viewport.js';
@@ -56,13 +56,13 @@ test('selection rectangles normalize both drag directions, clamp to the graph an
 
 test('multiple selection and control toggling are UI only and keep a single primary only for one object',()=>{
   const store=createStore(),a=store.addLine(),b=store.addPoint({x:2,y:3});
-  const doc=serializeDocument(store.getState());store.selectObjects([b,a,a,'missing']);
+  const doc=serializeActive(store.getState());store.selectObjects([b,a,a,'missing']);
   assert.deepEqual(store.getState().selectedIds,[a,b]);assert.equal(store.getState().selectedId,null);
   assert.equal(editorContext(store.getState()).kind,'multiple');
-  store.updateSelected({name:'must not edit a random object'});assert.deepEqual(serializeDocument(store.getState()),doc);
+  store.updateSelected({name:'must not edit a random object'});assert.deepEqual(serializeActive(store.getState()),doc);
   store.selectObject(a,{toggle:true});assert.deepEqual(store.getState().selectedIds,[b]);assert.equal(store.getState().selectedId,b);
   store.selectObject(b,{toggle:true});assert.deepEqual(store.getState().selectedIds,[]);assert.equal(store.getState().selectedId,null);
-  store.selectObjects([a,b]);assert.deepEqual(serializeDocument(store.getState()),doc);
+  store.selectObjects([a,b]);assert.deepEqual(serializeActive(store.getState()),doc);
   const detached=store.getState();detached.selectedIds.length=0;assert.equal(store.getState().selectedIds.length,2);
 });
 
@@ -71,13 +71,13 @@ test('a multi-delete is one undo/redo and restores all original geometry, select
   const sketch=store.addSketch({x:0,y:8},{x:8,y:0},{x:3,y:3},{lineId:a});
   store.markMinimum();
   const point=store.addPoint({x:9,y:9});
-  store.selectObjects([a,b,point]);const before=serializeDocument(store.getState()),curveBefore=store.getState().sketches[0];
+  store.selectObjects([a,b,point]);const before=serializeActive(store.getState()),curveBefore=store.getState().sketches[0];
   assert.equal(store.removeSelected(),true);
   assert.ok(!objectsOf(store.getState()).some(o=>[a,b,sum,point].includes(o.id)));
   assert.deepEqual(store.getState().selectedIds,[]);assert.equal(store.getState().sketches[0].binding,null);
   assert.deepEqual(store.getState().sketches[0].anchor,curveBefore.anchor);
   assert.equal(store.getState().points.length,0);assert.equal(store.getState().sketches.find(c=>c.id===sketch).showMinimum,true);
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);assert.deepEqual(store.getState().selectedIds,[a,b,point]);
+  store.undo();assert.deepEqual(serializeActive(store.getState()),before);assert.deepEqual(store.getState().selectedIds,[a,b,point]);
   store.redo();assert.deepEqual(store.getState().selectedIds,[]);assert.equal(store.removeSelected(),false);
 });
 
@@ -103,7 +103,7 @@ test('selection is graph-local, clears on layout and creation changes, and does 
 test('selection itself adds no history or JSON fields and undo still removes the last document edit',()=>{
   const store=createStore(),a=store.addLine(),b=store.addLine();
   store.selectObjects([a,b]);store.selectObject(a,{toggle:true});store.selectObjects([a,b]);
-  assert.ok(!JSON.stringify(serializeDocument(store.getState())).includes('selectedIds'));
+  assert.ok(!JSON.stringify(serializeActive(store.getState())).includes('selectedIds'));
   store.undo();assert.deepEqual(store.getState().objectOrder,[a]);assert.deepEqual(selectedIdsOf(store.getState()),[a]);
   store.redo();assert.deepEqual(store.getState().objectOrder,[a,b]);
 });

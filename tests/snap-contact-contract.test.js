@@ -7,7 +7,7 @@ import { snapSegmentPoint } from '../src/graph/segment-magnets.js';
 import { snapMovingSegment } from './fixtures/segments.js';
 import { CURVE_CONTACT_CASES, NON_SMOOTH_CONTACT_FAMILIES } from './fixtures/curve-contact-cases.js';
 import { CURVE_FAMILIES, OPPOSITE_CURVE_FAMILIES } from '../src/models/curve-families.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { snapFeedbackTargets } from '../src/graph/snap-feedback.js';
 import { createViewport } from '../src/graph/viewport.js';
 
@@ -49,7 +49,7 @@ for (const fixture of CURVE_CONTACT_CASES) test(`contact round trip: ${fixture.n
   if (expected) close(contact.point, expected);
   store.beginHistory(); store.selectObject(moving);
   store.updateSelected({ anchor: contact.anchor, translate: true }); store.endHistory();
-  const document = serializeDocument(store.getState());
+  const document = serializeActive(store.getState());
   // A fresh clone proves the target does not depend on object identity or drag metadata.
   const targets = buildSnapTargets(structuredClone(store.getState()), bounds);
   const pair = targets.crossings.filter(c => c.kind === 'tangent' && c.ids.includes(target) && c.ids.includes(moving));
@@ -77,7 +77,7 @@ for (const fixture of CURVE_CONTACT_CASES) test(`contact round trip: ${fixture.n
     close({ x: result.geometry.end.x - result.geometry.anchor.x, y: result.geometry.end.y - result.geometry.anchor.y },
       { x: segment.end.x - segment.anchor.x, y: segment.end.y - segment.anchor.y });
   }
-  assert.deepEqual(serializeDocument(store.getState()), document, 'target discovery must not mutate document geometry');
+  assert.deepEqual(serializeActive(store.getState()), document, 'target discovery must not mutate document geometry');
   store.undo();
   assert.ok(!buildSnapTargets(store.getState(), bounds).crossings.some(c => c.kind === 'tangent' && c.ids.includes(moving) && c.ids.includes(target)));
   store.redo(); close(snapPoint({ x: contact.point.x + 0.1, y: contact.point.y + 0.1 }, buildSnapTargets(store.getState(), bounds), unit).point, contact.point);

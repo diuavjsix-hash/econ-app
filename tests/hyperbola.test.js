@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { indifferenceValue, moveIndifference, shapeIndifference, indifferenceShapeHandle, indifferenceContact, indifferenceOnLine } from '../src/graph/indifference.js';
 import { displayedCurveSegments } from '../src/graph/display.js';
 import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
@@ -64,8 +64,8 @@ test('hyperbola size, copies, undo, graph isolation and JSON keep the exact curv
   const curves=store.getState().curves;assert.equal(curves.length,3);
   assert.deepEqual(curves[0],original);assert.notDeepEqual(curves[1].anchor,curves[2].anchor);
   for (const c of curves) {assert.equal(c.family,'rectangular-hyperbola');assert.equal(c.shape,1);close(indifferenceValue(c,2)*2,c.anchor.x*c.anchor.y);}
-  const json=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(json.schemaVersion,12);assert.equal(json.curves.length,3);
+  const json=JSON.parse(JSON.stringify(serializeActive(store.getState())));
+  assert.equal(json.schemaVersion,13);assert.equal(json.curves.length,3);
   assert.equal(json.curves[0].geometry.domain,'nonnegative');
   assert.equal(json.curves[0].family,'rectangular-hyperbola');
   store.configureLayout('horizontal2');store.selectDiagram(store.getState().diagrams[1].id);

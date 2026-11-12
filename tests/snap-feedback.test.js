@@ -8,7 +8,7 @@ import { buildSnapTargets, snapPoint, SNAP_RADIUS } from '../src/graph/snap.js';
 import { snapSketchTangent } from '../src/graph/sketch-magnets.js';
 import { createViewport } from '../src/graph/viewport.js';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { drawSegment, segmentEnds } from './fixtures/segments.js';
 
 const bounds={xMin:0,xMax:10,yMin:0,yMax:10},unit=50;
@@ -56,11 +56,11 @@ test('curve creation honors its snap preference, direct line hit, visibility and
 
 test('the third-click candidate retains the real tangent binding and creates only one history step',()=>{
   const store=createStore(),id=store.addLine();store.updateSelected({slope:-1,anchor:{x:0,y:8}});
-  const before=serializeDocument(store.getState()),candidate=snapSketchTangent({x:4.1,y:4.1},store.getState(),bounds,unit);
+  const before=serializeActive(store.getState()),candidate=snapSketchTangent({x:4.1,y:4.1},store.getState(),bounds,unit);
   assert.ok(candidate);
   store.addSketch({x:1,y:7},{x:7,y:1},candidate.point,{lineId:candidate.line.id});
   assert.equal(store.getState().sketches[0].binding.sourceId,id);
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);
+  store.undo();assert.deepEqual(serializeActive(store.getState()),before);
 });
 
 test('shared feedback normalizes target ids and wording without changing geometry results',()=>{

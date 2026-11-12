@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { snapCurveToCurveTangency, contactBranches } from '../src/graph/curve-curve-tangency.js';
 import { snapMovingCurve } from '../src/graph/point-magnets.js';
 import { translatedSketch } from '../src/graph/sketch.js';
@@ -33,7 +33,7 @@ function tangentAtPoint(curve, point) {
 }
 
 test('two independent free curves snap at their true contact without reshaping or changing the target', () => {
-  const { store, fixed, moving, curve } = setup(), before = serializeDocument(store.getState());
+  const { store, fixed, moving, curve } = setup(), before = serializeActive(store.getState());
   const snap = snapMovingCurve(curve, store.getState(), bounds, unit);
   assert.ok(snap); assert.equal(snap.sourceId, fixed); assert.ok(snap.key.startsWith('curve-tangent:'));
   pclose(snap.point, { x: 4, y: 2.1 }); pclose(snap.anchor, snap.point);
@@ -41,8 +41,8 @@ test('two independent free curves snap at their true contact without reshaping o
   const after = store.getState().sketches.find(c => c.id === moving);
   for (const key of ['start', 'end']) pclose({ x: after[key].x - after.anchor.x, y: after[key].y - after.anchor.y }, { x: curve[key].x - curve.anchor.x, y: curve[key].y - curve.anchor.y });
   assert.deepEqual(after.tangent, curve.tangent); assert.equal(after.binding, null);
-  assert.deepEqual(serializeDocument(store.getState()).sketches[0], before.sketches[0]);
-  store.undo(); assert.deepEqual(serializeDocument(store.getState()), before); store.redo();
+  assert.deepEqual(serializeActive(store.getState()).sketches[0], before.sketches[0]);
+  store.undo(); assert.deepEqual(serializeActive(store.getState()), before); store.redo();
   assert.equal(store.getState().sketches[1].anchor.y, snap.anchor.y);
 });
 

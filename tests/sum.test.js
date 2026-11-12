@@ -5,7 +5,7 @@ import { objectsOf, canReparent } from '../src/objects.js';
 import { sourceValue, sumValue, sumBreakpoints, displayedSumSegments, SUM_TOLERANCE } from '../src/graph/sum.js';
 import { curvePoint } from '../src/graph/curve.js';
 import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { createViewport, toScreen } from '../src/graph/viewport.js';
 
 const close = (actual, expected, tolerance = 1e-9) => assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} ≠ ${expected}`);
@@ -82,9 +82,9 @@ test('mixed curves sum accurately, and rendering approximates horizontal inverse
 
 test('vertical lines work in horizontal sums, horizontal lines in vertical sums; ambiguous operations reject atomically', () => {
   const store = createStore(), a = line(store, null, 3, 0), b = line(store, null, 4, 0);
-  const before = serializeDocument(store.getState());
+  const before = serializeActive(store.getState());
   for (const ids of [[a,b], [a], [a,a], [a,'missing']]) assert.equal(store.addSum(ids), null);
-  assert.deepEqual(serializeDocument(store.getState()), before);
+  assert.deepEqual(serializeActive(store.getState()), before);
   assert.equal(store.addSum([a,b], { direction:'horizontal' }), 'sum-1');
   close(sumValue(sumOf(store), store.getState(), 4), 7);
   const c = line(store, 0, 0, 2), d = line(store, 0, 0, 3);
@@ -113,12 +113,12 @@ test('source deletion removes dependent sums in one undo step and retains nested
   const group = store.addGroup(), point = store.addPoint({x:2,y:3});
   store.moveObject(first, group); store.moveObject(a, first); store.moveObject(point, second);
   assert.equal(canReparent(objectsOf(store.getState()), first, a), false);
-  store.selectObject(a); const before = serializeDocument(store.getState());
+  store.selectObject(a); const before = serializeActive(store.getState());
   store.removeSelected();
   assert.equal(store.getState().sums.length, 0);
   assert.equal(store.getState().points[0].parentId, null);
   assert.equal(store.getState().selectedId, group);
-  store.undo(); assert.deepEqual(serializeDocument(store.getState()), before);
+  store.undo(); assert.deepEqual(serializeActive(store.getState()), before);
   store.redo(); assert.equal(store.getState().sums.length, 0);
 });
 
@@ -129,8 +129,8 @@ test('sum identity, history, hierarchy, clear and diagram-local references survi
   store.redo(); assert.equal(sumOf(store).id,id);
   store.updateSelected({ name:'ΣD', anchor:{x:20,y:20} });
   assert.equal(sumOf(store).anchor, undefined);
-  const doc = serializeDocument(store.getState());
-  assert.equal(doc.schemaVersion,12); assert.deepEqual(doc.sums,doc.diagrams[0].sums);
+  const doc = serializeActive(store.getState());
+  assert.equal(doc.schemaVersion,13); assert.deepEqual(doc.sums,doc.diagrams[0].sums);
   assert.deepEqual(doc.sums[0].sourceIds,[a,b]); assert.equal(doc.sums[0].name,'ΣD');
   assert.ok(!('collapsed' in doc.sums[0])); assert.ok(!('segments' in doc.sums[0]));
   doc.sums[0].sourceIds.push('bad'); assert.deepEqual(sumOf(store).sourceIds,[a,b]);
@@ -171,5 +171,5 @@ test('numeric overflow never produces non-finite geometry or corrupts JSON', () 
   store.addSum([a,b],{nonnegative:false});
   assert.equal(sumValue(sumOf(store),store.getState(),2),null);
   assert.deepEqual(displayedSumSegments(sumOf(store),store.getState(),{xMin:2,xMax:3,yMin:0,yMax:5}),[]);
-  assert.ok(!JSON.stringify(serializeDocument(store.getState())).includes('Infinity'));
+  assert.ok(!JSON.stringify(serializeActive(store.getState())).includes('Infinity'));
 });

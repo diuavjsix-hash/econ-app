@@ -240,7 +240,7 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/models/curve-families.js` | 곡선 종류 상속·고유 이동/편집/접점·기하 능력과 등록 계약 |
 | `src/ui/controls.js` | 버튼·아이콘 버튼·도구·분할 선택·스위치·체크·선택/텍스트/숫자/슬라이더 마크업 생성과 공통 검증·접근성 값/진행 표시 |
 | `src/graph/interactions.js`, `editing-handles.js` | 도형별 조작과 포인터/키보드 훅·선택 손잡이 |
-| `src/graph/curve-contacts.js`, `curve-curve-tangency.js` | 공유 원본 접점 기하와 허용 이동 제약에 맞춘 곡선끼리 자석 |
+| `src/graph/curve-contacts.js`, `curve-curve-tangency.js` | 공유 원본 접점 기하와 허용 이동 제약에 맞춘 곡선끼리 자석. 수직합·수평합은 `sumContactBranches`가 꺾임마다 나눈 직선 구간·기울기 단조 함수 구간(`FunctionBranch`, 원본 값의 미분)으로 같은 목록에 들어감(`strokeContactBranches`). 합과 자기 원본, 합끼리는 접점을 찾지 않음. 합의 표시 근사 교차가 같은 합의 등록 접점 0.002 안이면 `buildSnapTargets`·선분 끝 안내선 계산에서 같은 점으로 봄 |
 | `src/graph/snap-context.js` | 자기/계산 종속 도형 공통 제외·캐시용 수학 기하 키 |
 | `src/graph/ppc.js`, `axes.js` | ¼타원 기하와 공통 유한 좌표축 |
 | `src/graph/svg-renderer.js` | SVG 노드·경로와 공통 획/히트 영역·접근성 속성 |
@@ -282,7 +282,8 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/tools/objects.js` | 도형·폴더 트리, 이름 편집·삭제·분류 이동·접기 |
 | `src/quadrants.js` | 배치·사분면의 초안 선택과 일괄 적용, 첫 시작과 이후 변경 창 |
 | `src/axes.js` | 수평·수직축 이름과 축 간격 입력 |
-| `src/export.js` | `serializeDocument`와 JSON 모달·복사·다운로드 |
+| `src/export.js` | `serializeDocument`(전체 정밀도 문서), `exportJson`(저장 창 문자열, 소수 6자리)과 JSON 모달·복사·다운로드 |
+| `src/graph/drawn-relations.js` | 내보낼 때 현재 기하에서 계산하는 `relations`(지나는 도형·접점·기울기·끝). `buildSnapTargets`·`guidedSnapCandidates`·`curveTangentsAt`를 재사용하며 문서에 저장하지 않음 |
 | `src/styles.css` | 앱 배치·캔버스 SVG 표현·반응형 배치(토큰만 사용) |
 | `scripts/dev-server.mjs` | localhost 정적 파일 서버; 앱 자산만 제공 |
 | `scripts/server.ps1` | Node 실행 파일 탐색, 서버 시작·종료·상태 확인과 메뉴 |

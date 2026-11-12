@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
 import { curvePoint } from '../src/graph/curve.js';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { sketchControls, quadraticPoint } from '../src/graph/sketch.js';
 import { snapLineToTangency } from '../src/graph/tangency.js';
 import { segmentLine } from './fixtures/segments.js';
@@ -111,8 +111,8 @@ test('toggling snap changes only the tool preference, and snapped coordinates re
   store.update({ pointSnap: false });
   assert.equal(store.getState().selectedId, id);
   close(store.getState().points[0].anchor, { x: 4, y: 4 });
-  const exported = serializeDocument(store.getState());
-  assert.equal(exported.schemaVersion, 12);
+  const exported = serializeActive(store.getState());
+  assert.equal(exported.schemaVersion, 13);
   assert.equal('pointSnap' in exported, false);
   close(exported.points[0].anchor, { x: 4, y: 4 });
 });
@@ -147,7 +147,7 @@ test('a duplicated line moved onto an interior free-curve tangent becomes an exa
   const snapped=snapPoint({x:expected.x+0.12,y:expected.y+0.06},targets,56);
   store.addPoint(snapped.point);
   close(store.getState().points[0].anchor,expected);
-  close(serializeDocument(store.getState()).points[0].anchor,expected);
+  close(serializeActive(store.getState()).points[0].anchor,expected);
   assert.deepEqual(store.getState().sketches[0],sketch);
 });
 

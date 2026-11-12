@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { angleFromSlope, clipLine, equation, interceptOf, lineEndpoints, lineEquation, normalizeSlope, slopeFromAngle } from '../src/graph/math.js';
 import { createViewport, visibleAnchor } from '../src/graph/viewport.js';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 
 test('positive, negative and horizontal lines stay inside the viewport and satisfy y = mx', () => {
   for (const slope of [-3, -1, -0.1, 0, 0.1, 1, 3]) {
@@ -78,8 +78,8 @@ test('JSON captures every line and internal coordinates after moving and changin
   store.addLine();
   store.updateSelected({ slope: 2, anchor: { x: 1, y: 3 } });
   store.update({ showGrid: false });
-  const exported = JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(exported.schemaVersion, 12);
+  const exported = JSON.parse(JSON.stringify(serializeActive(store.getState())));
+  assert.equal(exported.schemaVersion, 13);
   assert.equal(exported.coordinateSystem.axesVisible, true);
   assert.equal(exported.showGrid, false);
   assert.equal(exported.lines.length, 2);
@@ -105,9 +105,9 @@ test('quadrant modes map pixels to the correct mathematical domain without movin
   const original = store.getState().lines[0];
   store.update({ quadrantMode: 'upper' });
   assert.deepEqual(store.getState().lines[0], original);
-  assert.deepEqual(serializeDocument(store.getState()).coordinateSystem.quadrants, [1, 2]);
+  assert.deepEqual(serializeActive(store.getState()).coordinateSystem.quadrants, [1, 2]);
   store.update({ quadrantMode: 'all' });
-  assert.deepEqual(serializeDocument(store.getState()).coordinateSystem.quadrants, [1, 2, 3, 4]);
+  assert.deepEqual(serializeActive(store.getState()).coordinateSystem.quadrants, [1, 2, 3, 4]);
   store.update({ quadrantMode: 'invalid' });
   assert.equal(store.getState().quadrantMode, 'all');
 });
@@ -148,7 +148,7 @@ test('vertical and huge slopes export valid, recoverable JSON without Infinity',
   const store = createStore();
   store.addLine();
   store.updateSelected({ slope: null, anchor: { x: 2, y: 3 } });
-  const vertical = JSON.parse(JSON.stringify(serializeDocument(store.getState()))).lines[0];
+  const vertical = JSON.parse(JSON.stringify(serializeActive(store.getState()))).lines[0];
   assert.equal(vertical.vertical, true);
   assert.equal(vertical.slope, null);
   assert.equal(vertical.intercept, null);
@@ -156,7 +156,7 @@ test('vertical and huge slopes export valid, recoverable JSON without Infinity',
   assert.equal(lineEquation(vertical), 'x = 2');
   assert.equal(vertical.implicit.a * 2 + vertical.implicit.b * 3 + vertical.implicit.c, 0);
   store.updateSelected({ slope: Number.MAX_VALUE });
-  const steep = JSON.parse(JSON.stringify(serializeDocument(store.getState()))).lines[0];
+  const steep = JSON.parse(JSON.stringify(serializeActive(store.getState()))).lines[0];
   assert.equal(steep.slope, Number.MAX_VALUE);
   assert.ok(Object.values(steep.implicit).every(Number.isFinite));
   assert.ok(!lineEquation(steep).includes('Infinity'));
@@ -182,7 +182,7 @@ test('deleting selected lines preserves unique IDs and handles an empty drawing'
   store.removeSelected();
   store.removeSelected();
   store.updateSelected({ slope: 2 });
-  assert.deepEqual(serializeDocument(store.getState()).lines, []);
+  assert.deepEqual(serializeActive(store.getState()).lines, []);
   assert.equal(store.getState().selectedId, null);
 });
 
@@ -193,7 +193,7 @@ test('axis names update independently, survive quadrant changes and export witho
   store.update({ axisNames: { x: '소비량' } });
   assert.deepEqual(store.getState().axisNames, { x: '소비량', y: 'y' });
   store.update({ axisNames: { y: '효용' }, quadrantMode: 'all', showGrid: false });
-  const document = serializeDocument(store.getState());
+  const document = serializeActive(store.getState());
   assert.equal(document.coordinateSystem.axesVisible, true);
   assert.deepEqual(document.coordinateSystem.axisNames, { x: '소비량', y: '효용' });
   assert.deepEqual(store.getState().lines[0], original);

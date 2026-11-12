@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { createViewport, toScreen } from '../src/graph/viewport.js';
 import { clipLine } from '../src/graph/math.js';
 import { clipCurveWithExtensions, curvePoint } from '../src/graph/curve.js';
@@ -106,12 +106,12 @@ test('gap preferences export, undo and group slider changes without modifying ob
   const store = createStore();
   store.addLine();
   store.addCurve();
-  const original = serializeDocument(store.getState());
+  const original = serializeActive(store.getState());
   store.update({ axisGapEnabled: true });
   store.beginHistory();
   for (const axisGap of [0.8, 1, 1.25]) store.update({ axisGap });
   store.endHistory();
-  const enabled = serializeDocument(store.getState());
+  const enabled = serializeActive(store.getState());
   assert.deepEqual(enabled.lines, original.lines);
   assert.deepEqual(enabled.curves, original.curves);
   assert.deepEqual(enabled.coordinateSystem.lineAxisGap, { enabled: true, distance: 1.25 });
@@ -121,7 +121,7 @@ test('gap preferences export, undo and group slider changes without modifying ob
   assert.equal(store.getState().axisGapEnabled, false);
   store.redo();
   store.redo();
-  assert.deepEqual(serializeDocument(store.getState()), enabled);
+  assert.deepEqual(serializeActive(store.getState()), enabled);
   store.clearAll();
   assert.equal(store.getState().axisGapEnabled, true);
   assert.equal(store.getState().axisGap, 1.25);
@@ -146,7 +146,7 @@ test('axis gap settings belong to each diagram and survive selection, layouts an
   store.redo(); assert.equal(store.getState().axisGap, 1.5);
   store.configureLayout('single'); assert.equal(store.getState().activeDiagramId, first);
   store.configureLayout('vertical2'); store.selectDiagram(second);
-  const exported = serializeDocument(store.getState());
+  const exported = serializeActive(store.getState());
   assert.deepEqual(exported.diagrams.map(diagram => diagram.coordinateSystem.lineAxisGap), [{enabled:true,distance:0.5},{enabled:true,distance:1.5}]);
   assert.equal(exported.diagrams[0].lines.length, 1);
 });

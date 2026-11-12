@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
 import { canReparent, objectsOf } from '../src/objects.js';
 import { pointCoordinatesLabel } from '../src/graph/point.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 
 test('curve directions change independently of custom names and hierarchy', () => {
   const store = createStore();
@@ -66,7 +66,7 @@ test('coordinate creation preference applies to new points and per-point visibil
   store.selectObject(first);
   store.updateSelected({ showCoordinates: true });
   assert.equal(pointCoordinatesLabel(store.getState().points[0].anchor), '(1.23, 0)');
-  const exported = serializeDocument(store.getState());
+  const exported = serializeActive(store.getState());
   assert.deepEqual(exported.points[0].anchor, { x: 1.23456, y: -0.001 });
   assert.equal(exported.points[0].showCoordinates, true);
   assert.equal(exported.points[1].showCoordinates, true);
@@ -80,7 +80,7 @@ test('points no longer store or export guide settings', () => {
   const store = createStore(); store.addPoint({ x: 2, y: 4 });
   store.updateSelected({ guides: { horizontal: 'dashed', vertical: 'solid', extent: 'full' } });
   assert.equal('guides' in store.getState().points[0], false);
-  assert.equal('guides' in serializeDocument(store.getState()).points[0], false);
+  assert.equal('guides' in serializeActive(store.getState()).points[0], false);
 });
 
 test('mixed hierarchy supports nesting and extraction, prevents cycles, and preserves geometry', () => {
@@ -147,8 +147,8 @@ test('JSON version 9 exports point labels and mixed parent links in creation ord
   store.moveObject(line, folder);
   store.moveObject(curve, line);
   store.moveObject(point, line);
-  const exported = JSON.parse(JSON.stringify(serializeDocument(store.getState())));
-  assert.equal(exported.schemaVersion, 12);
+  const exported = JSON.parse(JSON.stringify(serializeActive(store.getState())));
+  assert.equal(exported.schemaVersion, 13);
   assert.deepEqual(exported.objectOrder, [line, curve, point, folder]);
   assert.equal(exported.lines[0].parentId, folder);
   assert.equal(exported.curves[0].parentId, line);

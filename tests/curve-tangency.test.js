@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { directionOf } from '../src/graph/math.js';
 import { curvePoint } from '../src/graph/curve.js';
 import { sketchControls, quadraticPoint, translatedSketch } from '../src/graph/sketch.js';
@@ -33,11 +33,11 @@ test('a copied curve finds a different interior tangent on a copied line with a 
   const rawContact=quadraticPoint([a,b,c],-from/(to-from)),d=directionOf(slope),n={x:-d.y,y:d.x};
   const offset=(line.anchor.x-rawContact.x)*n.x+(line.anchor.y-rawContact.y)*n.y;
   const raw=pose(copy,{x:n.x*(offset+0.1),y:n.y*(offset+0.1)});
-  const before=serializeDocument(store.getState());
+  const before=serializeActive(store.getState());
   const result=snapCurveToTangency(raw,store.getState(),bounds,56,{reference:rawContact});
   assert.equal(result.sourceId,lineId);assert.ok(Math.hypot(result.point.x-raw.anchor.x,result.point.y-raw.anchor.y)>0.1);
   near((result.point.x-line.anchor.x)*n.x+(result.point.y-line.anchor.y)*n.y,0);
-  assert.deepEqual(serializeDocument(store.getState()),before);
+  assert.deepEqual(serializeActive(store.getState()),before);
   store.updateSelected({...translatedSketch(copy,{x:result.anchor.x-copy.anchor.x,y:result.anchor.y-copy.anchor.y}),translate:true});
   const after=store.getState().sketches.find(curve=>curve.id===copyId);
   for(const key of ['start','end']) pointNear({x:after[key].x-after.anchor.x,y:after[key].y-after.anchor.y},{x:copy[key].x-copy.anchor.x,y:copy[key].y-copy.anchor.y});
@@ -101,9 +101,9 @@ test('contacts are clipped after correction, including axis gaps and initially o
 test('a finite curve with no matching tangent stays free without shape changes or invented extensions',()=>{
   const store=createStore();store.addSketch({x:1,y:1},{x:7,y:7},{x:4,y:4},{mode:'vertical'});
   const curve=store.getState().sketches[0];addLine(store,0,{x:4,y:4});
-  const before=serializeDocument(store.getState());
+  const before=serializeActive(store.getState());
   assert.equal(snapCurveToTangency(curve,store.getState(),bounds,56),null);
-  assert.deepEqual(serializeDocument(store.getState()),before);
+  assert.deepEqual(serializeActive(store.getState()),before);
 });
 
 test('bound curves remain excluded and a minimum display does not create line magnets',()=>{
@@ -148,7 +148,7 @@ test('straight free pieces choose a visible contact near the pointer after trans
 
 test('a snapped curve drag and its minimum display undo together in reflected axes',()=>{
   const store=createStore(),id=cup(store);store.markMinimum();const target=addLine(store,0,{x:4,y:2.1});store.selectObject(id);
-  const curve=store.getState().sketches[0],before=serializeDocument(store.getState());store.beginHistory();
+  const curve=store.getState().sketches[0],before=serializeActive(store.getState());store.beginHistory();
   for(const flipX of [false,true]) for(const flipY of [false,true]) {
     const viewport=createViewport(800,600,'first',{flipX,flipY});
     const result=snapCurveToTangency(curve,store.getState(),viewport.bounds,viewport.unit);
@@ -156,7 +156,7 @@ test('a snapped curve drag and its minimum display undo together in reflected ax
     near(store.getState().sketches[0].anchor.y,2.1);assert.equal(store.getState().sketches[0].showMinimum,true);
     assert.equal(store.getState().points.length,0);
   }
-  store.endHistory();const after=serializeDocument(store.getState());
+  store.endHistory();const after=serializeActive(store.getState());
   assert.deepEqual(store.getState().lines.find(line=>line.id===target.id),target);
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);store.redo();assert.deepEqual(serializeDocument(store.getState()),after);
+  store.undo();assert.deepEqual(serializeActive(store.getState()),before);store.redo();assert.deepEqual(serializeActive(store.getState()),after);
 });

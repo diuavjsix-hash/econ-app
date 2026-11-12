@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { directionOf } from '../src/graph/math.js';
 import { curvePoint } from '../src/graph/curve.js';
 import { quadraticPoint, sketchControls } from '../src/graph/sketch.js';
@@ -18,10 +18,10 @@ function line(store,slope=0,anchor={x:4,y:2.1}) {
 
 test('horizontal line snaps exactly to a free curve without changing slope or source geometry',()=>{
   const store=createStore();const source=cup(store), moving=line(store);
-  const before=serializeDocument(store.getState()),original=structuredClone(store.getState().sketches[0]);
+  const before=serializeActive(store.getState()),original=structuredClone(store.getState().sketches[0]);
   const result=snapLineToTangency(moving,store.getState(),bounds,56);
   assert.equal(result.sourceId,source);samePoint(result.point,{x:4,y:2});samePoint(result.anchor,{x:4,y:2});
-  assert.deepEqual(serializeDocument(store.getState()),before);
+  assert.deepEqual(serializeActive(store.getState()),before);
   store.updateSelected({anchor:result.anchor});assert.equal(store.getState().lines[0].slope,0);
   assert.deepEqual(store.getState().sketches[0],original);
   assert.equal(store.getState().lines[0].binding,undefined);
@@ -129,16 +129,16 @@ test('dependent curves and point-bound lines are excluded; other graphs never co
 
 test('axis flips keep the same mathematical tangent and a snapped drag is one undo/redo step',()=>{
   const store=createStore();cup(store);const moving=line(store,0,{x:4,y:3});
-  const before=serializeDocument(store.getState());
+  const before=serializeActive(store.getState());
   store.beginHistory();
   for (const flipX of [false,true]) for (const flipY of [false,true]) {
     const viewport=createViewport(800,600,'first',{flipX,flipY});
     const result=snapLineToTangency({...moving,anchor:{x:4,y:2.1}},store.getState(),viewport.bounds,viewport.unit);
     samePoint(result.anchor,{x:4,y:2});store.updateSelected({anchor:result.anchor});
   }
-  store.endHistory();const after=serializeDocument(store.getState());
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);
-  store.redo();assert.deepEqual(serializeDocument(store.getState()),after);
+  store.endHistory();const after=serializeActive(store.getState());
+  store.undo();assert.deepEqual(serializeActive(store.getState()),before);
+  store.redo();assert.deepEqual(serializeActive(store.getState()),after);
 });
 
 test('Shift-constrained tangency corrects only the moving axis and measures the actual correction',()=>{

@@ -42,6 +42,31 @@ export const CURVE_CONTACT_CASES = [
       return { store, target: basic.id, moving, expected: point };
     },
   },
+  {
+    // Market demand: the horizontal sum of two linear demands is x = 12 − 2y below its kink at y = 4.
+    name: 'free and horizontal sum of lines', axis: 'y', families: [],
+    setup() {
+      const store = createStore();
+      const a = store.addLine({ x: 8, y: 0 }, { x: 0, y: 8 }), b = store.addLine({ x: 4, y: 0 }, { x: 0, y: 4 });
+      const target = store.addSum([a, b], { direction: 'horizontal', nonnegative: true });
+      // Gentle enough that its slope never reaches the upper branch's −1 within the drawn curve.
+      const point = { x: 5.5, y: (12 - 5.5) / 2 };
+      return { store, target, moving: parabola(store, 0.05, point, -0.5, 0.08), expected: point };
+    },
+  },
+  {
+    // A curved sum: a basic curve raised by a horizontal line, summed vertically.
+    name: 'free and vertical sum with a curve', axis: 'y', families: [],
+    setup() {
+      const store = createStore(); store.addCurve({ anchor: { x: 4, y: 3 }, span: 3, variant: 'descending' });
+      const basic = store.getState().curves[0], lift = store.addLine({ x: 0, y: 1 }, { x: 8, y: 1 });
+      const target = store.addSum([basic.id, lift], { direction: 'vertical', nonnegative: true });
+      const x = 4.37, dx = x - basic.anchor.x;
+      const point = { x, y: 1 + basic.anchor.y + basic.slope * dx + basic.bend / basic.span * dx * dx };
+      const moving = parabola(store, -0.2, point, basic.slope + 2 * basic.bend / basic.span * dx, -0.08);
+      return { store, target, moving, expected: point };
+    },
+  },
   ...['ppc', 'rectangular-hyperbola', 'cobb-douglas', 'substitutes', 'quasilinear'].map(family => ({
     name: `${family} and PPC`, families: [family, 'ppc'],
     setup() {

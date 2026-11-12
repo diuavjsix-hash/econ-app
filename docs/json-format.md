@@ -1,6 +1,34 @@
-# JSON 출력 형식 · schemaVersion 12
+# JSON 출력 형식 · schemaVersion 13
 
-구현 기준은 `src/export.js`의 `serializeDocument(state)`입니다. 현재는 내보내기만 지원하며 JSON 불러오기 API와 UI는 없습니다. 화면에서 가려진 도형도 모두 내보냅니다.
+구현 기준은 `src/export.js`의 `serializeDocument(state)`이고, 저장 창은 이를 `exportJson(state)`로 소수 6자리 반올림한 문자열을 보여 줍니다. 현재는 내보내기만 지원하며 JSON 불러오기 API와 UI는 없습니다. 화면에서 가려진 도형도 모두 내보냅니다.
+
+## 버전 13의 변경 (2026-11-12)
+
+- **최상위 사본 제거:** 버전 12까지 최상위에 있던 활성 그래프의 `lines`·`points`·`coordinateSystem` 등 사본을 없앴습니다. 모든 그래프는 `diagrams`에만 한 번씩 들어갑니다. 활성 그래프는 `activeDiagramId`로 찾습니다.
+- **`legend`:** 최상위에 짧은 한국어 설명(좌표 의미·`relations` 키·축 ID)을 넣어, 파일만 받은 사람이나 AI가 형식을 읽을 수 있게 했습니다.
+- **`relations`:** 각 그래프 마지막에 계산된 위치 관계 목록을 넣습니다(아래 절).
+- **반올림:** 저장 창·복사·다운로드의 숫자는 소수 6자리로 반올림하고 `-0`은 `0`으로 씁니다. 앱 안의 문서와 `serializeDocument`는 전체 정밀도를 유지합니다.
+
+## 위치 관계 `relations` · 버전 13
+
+자석으로 점을 교점·접점에 찍거나 곡선을 직선에 접하게 옮겨도 문서에는 좌표만 남습니다. 좌표만 보면 읽는 쪽이 베지어 식을 풀어야 접점인지 알 수 있으므로, 내보낼 때 현재 기하에서 관계를 다시 계산해 적습니다. 문서·undo·binding에는 저장하지 않고 따라가기 관계도 만들지 않습니다. 맞춘 뒤 도형을 옮겨 관계가 깨지면 다음 내보내기에서 빠집니다.
+
+```json
+{"at":{"x":7.660958,"y":4.159163},"points":["point-5"],"on":["sketch-16","line-4","sketch-17"],"tangent":[["sketch-16","line-4"]],"slopes":{"sketch-16":-0.388701,"sketch-17":6.572264}}
+```
+
+| 필드 | 의미 |
+| --- | --- |
+| `at` | 위치(수학 좌표) |
+| `points` | 이 위치에 있는 점 객체 ID. 없으면 생략 |
+| `on` | 이 위치를 지나는 직선·곡선·자유 곡선·합과 축. 축은 `axis-x`·`axis-y`(에지워드 B는 `axis-b-x`·`axis-b-y`), 원점은 두 축이 함께 들어감 |
+| `tangent` | `on` 가운데 이 위치에서 방향이 같은(접하는) 두 도형의 쌍. 적어도 하나는 곡선이며 직선끼리는 넣지 않음. 없으면 생략 |
+| `slopes` | `on`의 곡선(기본·무차별·자유 곡선)과 합의 이 위치 기울기. 수직이면 null. 직선은 자기 `slope`를 읽음. 합의 모서리(원본이 끊기는 곳)처럼 한 방향이 없는 곳은 생략 |
+| `features` | `{object, kind}` 목록. kind는 `start`·`end`(선분·반직선·자유 곡선의 시작·끝), `kink`(완전보완재 꺾임), `minimum`(표시한 최저점) |
+
+목록에 넣는 위치는 (1) 점 객체가 한 도형 이상 위에 있는 곳, (2) 선분 끝·자유 곡선 시작/끝이 다른 도형이나 축에 닿은 곳, (3) 점이 없어도 두 도형이 접하는 곳입니다. 점 없는 단순 교차는 식에서 계산할 수 있으므로 넣지 않습니다. 같은 위치(거리 0.002 이내)는 한 항목으로 합칩니다.
+
+판정 기준은 `src/graph/drawn-relations.js`입니다. 위치에서 도형까지 거리 0.002 이내면 지나는 것으로, 두 방향 사이 각의 사인이 0.001(약 0.06°) 이하면 접하는 것으로 봅니다. 자석 결과는 이보다 훨씬 정확하고(약 10⁻⁹), 자유 곡선끼리 교점은 표시 근사 오차 0.001 안에 있습니다. 손으로 대충 맞춘 위치는 보통 이 기준 밖이므로 관계로 적히지 않습니다. 계산 범위는 화면이 아니라 그래프의 사분면 형식과 모든 도형을 담는 넓은 영역입니다. 축 간격으로 숨긴 부분은 화면과 같이 제외합니다.
 
 구역 칠하기의 `fills` 컬렉션을 추가해 schemaVersion을 10으로 올렸습니다. 영역 선택의 `selectedIds`·단일 편집용 `selectedId`·드래그 사각형·선택 강조와 칠하기 도구/미리보기는 UI 상태이며 출력하지 않습니다.
 
@@ -18,8 +46,9 @@
 
 | 필드 | 설명 |
 | --- | --- |
-| `schemaVersion` | 현재 12. 별도 점선 도형 `dashedLines`를 없앰. 점선 선분은 `lines`의 `style:'dashed'`·`extent`로 저장(버전 11: 직선의 `style`·`extent`/`segment`, 버전 10: 칠한 구역 fills) |
-| `activeDiagramId` | 최상위 도형·좌표계 필드가 가리키는 그래프 ID |
+| `schemaVersion` | 현재 13. 최상위 사본 제거·`legend`·그래프별 `relations`·소수 6자리 출력(버전 12: 별도 점선 도형 `dashedLines` 제거, 버전 11: 직선의 `style`·`extent`/`segment`, 버전 10: 칠한 구역 fills) |
+| `legend` | 형식을 읽는 사람·AI를 위한 짧은 설명(버전 13) |
+| `activeDiagramId` | 내보낼 때 선택되어 있던 그래프 ID |
 | `layout` | `preset`과 `slots`: `{diagramId, row, column}` 배열. 행·열은 0부터 시작 |
 | `diagrams` | 숨겨진 그래프를 포함한 모든 그래프. 각각 `id`, `name`, 아래의 좌표계·도형 필드를 보유 |
 | `coordinateSystem` | 원점 배치·사분면·방향·축 표시·축 이름 |
@@ -33,8 +62,9 @@
 | `rulers` | 비활성화된 이전 자 자료 보존용 배열 |
 | `groups` | 도형 없이 분류에 사용하는 폴더 |
 | `objectOrder` | 모든 종류를 섞은 생성 순서의 ID 배열 |
+| `relations` | 현재 기하에서 계산한 위치 관계(버전 13, [위치 관계](#위치-관계-relations--버전-13)) |
 
-최상위 `coordinateSystem`, `showGrid`, `lines`, `curves`, `sketches`, `sums`, `points`, `fills`, `rulers`, `groups`, `objectOrder`는 선택한 그래프의 사본입니다. 전체 문서는 `diagrams`와 `layout`으로 읽습니다. 배치를 줄여도 `diagrams`에서 삭제하지 않으며 `layout.slots`에 있는 그래프만 표시합니다. 다음 예시는 좌우 대면 배치입니다.
+아래 표의 `coordinateSystem`부터 `relations`까지는 `diagrams`의 각 그래프 안에 있는 필드입니다(버전 12까지는 활성 그래프 사본이 최상위에도 있었음). 전체 문서는 `diagrams`와 `layout`으로 읽습니다. 배치를 줄여도 `diagrams`에서 삭제하지 않으며 `layout.slots`에 있는 그래프만 표시합니다. 다음 예시는 좌우 대면 배치입니다.
 
 ```json
 {"preset":"face2","slots":[{"diagramId":"diagram-1","row":0,"column":0},{"diagramId":"diagram-2","row":0,"column":1}]}
@@ -197,7 +227,7 @@ schemaVersion 5에서 점 보조선 기능과 `guides` 필드를 제거했습니
 
 ## 예시
 
-[두 그래프의 전체 예시](examples/editor-v12.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, 최저점을 표시한 U자 곡선과 별도 일반 점의 통과 직선, 폴더와 점선 선분, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다(당시 형식이며 현재 출력과 다릅니다).
+[두 그래프의 전체 예시](examples/editor-v13.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, 최저점을 표시한 U자 곡선과 별도 일반 점의 통과 직선, 폴더와 점선 선분, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다(당시 형식이며 현재 출력과 다릅니다).
 
 버전 9 당시 직렬화 함수로 생성한 점과 점선 문서입니다. 축 간격 기본 설정도 함께 포함합니다.
 

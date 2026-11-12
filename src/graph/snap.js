@@ -1,6 +1,6 @@
 import { displayedLineSegments, displayedCurveSegments, isLinePointVisible, lineDisplayRegions } from './display.js';
 import { clipSegment } from './ruler.js';
-import { displayedSumSegments } from './sum.js';
+import { displayedSumSegments, SUM_TOLERANCE } from './sum.js';
 import { displayedSketchSegments, displayedSketchMinimum, sketchControls } from './sketch.js';
 import { isIndifference, indifferenceLineIntersections } from './indifference.js';
 import { SNAP_CAPTURE_PX, SNAP_RELEASE_PX, chooseSnapCandidate } from './snap-policy.js';
@@ -260,8 +260,13 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
     .map(sketch=>[sketch.id,sketchControls(sketch).map(points=>piece(sketch.id,points))]));
   const quadratics = [...exactSketches.values()].flatMap(pieces => pieces.flatMap(shape =>
     lineDisplayRegions(bounds, state).flatMap(region => clipQuadraticPiece(shape, region))));
+  // Sums are crossed on their display chords; within that approximation a registered contact on
+  // the same sum is the same point, so the chord crossing beside it is not a second target.
+  const approximateIds = new Set((state.sums ?? []).map(sum => sum.id));
+  const sameAsRegistered = (point, ids, item) => distance(point, item.point) < 1e-7
+    || (distance(point, item.point) <= 2 * SUM_TOLERANCE && ids.some(id => approximateIds.has(id) && item.ids?.includes(id)));
   const addCrossing = (point,ids,kind='intersection') => {
-    if (!crossings.some(item=>distance(point,item.point)<1e-7)) crossings.push({point,ids,kind});
+    if (!crossings.some(item=>sameAsRegistered(point,ids,item))) crossings.push({point,ids,kind});
   };
   const exactIndifferences=new Set(state.curves.filter(isIndifference).map(c=>c.id));
   // Exact curve/line solvers consume visible finite straight pieces, regardless of
@@ -310,7 +315,7 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
   };
   for (const line of state.lines) for (const end of lineEndPoints(line)) if (end) addEnd(end, line.id);
   for (const sketch of state.sketches ?? []) for (const end of [sketch.start, sketch.end]) addEnd(end, sketch.id);
-  return { shapes, crossings, intercepts, analyticCurves, quadratics };
+  return { shapes, crossings, intercepts, analyticCurves, quadratics, approximateIds };
 }
 
 /** Point/sketch handles and all line-tool operations share one cache and source policy. */
@@ -377,7 +382,11 @@ function guideSnapCandidates(point, targets, unit, guide, radius) {
   const registered = targets.crossings.filter(crossing => Math.abs(offset(crossing.point)) <= EPS);
   for (const crossing of registered) add(crossing, `crossing:${crossing.ids.join(',')}:${crossing.point.x}:${crossing.point.y}`);
   // A computed guide crossing at a registered target (contact, kink, end…) is the same point: keep the registered meaning.
-  const addComputed = (candidate, key) => { if (!registered.some(c => distance(c.point, candidate.point) < 1e-7)) add(candidate, key); };
+  const approximate = targets.approximateIds ?? new Set();
+  const addComputed = (candidate, key) => {
+    if (!registered.some(c => distance(c.point, candidate.point) < 1e-7
+      || (distance(c.point, candidate.point) <= 2 * SUM_TOLERANCE && candidate.ids.some(id => approximate.has(id) && c.ids?.includes(id))))) add(candidate, key);
+  };
   const analyticIds = new Set((targets.analyticCurves ?? []).map(({ curve }) => curve.id));
   for (const { curve, domains } of targets.analyticCurves ?? []) for (const { region } of domains) {
     for (const { point: target } of curveFamilyOf(curve).lineIntersections(curve, line, region)) addComputed(crossingOf(curve.id, target), `guide:${curve.id}:${target.x}:${target.y}`);

@@ -5,6 +5,7 @@ import { validPoint } from './ruler.js';
 import { isLinePointVisible } from './display.js';
 import { curveFamilyOf } from '../models/curve-families.js';
 import { independentSnapState } from './snap-context.js';
+import { sumSources, sumError, sourceValue, sumBreakpoints } from './sum.js';
 
 const cross = (a, b) => a.x * b.y - a.y * b.x;
 const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
@@ -70,6 +71,92 @@ class AnalyticBranch extends ContactBranch {
     return tangent ? { point, tangent } : null;
   }
 }
+/**
+ * One smooth, direction-monotone stretch of a function graph: y(u) for a vertical sum, x(u) for a
+ * horizontal one. The direction comes from the evaluated derivative, never from display chords.
+ */
+class FunctionBranch extends ContactBranch {
+  constructor(key, value, vertical, low, high) {
+    super(key); this.value = value; this.vertical = vertical; this.low = low; this.high = high;
+    this.range = angles(this.raw(low), this.raw(high));
+  }
+  point(u) { const v = this.value(u); return v === null ? null : this.vertical ? { x: u, y: v } : { x: v, y: u }; }
+  slope(u) { return functionSlope(this.value, u, this.low, this.high); }
+  raw(u) { const s = this.slope(u); return this.vertical ? { x: 1, y: s } : { x: s, y: 1 }; }
+  contact(angle) {
+    const d = direction(angle), g = u => cross(this.raw(u), d);
+    let low = this.low, high = this.high, gLow = g(low), gHigh = g(high), u;
+    if (Math.abs(gLow) < 1e-12) u = low;
+    else if (Math.abs(gHigh) < 1e-12) u = high;
+    else if (!(gLow * gHigh < 0)) return null;
+    else {
+      for (let i = 0; i < 64; i++) { const mid = (low + high) / 2, gMid = g(mid); if (gLow * gMid <= 0) high = mid; else { low = mid; gLow = gMid; } }
+      u = (low + high) / 2;
+    }
+    const point = this.point(u), tangent = unitVector(this.raw(u));
+    return point && tangent ? { point, tangent, parameter: u } : null;
+  }
+  tangentAt(p) {
+    const u = Math.max(this.low, Math.min(this.high, this.vertical ? p.x : p.y)), point = this.point(u), tangent = unitVector(this.raw(u));
+    return point && tangent ? { distance: distance(point, p), tangent } : null;
+  }
+}
+/** Derivative inside [low, high] only, so a corner at either end never leaks into the branch. */
+function functionSlope(value, u, low, high) {
+  const h = Math.min(1e-6 * Math.max(1, Math.abs(u)), (high - low) / 4);
+  const a = Math.max(low, u - h), b = Math.min(high, u + h), va = value(a), vb = value(b);
+  return va === null || vb === null || b <= a ? NaN : (vb - va) / (b - a);
+}
+
+/**
+ * A vertical or horizontal sum as contact branches: straight runs where it is linear (sums of
+ * lines) and direction-monotone function runs elsewhere, split at the sum's own breakpoints.
+ */
+export function sumContactBranches(sum, state, bounds) {
+  const sources = sumSources(sum, state);
+  if (sumError(sources, sum.direction)) return [];
+  const vertical = sum.direction === 'vertical';
+  const value = u => {
+    if (sum.nonnegative && u < 0) return null;
+    let total = 0;
+    for (const source of sources) {
+      const v = sourceValue(source, u, sum.direction);
+      if (!Number.isFinite(v)) return null;
+      total += sum.nonnegative ? Math.max(0, v) : v;
+    }
+    return Number.isFinite(total) ? total : null;
+  };
+  const min = Math.max(vertical ? bounds.xMin : bounds.yMin, sum.nonnegative ? 0 : -Infinity), max = vertical ? bounds.xMax : bounds.yMax;
+  if (!(min < max)) return [];
+  const cuts = sumBreakpoints(sum, state, min, max), branches = [];
+  for (let i = 1; i < cuts.length; i++) {
+    const low = cuts[i - 1], high = cuts[i];
+    if (high - low < 1e-9) continue;
+    const at = u => vertical ? { x: u, y: value(u) } : { x: value(u), y: u };
+    const samples = Array.from({ length: 25 }, (_, k) => low + (high - low) * k / 24), slopes = samples.map(u => functionSlope(value, u, low, high));
+    if (slopes.some(s => !Number.isFinite(s))) continue;
+    if (Math.max(...slopes) - Math.min(...slopes) <= 1e-9 * Math.max(1, ...slopes.map(Math.abs))) {
+      const a = at(low), b = at(high);
+      if (validPoint(a) && validPoint(b) && distance(a, b) > 1e-10) branches.push(new StraightBranch(`sum-${i}`, a, b));
+      continue;
+    }
+    // Split where the slope stops rising or falling so each run has one contact per direction.
+    let start = 0, trend = 0;
+    for (let k = 1; k < samples.length; k++) {
+      const step = Math.sign(slopes[k] - slopes[k - 1]);
+      if (step && trend && step !== trend) { branches.push(new FunctionBranch(`sum-${i}-${start}`, value, vertical, samples[start], samples[k - 1])); start = k - 1; }
+      if (step) trend = step;
+    }
+    branches.push(new FunctionBranch(`sum-${i}-${start}`, value, vertical, samples[start], high));
+  }
+  return branches;
+}
+
+/** Contact branches of any stroke that can be touched: curves, free curves and sums. */
+export function strokeContactBranches(object, state, bounds) {
+  return object.type === 'sum' ? sumContactBranches(object, state, bounds) : contactBranches(object, bounds);
+}
+
 function quadraticBranch(key, points) {
   const from = sub(points[1], points[0]), to = sub(points[2], points[1]);
   if (Math.abs(cross(from, to)) > 1e-12 * length(from) * length(to) && length(from) > 1e-12 && length(to) > 1e-12) return new QuadraticBranch(key, points);
@@ -203,10 +290,14 @@ export function coincidentCurves(curve, target) {
 /** Shared discrete targets for points, line ends and other guided consumers. */
 export function buildCurveContactTargets(state, bounds, excludeObjectId = null) {
   state = independentSnapState(state, excludeObjectId);
-  const curves = [...(state.curves ?? []), ...(state.sketches ?? [])];
-  const branches = curves.map(c => contactBranches(c, bounds)), targets = [];
+  const curves = [...(state.curves ?? []), ...(state.sketches ?? []), ...(state.sums ?? [])];
+  const branches = curves.map(c => strokeContactBranches(c, state, bounds)), targets = [];
   for (let i = 0; i < curves.length; i++) for (let j = i + 1; j < curves.length; j++) {
-    if (coincidentCurves(curves[i], curves[j])) continue;
+    const [a, b] = [curves[i], curves[j]];
+    if (a.type === 'sum' || b.type === 'sum') {
+      // A sum overlaps its own sources wherever the others add nothing; that is not a contact.
+      if ((a.type === 'sum' && b.type === 'sum') || (a.type === 'sum' ? a : b).sourceIds.includes((a.type === 'sum' ? b : a).id)) continue;
+    } else if (coincidentCurves(a, b)) continue;
     for (const a of branches[i]) for (const b of branches[j]) for (const { point, tangent } of curvePairContacts(a, b)) {
       if (!isLinePointVisible(point, bounds, state)) continue;
       const ids = [curves[i].id, curves[j].id];

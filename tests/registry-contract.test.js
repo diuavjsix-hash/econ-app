@@ -7,7 +7,7 @@ import { StrokeObject } from '../src/models/graph-object.js';
 import { TOOL_MODES, TOOL_MODE_FLAGS, toolModeOf, toolModeFlags, requestedToolMode } from '../src/tool-modes.js';
 import { editorContext } from '../src/editor-ui.js';
 import { diagramState } from '../src/workspace.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { createViewport } from '../src/graph/viewport.js';
 import { buildSnapTargets } from '../src/graph/snap.js';
 import { geometryKey } from '../src/graph/snap-context.js';
@@ -82,7 +82,7 @@ function storeWithEveryStroke() {
 }
 
 test('every document collection is part of history, deletion and the JSON document', () => {
-  const store = storeWithEveryStroke(), state = store.getState(), json = serializeDocument(state);
+  const store = storeWithEveryStroke(), state = store.getState(), json = serializeActive(state);
   for (const collection of OBJECT_COLLECTIONS) {
     assert.ok(Array.isArray(state[collection]), collection);
     assert.ok(Array.isArray(json[collection]), `${collection} is serialized`);

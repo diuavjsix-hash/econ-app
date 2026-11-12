@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { ppcRadii } from '../src/graph/ppc.js';
 import { indifferenceValue, indifferenceContact, indifferenceOnLine, indifferenceThroughPoint, indifferenceLineIntersections, indifferenceShapeHandle, shapeIndifference, moveIndifference } from '../src/graph/indifference.js';
 import { displayedCurveSegments } from '../src/graph/display.js';
@@ -69,15 +69,15 @@ test('PPC shares exact tangent snaps, point snaps, Alt and axis-gap exclusion',(
 
 test('PPC independent radii, copies, grouped undo, graph isolation and export preserve ellipse geometry',()=>{
   const store=createStore(),id=store.addIndifference('ppc',{anchor:c.anchor});
-  const before=serializeDocument(store.getState());store.beginHistory();
+  const before=serializeActive(store.getState());store.beginHistory();
   store.updateSelected({anchor:{x:6/Math.SQRT2,y:c.anchor.y},reshape:true});
   store.updateSelected({anchor:{x:8/Math.SQRT2,y:c.anchor.y},reshape:true});store.endHistory();
   close(ppcRadii(store.getState().curves[0]).x,8);close(ppcRadii(store.getState().curves[0]).y,3);
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);store.redo();
+  store.undo();assert.deepEqual(serializeActive(store.getState()),before);store.redo();
   store.duplicateSelected();store.selectObject(id);store.duplicateSelected();
   const curves=store.getState().curves;assert.equal(curves.length,3);assert.notDeepEqual(curves[1].anchor,curves[2].anchor);
   for (const curve of curves) close(curve.anchor.y/curve.anchor.x,3/8);
-  const doc=JSON.parse(JSON.stringify(serializeDocument(store.getState())));
+  const doc=JSON.parse(JSON.stringify(serializeActive(store.getState())));
   assert.equal(doc.curves[0].geometry.type,'ellipse-arc');close(doc.curves[0].geometry.radii.x,8);
   store.configureLayout('horizontal2');store.selectDiagram(store.getState().diagrams[1].id);assert.equal(store.getState().curves.length,0);
 });

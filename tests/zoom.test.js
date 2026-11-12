@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createViewport, clampZoom, wheelZoom, gridStep, zoomable, ZOOM_MIN, ZOOM_MAX } from '../src/graph/viewport.js';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 
 test('zoom scales the unit about the fixed origin; the box format keeps its fit', () => {
   const base = createViewport(800, 540, 'first'), zoomed = createViewport(800, 540, 'first', { zoom: 2 });
@@ -37,12 +37,12 @@ test('zoom is per graph view state: no undo step, no JSON field, kept across gra
   fresh.setZoom(3);
   assert.equal(fresh.getState().canUndo, false, 'zooming is not an undo step');
   assert.equal(fresh.undo(), false);
-  const before = JSON.stringify(serializeDocument(store.getState()));
+  const before = JSON.stringify(serializeActive(store.getState()));
   store.setZoom(2);
   let state = store.getState();
   assert.equal(state.zoom, 2); assert.equal(state.diagrams.find(d => d.id === first).zoom, 2);
   assert.equal(state.diagrams.find(d => d.id === second).zoom, 1, 'the other graph keeps its own view');
-  assert.equal(JSON.stringify(serializeDocument(state)), before, 'zoom is not saved in the JSON');
+  assert.equal(JSON.stringify(serializeActive(state)), before, 'zoom is not saved in the JSON');
   store.setDiagramZoom(second, 0.5);
   store.selectDiagram(second); assert.equal(store.getState().zoom, 0.5);
   store.selectDiagram(first); assert.equal(store.getState().zoom, 2);

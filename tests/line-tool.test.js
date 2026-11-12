@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { toolModeOf } from '../src/tool-modes.js';
 import { lineFromPoints, lineKindOf, extentForKind, lineEndPoints, slopeThrough, visibleLineEnds } from '../src/graph/line-extent.js';
 import { buildSnapTargets } from '../src/graph/snap.js';
@@ -48,7 +48,7 @@ test('the line tool returns to selection with the new line selected, keeps kind 
   assert.equal(toolModeOf(state), 'hand');
   assert.deepEqual(state.selectedIds, [id]);
   assert.equal(line.style, 'dashed'); assert.equal(lineKindOf(line), 'segment'); assert.match(line.name, /^선분/);
-  const saved = serializeDocument(state).lines[0];
+  const saved = serializeActive(state).lines[0];
   close(saved.segment.start, { x: 1, y: 1 }); close(saved.segment.end, { x: 5, y: 3 });
   assert.equal(saved.style, 'dashed');
   store.undo();

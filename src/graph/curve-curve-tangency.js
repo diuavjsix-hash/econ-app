@@ -4,7 +4,7 @@ import { isLinePointVisible } from './display.js';
 import { curveFamilyOf } from '../models/curve-families.js';
 import { canAttach } from '../relations.js';
 import { SNAP_RELEASE_PX, SHAPE_SNAP_POLICY } from './snap-policy.js';
-import { contactBranches, contactDirectionRanges, contactsAtDirection, searchContactDirections, isolatedContact, coincidentCurves } from './curve-contacts.js';
+import { contactBranches, strokeContactBranches, contactDirectionRanges, contactsAtDirection, searchContactDirections, isolatedContact, coincidentCurves } from './curve-contacts.js';
 export { contactBranches } from './curve-contacts.js';
 
 const cross = (a, b) => a.x * b.y - a.y * b.x;
@@ -35,6 +35,7 @@ function fit(curve, a, b, mode) {
   return validPoint(anchor) ? { anchor, scale: 1 } : null;
 }
 function coincidentPose(curve, target, anchor) {
+  if (target.type === 'sum') return false; // A moved curve is never one of the sum's sources.
   const moved = curve.type === 'sketch' ? { ...curve, ...translatedSketch(curve, sub(anchor, curve.anchor)) } : { ...curve, anchor };
   return coincidentCurves(moved, target);
 }
@@ -96,9 +97,10 @@ export function snapCurveToCurveTangency(curve, state, bounds, unit, { previous 
   const margin = SNAP_RELEASE_PX / unit, expanded = { xMin: bounds.xMin - margin, xMax: bounds.xMax + margin, yMin: bounds.yMin - margin, yMax: bounds.yMax + margin };
   const moving = contactBranches(curve, expanded), mode = movement(curve, axis), candidates = [];
   if (!moving.length) return null;
-  for (const target of [...state.curves, ...(state.sketches ?? [])]) {
+  // Sums are stationary strokes too: their straight runs act like lines, curved runs like curves.
+  for (const target of [...state.curves, ...(state.sketches ?? []), ...(state.sums ?? [])]) {
     if (target.id === curve.id || !canAttach(state, curve.id, target.id)) continue;
-    const stationary = contactBranches(target, bounds);
+    const stationary = strokeContactBranches(target, state, bounds);
     for (const a of moving) for (const b of stationary) candidates.push(...pairCandidates(curve, target, a, b, mode, bounds, state, unit, reference, expanded));
   }
   return SHAPE_SNAP_POLICY.choose(candidates, previous);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { createViewport, toScreen, toWorld } from '../src/graph/viewport.js';
 import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
 import { snapFeedbackTargets } from '../src/graph/snap-feedback.js';
@@ -24,10 +24,10 @@ test('Edgeworth totals define one coordinate box with equal scale in every viewp
 });
 
 test('Edgeworth format, totals and B axis names are independent documents with undo and hidden-layout retention',()=>{
-  const store=createStore(),before=serializeDocument(store.getState());
+  const store=createStore(),before=serializeActive(store.getState());
   store.configureLayout('horizontal2',null,'edgeworth',{boxSize:{width:12,height:6}});
   assert.ok(store.getState().diagrams.every(d=>d.quadrantMode==='edgeworth'&&d.boxSize.width===12));
-  store.undo();assert.deepEqual(serializeDocument(store.getState()),before);store.redo();
+  store.undo();assert.deepEqual(serializeActive(store.getState()),before);store.redo();
   const [a,b]=store.getState().diagrams.map(d=>d.id);store.addPoint({x:3,y:2});
   store.update({boxSize:{width:15},boxAxisNames:{x:'재화 1 B'}});store.undo();assert.equal(store.getState().boxSize.width,12);store.redo();
   store.selectDiagram(b);assert.equal(store.getState().boxSize.width,12);assert.equal(store.getState().boxAxisNames.x,'xᴮ');
@@ -54,7 +54,7 @@ test('Edgeworth four walls share point/dashed snap targets, common feedback and 
 test('Edgeworth JSON stores totals and the opposite origin without screen-dependent geometry',()=>{
   const store=createStore();store.configureLayout('single',null,'edgeworth',{boxSize:{width:12,height:7}});
   store.updateDiagram({flipX:true,flipY:true});store.addPoint({x:3,y:2});
-  const doc=JSON.parse(JSON.stringify(serializeDocument(store.getState()))),coordinates=doc.coordinateSystem;
+  const doc=JSON.parse(JSON.stringify(serializeActive(store.getState()))),coordinates=doc.coordinateSystem;
   assert.equal(coordinates.type,'edgeworth');assert.deepEqual(coordinates.totals,{width:12,height:7});
   assert.deepEqual(coordinates.oppositeOrigin,{x:12,y:7});assert.equal(coordinates.oppositeXPositive,'right');assert.equal(coordinates.oppositeYPositive,'up');
   assert.deepEqual(doc.diagrams[0].coordinateSystem,coordinates);assert.deepEqual(doc.points[0].anchor,{x:3,y:2});

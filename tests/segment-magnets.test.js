@@ -5,7 +5,7 @@ import { lineEndPoints } from '../src/graph/line-extent.js';
 import { segmentLine, drawSegment } from './fixtures/segments.js';
 import { buildSnapTargets } from '../src/graph/snap.js';
 import { createStore } from '../src/state.js';
-import { serializeDocument } from '../src/export.js';
+import { serializeActive } from './fixtures/document.js';
 import { createViewport, toScreen, toWorld } from '../src/graph/viewport.js';
 
 const bounds = { xMin: 0, xMax: 10, yMin: 0, yMax: 10 }, unit = 50;
@@ -128,7 +128,7 @@ test('snapped end drag records once and leaves the source point, line and JSON s
   store.updateSelected({ slope: null, anchor: { x: 5, y: 4 } });
   store.addPoint({ x: 1, y: 3 });
   const segmentId = drawSegment(store, { x: 1, y: 3 }, { x: 3, y: 3 }, { style: 'dashed' });
-  const before = serializeDocument(store.getState());
+  const before = serializeActive(store.getState());
   const target = buildSnapTargets(store.getState(), bounds, segmentId);
   store.beginHistory();
   for (const x of [4.7, 4.8, 4.9]) {
@@ -136,12 +136,12 @@ test('snapped end drag records once and leaves the source point, line and JSON s
     store.updateSelected({ extent: [0, snapped.point.x - 1] });
   }
   store.endHistory();
-  const after = serializeDocument(store.getState());
-  assert.equal(after.schemaVersion, 12); assert.deepEqual(after.points, before.points);
+  const after = serializeActive(store.getState());
+  assert.equal(after.schemaVersion, 13); assert.deepEqual(after.points, before.points);
   assert.deepEqual(after.lines.find(line => line.id === lineId), before.lines.find(line => line.id === lineId));
   const segment = after.lines.find(line => line.id === segmentId);
   assert.deepEqual(segment.segment.end, { x: 5, y: 3 }); assert.equal(segment.style, 'dashed');
   assert.equal('binding' in segment, false); assert.equal('dashedLines' in after, false);
-  store.undo(); assert.deepEqual(serializeDocument(store.getState()), before);
-  store.redo(); assert.deepEqual(serializeDocument(store.getState()), after);
+  store.undo(); assert.deepEqual(serializeActive(store.getState()), before);
+  store.redo(); assert.deepEqual(serializeActive(store.getState()), after);
 });
