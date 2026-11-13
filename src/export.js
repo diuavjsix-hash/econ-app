@@ -1,5 +1,5 @@
 import { DEFAULT_AXIS_GAP } from './graph/display.js';
-import { QUADRANT_MODES, faceToFace } from './graph/viewport.js';
+import { QUADRANT_MODES, faceToFace, stacked, lowerHeightOf } from './graph/viewport.js';
 import { objectModel } from './models/objects.js';
 import { describeRelations } from './graph/drawn-relations.js';
 const serializeObjects = objects => (objects ?? []).map(object => objectModel(object).serialize());
@@ -12,21 +12,26 @@ export const EXPORT_DECIMALS = 6;
 const LEGEND = Object.freeze({
   coordinates: '모든 좌표는 그래프의 수학 좌표입니다. 화면 픽셀이 아닙니다.',
   relations: '현재 그림에서 계산한 위치 관계입니다. at=위치, points=그 위치의 점, on=그 위치를 지나는 도형과 축, tangent=그 위치에서 방향이 같은(접하는) 두 도형, slopes=곡선의 그 위치 기울기(null은 수직), features=도형의 start·end(시작·끝)·kink(꺾임)·minimum(최저점)',
-  axes: 'axis-x·axis-y는 x축·y축, axis-b-x·axis-b-y는 에지워드 상자 B의 축입니다.',
+  axes: 'axis-x·axis-y는 x축·y축, axis-b-x·axis-b-y는 에지워드 상자 B의 축, axis-lower-x·axis-lower-y는 상하 2단의 아래 그래프 축입니다.',
 });
 // Added only when a face-to-face sheet is exported, so other files keep their legend.
 const FACE_LEGEND = 'coordinateSystem.type이 face-to-face인 그래프는 y축을 공유하는 맞붙은 두 그래프입니다. x<0인 좌표는 맞은편 그래프에 있고, 그 그래프의 수평축 값은 -x입니다.';
 
 /** The facing graph on a face-to-face sheet: where it is drawn and how to read its x. */
+// Added only when a stacked sheet is exported.
+const STACKED_LEGEND = 'coordinateSystem.type이 stacked인 그래프는 x 눈금을 맞춘 위·아래 두 그래프입니다. y≥0인 좌표는 위 그래프(원점 0,0)에, y<0인 좌표는 아래 그래프(원점 lowerOrigin)에 있고, 아래 그래프에서 읽는 세로축 값은 y+lowerHeight입니다. 두 그래프를 가로지르는 선분(보조선)은 한 좌표계 안의 보통 선분입니다.';
+/** The lower graph on a stacked sheet: its origin and axis names. */
+const lowerGraph = state => ({ lowerHeight: lowerHeightOf(state), lowerOrigin: { x: 0, y: -lowerHeightOf(state) }, lowerAxisNames: { ...(state.lowerAxisNames ?? { x: 'x', y: 'y' }) }, ownY: 'y+lowerHeight' });
 const facingSide = state => ({ side: state.flipX ? 'right' : 'left', axisName: state.faceAxisName, xPositive: state.flipX ? 'right' : 'left', ownX: '-x' });
 
 function serializeDiagram(state) {
   const baseOrigin = QUADRANT_MODES[state.quadrantMode].origin;
-  const origin = baseOrigin === 'center' ? 'center' : `${state.flipY ? 'top' : 'bottom'}-${baseOrigin.endsWith('center') ? 'center' : state.flipX ? 'right' : 'left'}`;
+  const origin = baseOrigin === 'center' ? 'center' : `${baseOrigin.startsWith('middle') ? 'middle' : state.flipY ? 'top' : 'bottom'}-${baseOrigin.endsWith('center') ? 'center' : state.flipX ? 'right' : 'left'}`;
   return {
     coordinateSystem: { origin, quadrants: [...QUADRANT_MODES[state.quadrantMode].quadrants], xPositive: state.flipX ? 'left' : 'right', yPositive: state.flipY ? 'down' : 'up', axesVisible: true, axisNames: { ...state.axisNames }, lineAxisGap: { enabled: Boolean(state.axisGapEnabled), distance: state.axisGap ?? DEFAULT_AXIS_GAP },
       ...(state.quadrantMode==='edgeworth'?{type:'edgeworth',totals:{...state.boxSize},oppositeOrigin:{x:state.boxSize.width,y:state.boxSize.height},oppositeAxisNames:{...state.boxAxisNames},oppositeXPositive:state.flipX?'right':'left',oppositeYPositive:state.flipY?'up':'down'}:{}),
-      ...(faceToFace(state.quadrantMode) ? { type: 'face-to-face', sharedAxis: 'y', facing: facingSide(state) } : {}) },
+      ...(faceToFace(state.quadrantMode) ? { type: 'face-to-face', sharedAxis: 'y', facing: facingSide(state) } : {}),
+      ...(stacked(state.quadrantMode) ? { type: 'stacked', sharedAxis: 'x', lower: lowerGraph(state) } : {}) },
     showGrid: state.showGrid,
     objectOrder: [...state.objectOrder],
     lines: serializeObjects(state.lines),
@@ -45,7 +50,8 @@ function serializeDiagram(state) {
 export function serializeDocument(state) {
   return {
     schemaVersion: SCHEMA_VERSION,
-    legend: { ...LEGEND, ...(state.diagrams.some(diagram => faceToFace(diagram.quadrantMode)) ? { faceToFace: FACE_LEGEND } : {}) },
+    legend: { ...LEGEND, ...(state.diagrams.some(diagram => faceToFace(diagram.quadrantMode)) ? { faceToFace: FACE_LEGEND } : {}),
+      ...(state.diagrams.some(diagram => stacked(diagram.quadrantMode)) ? { stacked: STACKED_LEGEND } : {}) },
     activeDiagramId: state.activeDiagramId,
     diagrams: state.diagrams.map(diagram => ({ id: diagram.id, name: diagram.name, ...serializeDiagram(diagram) })),
   };

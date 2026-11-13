@@ -6,7 +6,7 @@ import { prepareDuplicate, DUPLICATABLE, placeCopiesNearby } from './duplicate.j
 import { validPoint, rulerMetrics } from './graph/ruler.js';
 import { normalizeSlope, directionOf } from './graph/math.js';
 import { LINE_KINDS, LINE_STYLES, lineFromPoints, lineKindOf } from './graph/line-extent.js';
-import { QUADRANT_MODES, clampZoom } from './graph/viewport.js';
+import { QUADRANT_MODES, clampZoom, DEFAULT_LOWER_HEIGHT, MIN_LOWER_HEIGHT, MAX_LOWER_HEIGHT } from './graph/viewport.js';
 import { CURVE_PRESETS } from './graph/curve.js';
 import { canReparent, objectsOf } from './objects.js';
 import { sumError } from './graph/sum.js';
@@ -28,7 +28,7 @@ export function createStore() {
     ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [],
     ...toolModeFlags('hand'), fillColor: INK.blue, fillAutoColor: true, fillOpacity: 0.24,
     selectedId: null, indifferenceOpposite: false, sketchMode: 'auto', activeTool: 'point', rulerSelected: false, segmentSnap: true, lineKind: 'line', lineStyle: 'solid', pointSnap: true, pointCoordinates: false, showGrid: true,
-    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
+    quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', lowerHeight: DEFAULT_LOWER_HEIGHT, lowerAxisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
   let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1;
   let nextSumId = 1;
@@ -48,8 +48,8 @@ export function createStore() {
     if (spec.keepSelection && !spec.keepSelection(objectsOf(state).filter(object => selected.has(object.id)))) setSelection([]);
   };
   // Each registered collection is part of a diagram document, its history and deletion.
-  const documentKeys = [...OBJECT_COLLECTIONS, 'objectOrder', 'quadrantMode', 'axisNames', 'boxSize', 'boxAxisNames', 'faceAxisName', 'showGrid', 'axisGapEnabled', 'axisGap'];
-  const emptyDocument = () => ({ ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
+  const documentKeys = [...OBJECT_COLLECTIONS, 'objectOrder', 'quadrantMode', 'axisNames', 'boxSize', 'boxAxisNames', 'faceAxisName', 'lowerHeight', 'lowerAxisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
+  const emptyDocument = () => ({ ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', lowerHeight: DEFAULT_LOWER_HEIGHT, lowerAxisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
   const zooms = new Map(); // diagram id → view zoom; kept out of documentState on purpose
@@ -209,8 +209,10 @@ export function createStore() {
       for (const axis of ['x', 'y']) {
         if (typeof patch.axisNames?.[axis] === 'string') state.axisNames[axis] = patch.axisNames[axis].slice(0, 80);
         if (typeof patch.boxAxisNames?.[axis] === 'string') state.boxAxisNames[axis] = patch.boxAxisNames[axis].slice(0, 80);
+        if (typeof patch.lowerAxisNames?.[axis] === 'string') state.lowerAxisNames = { ...state.lowerAxisNames, [axis]: patch.lowerAxisNames[axis].slice(0, 80) };
       }
       if (typeof patch.faceAxisName === 'string') state.faceAxisName = patch.faceAxisName.slice(0, 80);
+      if (Number.isFinite(patch.lowerHeight) && patch.lowerHeight >= MIN_LOWER_HEIGHT && patch.lowerHeight <= MAX_LOWER_HEIGHT) state.lowerHeight = patch.lowerHeight;
       const previousBox={...state.boxSize};
       for (const key of ['width','height']) if (Number.isFinite(patch.boxSize?.[key]) && patch.boxSize[key]>=1 && patch.boxSize[key]<=100) state.boxSize[key]=patch.boxSize[key];
       followBoxOrigin(state,previousBox);
@@ -246,7 +248,7 @@ export function createStore() {
       return add('lines', {
         id: `line-${nextId}`, type: 'line', name: `직선 ${String(nextId++).padStart(2, '0')}`,
         slope: [1, -1, 0.5, -0.5, 0, 2][(box ? state.lines.length : index) % 6] * (box ? box.height / box.width : 1),
-        anchor: box ? { x: box.width / 2, y: box.height / 2 } : { x: state.quadrantMode === 'first' ? 3 : 0, y: (state.quadrantMode === 'all' ? 0 : 3) + (index % 5) * 0.6 }, color: lineColor(index, 'solid'),
+        anchor: box ? { x: box.width / 2, y: box.height / 2 } : { x: ['first', 'stacked'].includes(state.quadrantMode) ? 3 : 0, y: (state.quadrantMode === 'all' ? 0 : 3) + (index % 5) * 0.6 }, color: lineColor(index, 'solid'),
       });
     },
     addCurve(placement = {}) {
@@ -258,7 +260,7 @@ export function createStore() {
         variant, slope: preset.slope, color: preset.color,
         span: Number.isFinite(placement.span) && placement.span > 0 ? placement.span : 3, bend: 0.25,
         anchor: Number.isFinite(placement.anchor?.x) && Number.isFinite(placement.anchor?.y)
-          ? { ...placement.anchor } : { x: state.quadrantMode === 'first' ? 4 : 0, y: state.quadrantMode === 'all' ? 0 : 4 },
+          ? { ...placement.anchor } : { x: ['first', 'stacked'].includes(state.quadrantMode) ? 4 : 0, y: state.quadrantMode === 'all' ? 0 : 4 },
       });
     },
     addIndifference(family, placement={}) {

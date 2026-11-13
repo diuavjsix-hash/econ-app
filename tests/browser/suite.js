@@ -145,6 +145,36 @@ async function faceSmoke(width, height) {
   check(doc.querySelector('[aria-label="맞은편 수평축 L₂"]') && exported(doc).coordinateSystem.facing.axisName === 'L₂', `${size}: the facing axis name is drawn and exported`);
   el.remove();
 }
+// Stacked sheet: strokes are drawn as drawn across both graphs; one Shift guide drops from a crossing to the lower axis.
+async function stackedSmoke(width, height) {
+  const el = await frame('/', width, height), doc = el.contentDocument, win = el.contentWindow, size = `${width}x${height} stacked`;
+  win.addEventListener('error', e => errors.push(`${size}: ${e.message}`));
+  await wait(() => doc.querySelector('#quadrant-dialog[open]'), 'app startup');
+  doc.querySelector('[data-quadrants="stacked"]').click(); doc.getElementById('apply-workspace').click();
+  const svg = doc.querySelector('.graph-svg'), r = svg.getBoundingClientRect(), v = createViewport(r.width, r.height, 'stacked', { lowerHeight: 6 });
+  check(doc.querySelector('[aria-label="아래 수평축 x"]') && doc.querySelector('[aria-label="아래 수직축 y"]'), `${size}: the lower graph has its own axes and names`);
+  svg.setPointerCapture = () => {}; svg.hasPointerCapture = () => false; svg.releasePointerCapture = () => {};
+  const pointer = (p, type, flags = {}) => { const s = toScreen(p, v);
+    svg.dispatchEvent(new win.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 97, pointerType: 'mouse', button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: r.left + s.x, clientY: r.top + s.y, ...flags })); };
+  const draw = (a, b, flags = {}) => { pointer(a, 'pointerdown'); pointer(b, 'pointermove', flags); pointer(b, 'pointerup', flags); };
+  for (const [a, b] of [[{ x: 1, y: 5 }, { x: 5, y: 1 }], [{ x: 1, y: 1 }, { x: 5, y: 5 }]]) {
+    doc.getElementById('line-tool').click(); doc.querySelector('#line-options [data-line-kind="line"]').click(); doc.querySelector('#line-options [data-line-style="solid"]').click();
+    draw(a, b, { altKey: true });
+  }
+  const below = [...svg.querySelectorAll('.graph-line .plotted-line')].flatMap(path => (path.getAttribute('d') ?? '').match(/-?\d+(\.\d+)?/g)?.filter((_, i) => i % 2 === 1).map(Number) ?? []);
+  check(below.some(y => y > v.cy + 50), `${size}: a full line in the upper graph runs on into the lower graph`);
+  doc.getElementById('line-tool').click(); doc.querySelector('#line-options [data-line-kind="segment"]').click(); doc.querySelector('#line-options [data-line-style="dashed"]').click();
+  draw({ x: 3.04, y: 3.03 }, { x: 3.1, y: -5.92 }, { shiftKey: true });
+  const json = exported(doc), guide = json.lines.at(-1), near = (p, q) => Math.hypot(p.x - q.x, p.y - q.y) < 1e-6;
+  check(guide.style === 'dashed' && [guide.segment.start, guide.segment.end].some(p => near(p, { x: 3, y: 3 })) && [guide.segment.start, guide.segment.end].some(p => near(p, { x: 3, y: -6 })), `${size}: a Shift guide runs from the crossing down to the lower x axis`);
+  check(json.coordinateSystem.type === 'stacked' && json.coordinateSystem.lower.lowerHeight === 6 && json.legend.stacked
+    && json.relations.some(rel => near(rel.at, { x: 3, y: -6 }) && rel.on.includes('axis-lower-x')), `${size}: the JSON says the guide ends on the lower x axis`);
+  doc.getElementById('graph-settings-action').click();
+  check(!doc.getElementById('stacked-settings').hidden && doc.getElementById('face-settings').hidden, `${size}: graph settings offer the lower graph`);
+  input(doc, 'lower-axis-y', 'P'); doc.getElementById('done-graph-settings').click();
+  check(doc.querySelector('[aria-label="아래 수직축 P"]') && exported(doc).coordinateSystem.lower.lowerAxisNames.y === 'P', `${size}: the lower axis name is drawn and exported`);
+  el.remove();
+}
 // Multi-graph layouts were removed (2026-11-13): one graph card, no layout choices or link buttons.
 async function singleGraphSmoke(width, height) {
   const el = await frame('/', width, height), doc = el.contentDocument, win = el.contentWindow, size = `${width}x${height} single graph`;
@@ -214,7 +244,7 @@ try {
   check(tangentResult.ok,`contact tangent line fixture: ${tangentResult.error ?? 'completed'}`);
   for (const name of tangentResult.passed) passed.push(`contact tangent line: ${name}`);
   tangentLine.remove();
-  await appSmoke(1280, 800); await appSmoke(390, 844); await faceSmoke(1280, 800); await singleGraphSmoke(1280, 800);
+  await appSmoke(1280, 800); await appSmoke(390, 844); await faceSmoke(1280, 800); await singleGraphSmoke(1280, 800); await stackedSmoke(1280, 800);
   check(errors.length === 0, `no browser runtime errors: ${errors.join('; ')}`);
 } catch (error) { errors.push(error.stack ?? String(error)); }
 const report = { ok: errors.length === 0, count: passed.length, passed, errors };

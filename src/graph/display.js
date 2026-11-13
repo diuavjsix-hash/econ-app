@@ -1,15 +1,25 @@
 import { clipLine } from './math.js';
 import { clipCurveWithExtensions } from './curve.js';
 import { isIndifference, clipIndifference } from './indifference.js';
+import { stacked, lowerHeightOf } from './viewport.js';
 
 export const DEFAULT_AXIS_GAP = 0.75;
 export const MIN_AXIS_GAP = 0.25;
 export const MAX_AXIS_GAP = 2;
 
-/** Cut out mathematical bands around both axes, without modifying stored shapes. */
+/**
+ * Cut out mathematical bands around the axes, without modifying stored shapes. A stacked
+ * sheet clips nothing else: every stroke is drawn as drawn, across both graphs.
+ */
 export function lineDisplayRegions(bounds, state) {
   if (!state.axisGapEnabled) return [bounds];
   const gap = state.axisGap ?? DEFAULT_AXIS_GAP;
+  if (stacked(state.quadrantMode)) {
+    const depth = lowerHeightOf(state), xMin = Math.max(bounds.xMin, gap);
+    if (xMin >= bounds.xMax) return [];
+    return [[Math.max(bounds.yMin, -depth + gap), Math.min(bounds.yMax, -gap)], [Math.max(bounds.yMin, gap), bounds.yMax]]
+      .filter(([from, to]) => to > from).map(([yMin, yMax]) => ({ xMin, xMax: bounds.xMax, yMin, yMax }));
+  }
   if (state.quadrantMode==='edgeworth') {
     const region={xMin:Math.max(bounds.xMin,gap),xMax:Math.min(bounds.xMax,state.boxSize.width-gap),
       yMin:Math.max(bounds.yMin,gap),yMax:Math.min(bounds.yMax,state.boxSize.height-gap)};
