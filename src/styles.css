@@ -30,9 +30,8 @@
 
 .canvas-card { position: relative; flex: 1; min-height: 0; overflow: auto; }
 .diagram-grid {
-  display: grid; gap: var(--space-3); width: 100%; height: 100%; min-height: 100%;
-  grid-template-columns: repeat(var(--columns, 1), minmax(280px, 1fr));
-  grid-template-rows: repeat(var(--rows, 1), minmax(280px, 1fr));
+  position: relative; display: grid; width: 100%; height: 100%; min-height: 100%;
+  grid-template: minmax(280px, 1fr) / minmax(280px, 1fr);
 }
 .diagram-card {
   position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
@@ -46,11 +45,7 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .diagram-title:hover { background: var(--bg-hover); color: var(--text); }
-.diagram-grid:not([data-count="1"]) .diagram-card.is-active { box-shadow: 0 0 0 1.5px var(--accent); }
-.diagram-grid:not([data-count="1"]) .diagram-title[aria-pressed=true] { color: var(--accent); }
 .graph-container { position: relative; flex: 1; min-width: 0; min-height: 0; isolation: isolate; }
-.diagram-grid { position: relative; }
-.link-bridges { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 
 /* Inspector ------------------------------------------------------------------ */
 .tools-panel { display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: var(--bg-chrome); border-left: var(--stroke-hairline) solid var(--border); }
@@ -124,19 +119,11 @@
 /* Dialog content. */
 .graph-settings-dialog { width: min(400px, calc(100vw - 32px)); }
 .quadrant-dialog { width: min(640px, calc(100vw - 32px)); }
-.layout-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
-.layout-preview { display: grid; gap: 2px; width: 44px; height: 32px; flex-shrink: 0; }
-.layout-preview-cell { display: grid; place-items: center; min-width: 0; min-height: 0; border-radius: 2px; background: var(--bg-track); }
-.layout-preview-cell svg { width: 100%; height: 100%; max-width: 22px; max-height: 22px; fill: none; stroke: currentColor; stroke-width: 1.4; }
-.choice[aria-pressed=true] .layout-preview-cell { background: var(--bg-pressed); }
 .quadrant-choices { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-2); }
 .quadrant-choices svg { width: 40px; height: 40px; }
 .quadrant-choices path { fill: none; stroke: currentColor; stroke-width: 1.4; }
 .quadrant-fill { fill: var(--bg-pressed); }
 .choice[aria-pressed=true] .quadrant-fill { fill: var(--accent-tint); }
-.custom-layout-grid { display: grid; grid-template-columns: repeat(3, 44px); gap: var(--space-1); }
-.custom-layout-grid button { height: 32px; border: var(--stroke-hairline) dashed var(--border-strong); border-radius: var(--radius-xs); background: var(--bg-surface); color: var(--text-disabled); }
-.custom-layout-grid button[aria-pressed=true] { border: var(--stroke-hairline) solid var(--border-inverse); background: var(--bg-pressed); color: var(--text); }
 .box-size-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .code-output {
   display: block; width: 100%; height: min(50dvh, 420px); padding: var(--space-3); resize: vertical;
@@ -227,13 +214,12 @@
   .tool { padding: 0 7px; gap: var(--space-1); }
   .editor-status { padding-left: var(--space-1); }
   .canvas-card { flex: none; height: 55dvh; min-height: 320px; }
-  .diagram-grid { gap: var(--space-2); grid-template-columns: repeat(var(--columns, 1), minmax(260px, 1fr)); grid-template-rows: repeat(var(--rows, 1), minmax(260px, 1fr)); }
+  .diagram-grid { grid-template: minmax(260px, 1fr) / minmax(260px, 1fr); }
   .tools-panel { border-left: 0; border-top: var(--stroke-hairline) solid var(--border); }
   .inspector { flex: none; overflow: visible; min-height: 0; }
   .inspector-heading { position: static; }
   .object-section { max-height: none; }
   .object-list { max-height: 240px; }
-  .layout-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .quadrant-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dialog-footer { flex-wrap: wrap; }
   .footer-note { flex-basis: 100%; }

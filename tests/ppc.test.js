@@ -79,5 +79,5 @@ test('PPC independent radii, copies, grouped undo, graph isolation and export pr
   for (const curve of curves) close(curve.anchor.y/curve.anchor.x,3/8);
   const doc=JSON.parse(JSON.stringify(serializeActive(store.getState())));
   assert.equal(doc.curves[0].geometry.type,'ellipse-arc');close(doc.curves[0].geometry.radii.x,8);
-  store.configureLayout('horizontal2');store.selectDiagram(store.getState().diagrams[1].id);assert.equal(store.getState().curves.length,0);
+  store.clearAll();assert.equal(store.getState().curves.length,0);
 });

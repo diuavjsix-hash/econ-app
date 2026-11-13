@@ -17,7 +17,7 @@ const click=p=>{send('pointerdown',p);send('pointerup',p)};
 function mount(){dispose?.();dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};}
 document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok,name)=>{if(!ok)throw Error(name);passed.push(name)};try{
  for(const size of [800,312])for(const flipX of [false,true])for(const flipY of [false,true])for(const boxSize of [{width:10,height:8},{width:1,height:100}]){
-  stage.style.width=size+'px';stage.style.height='540px';store=createStore();store.configureLayout('single',null,'edgeworth',{boxSize});store.updateDiagram({flipX,flipY});
+  stage.style.width=size+'px';stage.style.height='540px';store=createStore();store.configureWorkspace('edgeworth',{boxSize});store.updateDiagram({flipX,flipY});
   const id=store.addLine();store.update({handSelected:true});mount();
   const name=`${size} ${flipX}/${flipY} ${boxSize.width}/${boxSize.height}`,a={x:0,y:0},b={x:boxSize.width,y:boxSize.height};
   const points=displayedLineSegments(store.getState().lines[0],view().bounds,store.getState())[0];

@@ -177,7 +177,7 @@ classDiagram
 
 `quadrantMode:'edgeworth'`는 별도 그래프 두 개가 아닌 하나의 좌표 영역입니다. 각 그래프의 `boxSize:{width,height}`와 `boxAxisNames:{x,y}`는 문서/숨긴 그래프/undo에 포함합니다. `createViewport`는 총량 bounds를 고정하고 같은 x/y 단위 배율로 화면에 맞춰 상자 비율을 보존합니다. canvas는 A 원점과 반대 모서리 B 원점의 네 축·화살표·이름을 그립니다. 전체 축 반전도 같은 투영만 바꿉니다. `graph/axes.js`의 `axisSegments`를 snap·공통 feedback·fill이 함께 사용해 상자 위/오른쪽 경계를 복제하지 않습니다. 축 간격을 켜면 네 변 안쪽을 잘라 표시하며 도형 좌표는 유지합니다. 기존 해석 곡선은 A 원점 기준이고 B 전용 생성/효용 계산은 없습니다.
 
-`quadrants.js`는 첫 설정과 재설정에 같은 포맷 선택·총량 입력을 사용하고 `configureLayout`은 포맷 적용 대상 그래프에 총량을 함께 저장합니다. 그래프 설정에서는 활성 그래프만 수정합니다. canvas의 pointerdown은 편집 입력란을 먼저 blur하여 숫자 입력과 다음 드래그가 한 기록으로 합쳐지는 것을 막습니다. 실제 입력 6→끝점 드래그 7→undo 6을 확인했습니다. 내보내기 추가 필드는 [JSON 형식](json-format.md)에 정리했습니다.
+`quadrants.js`는 첫 설정과 재설정에 같은 포맷 선택·총량 입력을 사용하고 `configureWorkspace`는 그래프에 총량을 함께 저장합니다. 그래프 설정에서는 활성 그래프만 수정합니다. canvas의 pointerdown은 편집 입력란을 먼저 blur하여 숫자 입력과 다음 드래그가 한 기록으로 합쳐지는 것을 막습니다. 실제 입력 6→끝점 드래그 7→undo 6을 확인했습니다. 내보내기 추가 필드는 [JSON 형식](json-format.md)에 정리했습니다.
 
 현재 앱은 프레임워크나 외부 런타임 패키지 없이 동작하는 JavaScript ES module 기반의 정적 웹 앱입니다. Node.js 기본 모듈은 개발 서버·빌드·테스트에만 사용됩니다. 이 문서는 현재 구현을 설명하며, 대규모 프로젝트의 최종 구조를 확정하는 문서는 아닙니다.
 
@@ -242,7 +242,6 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/graph/interactions.js`, `editing-handles.js` | 도형별 조작과 포인터/키보드 훅·선택 손잡이 |
 | `src/graph/curve-contacts.js`, `curve-curve-tangency.js` | 공유 원본 접점 기하와 허용 이동 제약에 맞춘 곡선끼리 자석. 수직합·수평합은 `sumContactBranches`가 꺾임마다 나눈 직선 구간·기울기 단조 함수 구간(`FunctionBranch`, 원본 값의 미분)으로 같은 목록에 들어감(`strokeContactBranches`). 합과 자기 원본, 합끼리는 접점을 찾지 않음. 합의 표시 근사 교차가 같은 합의 등록 접점 0.002 안이면 `buildSnapTargets`·선분 끝 안내선 계산에서 같은 점으로 봄 |
 | `src/graph/snap-context.js` | 자기/계산 종속 도형 공통 제외·캐시용 수학 기하 키 |
-| `src/links.js` | 그래프 사이 연결선: 같은 열/행의 정렬된 그래프 찾기(`alignedPartners`), 구성원 좌표 맞추기(`syncLinks`), 묶인 그래프 확대 공유(`linkedDiagramIds`), 카드 사이 틈 잇기 계산(`linkBridges`), JSON 요약(`describeLinks`) |
 | `src/graph/ppc.js`, `axes.js` | ¼타원 기하와 공통 유한 좌표축 |
 | `src/graph/svg-renderer.js` | SVG 노드·경로와 공통 획/히트 영역·접근성 속성 |
 | `src/editor-ui.js` | 현재 작업별 편집 패널 문맥·그래프 설정 창 열기 |
@@ -253,8 +252,7 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/tools/sum.js` | 같은 그래프의 합산 원본 체크·방향·음수 처리와 선택한 합 설정 |
 | `src/tools/hand.js` | 손 모드와 Esc 복귀; 도형을 생성하지 않음 |
 | `src/tools/duplicate.js` | 복제 원본·배율·미리보기·하위 포함; 반복 복제의 원본 유지 |
-| `src/state.js` | 여러 그래프의 문서·활성 그래프 투영·배치·전체 편집 기록 |
-| `src/layouts.js` | 배치 프리셋 9종, 최대 3×3 사용자 지정 배치 검증 |
+| `src/state.js` | 그래프 문서(`diagrams`, 현재 하나)·활성 그래프 투영·전체 편집 기록 |
 | `src/workspace.js` | CSS grid의 그래프별 SVG mount·해제, 선택·도구 연결 |
 | `src/history.js` | 상단 되돌리기·다시 실행과 설정 창의 전체 삭제, 단축키·편집 묶음 |
 | `src/objects.js` | 생성 순서의 객체 조회와 상위 항목 이동의 순환 검사 |
@@ -281,7 +279,7 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/tools/curve.js` | 곡선 추가, 우상향·우하향 전환, 휘어짐 슬라이더 |
 | `src/tools/point.js` | 점 탭·좌클릭 생성·마우스 조정·좌표 표시 |
 | `src/tools/objects.js` | 도형·폴더 트리, 이름 편집·삭제·분류 이동·접기 |
-| `src/quadrants.js` | 배치·사분면의 초안 선택과 일괄 적용, 첫 시작과 이후 변경 창 |
+| `src/quadrants.js` | 포맷의 초안 선택과 적용(`configureWorkspace`), 첫 시작과 이후 변경 창 |
 | `src/axes.js` | 수평·수직축 이름과 축 간격 입력 |
 | `src/export.js` | `serializeDocument`(전체 정밀도 문서), `exportJson`(저장 창 문자열, 소수 6자리)과 JSON 모달·복사·다운로드 |
 | `src/graph/drawn-relations.js` | 내보낼 때 현재 기하에서 계산하는 `relations`(지나는 도형·접점·기울기·끝). `buildSnapTargets`·`guidedSnapCandidates`·`curveTangentsAt`를 재사용하며 문서에 저장하지 않음 |
@@ -303,7 +301,6 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `tests/intercepts.test.js` | 정확한 축 교차·선/곡선/합 절편·직선 이동·Shift/Alt·포착/해제·후보 유지·의존 제외·기록 회귀 12개 |
 | `tests/point-magnets.test.js` | 기존 점 통과·기울기/모양 보존·정확한 중간 구간·Shift/Alt·포착/해제·종속 제외·후보 전환·기록 회귀 12개 |
 | `tests/history.test.js` | 혼합 도형·편집 묶음·전체 삭제·계층·기록 분기·좌표·설정 복원·100단계 제한·점 도구 선택 테스트 8개 |
-| `tests/layout.test.js` | 배치·독립 편집·숨긴 그래프 보존·대면 좌표 변환·기록·JSON·스냅 회귀 테스트 10개 |
 | `tests/duplicate.test.js` | 상호 배타 도구·현재 기준점/부호·수직·숫자 범위·모든 도형·폴더 계층·기록·독립 그래프·명칭·자동 옆 생성/반복 복제 테스트 12개 |
 | `tests/dashed.test.js` | 점선 보정 기본값·도구 전환·두 끝점·스타일/측정 배제·JSON·계층·독립 그래프·기록·스냅 테스트 5개 |
 | `tests/ruler.test.js` | 생성 기본값·툴 전환·길이·방향 제한·클리핑·검증·이동·계층·기록·내보내기·반전 테스트 8개 |
@@ -347,16 +344,15 @@ sumPanel은 다른 생성 도구·복제와 배타적인 UI 상태입니다. 합
   quadrantMode: 'first',
   axisNames: { x: 'x', y: 'y' }, axisGapEnabled: false, axisGap: 0.75,
   activeDiagramId: 'diagram-1', flipX: false, flipY: false,
-  layout: { preset: 'single', slots: [{ row: 0, column: 0, flipX: false, flipY: false }] },
   diagrams: [/* id, name, flipX, flipY 및 그래프별 문서 필드 */]
 }
 ```
 
-`diagrams`가 그래프별 문서를 보관하고, 최상위 `lines`, `curves`, `sketches`, `sums`, `points`, `fills`, `rulers`, `groups`, `objectOrder`, `quadrantMode`, `axisNames`, `showGrid`, `axisGapEnabled`, `axisGap`는 활성 그래프의 편집용 투영입니다. `syncDiagram`으로 변경을 반영하고 `loadDiagram`으로 전환합니다. `configureLayout`은 필요한 그래프를 추가하며 배치를 줄여도 나머지 그래프를 보관합니다. 표시되는 그래프는 `diagrams`의 앞 N개와 `layout.slots`의 위치를 대응시킵니다. `diagram-N` ID 카운터도 되돌리지 않습니다.
+`diagrams`가 그래프별 문서를 보관하고, 최상위 `lines`, `curves`, `sketches`, `sums`, `points`, `fills`, `rulers`, `groups`, `objectOrder`, `quadrantMode`, `axisNames`, `showGrid`, `axisGapEnabled`, `axisGap`는 활성 그래프의 편집용 투영입니다. `syncDiagram`으로 변경을 반영하고 `loadDiagram`으로 전환합니다. `configureWorkspace(quadrantMode, {boxSize})`는 활성 그래프의 포맷(과 에지워드 총량)을 한 기록으로 바꿉니다. 여러 그래프 배치는 2026-11-13에 지웠으며 `diagrams` 배열 구조는 다시 구현할 때를 위해 남겼습니다(항상 그래프 하나).
 
 `workspace.js`는 그래프마다 `diagramState`로 분리한 store 구독을 전달합니다. SVG의 pointerdown·keydown capture 단계에서 먼저 그래프를 선택하므로 빈 평면·도형·좌클릭 생성도 올바른 그래프에 적용합니다. 비활성 그래프에는 선택 손잡이와 마우스 커서를 표시하지 않습니다. 각 SVG의 clipPath ID는 고유합니다. 숨긴 그래프는 mount를 해제하고 다시 표시할 때 재생성합니다. 도구·계층·스냅은 활성 그래프 문서만 읽습니다. 마우스 옵션은 작업 전체에서 공유합니다.
 
-`quadrants.js`는 선택 내용을 초안으로만 유지한 뒤 적용 버튼에서 한 번에 반영합니다. 첫 시작에서는 배치와 사분면 선택을 요구하고, 이후에는 Esc·닫기로 취소할 수 있습니다. 프리셋을 바꾸면 축 방향을 프리셋 값으로 설정하며, 배치를 그대로 적용할 때는 개별 축 반전을 유지합니다. 사용자 지정은 1~9칸, 중복 없는 정수 행·열 0~2를 검증하고 바깥 빈 여백만 제거합니다. 좁은 화면에서도 grid 위치를 유지하고 그래프 카드 안에서 스크롤합니다.
+`quadrants.js`는 포맷 선택을 초안으로만 유지한 뒤 적용 버튼에서 한 번에 반영합니다. 첫 시작에서는 포맷 선택을 요구하고, 이후에는 Esc·닫기로 취소할 수 있습니다. 축 반전은 그래프 설정에서 바꿉니다.
 
 구독 스냅샷에는 `canUndo`, `canRedo`, `historyRevision`도 포함합니다. 이 메타데이터와 UI 설정은 JSON에 출력하지 않습니다.
 
@@ -382,7 +378,7 @@ sumPanel은 다른 생성 도구·복제와 배타적인 UI 상태입니다. 합
 
 ## 축에서 선 띄우기
 
-axisGapEnabled는 기본 false, axisGap는 기본 0.75이며 0.25~2 내부 좌표로 제한합니다. 그래프별 문서 필드여서 전환·배치 변경·undo/redo에서 보존합니다. display.js는 x=0/y=0 주변 띠를 제외한 영역을 구하고 직선·곡선의 실제 형상만 클리핑합니다. 수직선·접선 연장·기울기·anchor는 변하지 않습니다. 축·점·독립 점선에는 적용하지 않습니다.
+axisGapEnabled는 기본 false, axisGap는 기본 0.75이며 0.25~2 내부 좌표로 제한합니다. 그래프별 문서 필드여서 포맷 변경·undo/redo에서 보존합니다. display.js는 x=0/y=0 주변 띠를 제외한 영역을 구하고 직선·곡선의 실제 형상만 클리핑합니다. 수직선·접선 연장·기울기·anchor는 변하지 않습니다. 축·점·독립 점선에는 적용하지 않습니다.
 
 렌더와 스냅이 동일한 표시 구간을 사용하므로 숨긴 부분에는 스냅하지 않습니다. 드래그 기준점은 lineEditingGeometry로 보이는 선분 위에 두며 곡선 손잡이는 isLinePointVisible로 검사합니다. canvas별 line-display-clip ID를 고유하게 만들고 영역의 양 끝을 투영한 min 좌표와 절대 폭·높이를 사용해 좌우·상하 반전에서도 클리핑을 유지합니다. JSON의 coordinateSystem.lineAxisGap에 enabled/distance를 기록합니다.
 
@@ -472,19 +468,13 @@ binding은 `{kind:'tangent',sourceId:lineId,parameter}`(직선 기준점에서 �
 
 렌더와 스냅은 displayedSumSegments의 동일한 선분·축 간격 클리핑을 공유합니다. 합 위 점·교점 스냅은 표시 근사에 기반하며 원본 직선·곡선의 기존 정확한 스냅은 유지합니다. 축 반전은 다른 도형과 동일하게 투영에만 적용합니다. 원본 삭제 시 해당 원본에 의존하는 모든 합을 함께 지우고, 삭제된 항목의 자식은 살아남는 상위 항목으로 올립니다. 이 변경은 하나의 기록이며 undo/redo·전체 삭제·그래프별 숨김/복원에 포함합니다. sums는 JSON 7에서 추가했고 현재 출력은 10입니다.
 
-## 그래프 사이 연결선 (2026-11-12)
+## 여러 그래프 배치·연결선 제거 (2026-11-13)
 
-연결선은 새 도형 종류가 아니라 **각 그래프에 하나씩 있는 보통 직선**을 `link:{id, axis}`로 묶은 것입니다. `axis:'x'`는 세로선(같은 x), `axis:'y'`는 가로선(같은 y)입니다. 구성원이 보통 직선이므로 그 그래프 안의 자석(교점·선 맞춤)·`relations`·선택·삭제·되돌리기·JSON이 따로 작업 없이 동작합니다.
-
-- **만들기:** 점을 선택하고 **세로 연결선**/**가로 연결선**을 누릅니다. 버튼은 `alignedPartners`가 같은 열(세로)/같은 행(가로)에서 축 위치와 방향이 같은 그래프를 찾을 때만 보입니다. 1사분면끼리, 또는 1·2사분면·전체·대면끼리(가로선은 원점 높이 기준), 같은 반전이어야 하며 에지워드 상자는 제외합니다. 지금 그래프에는 점에서 상대 그래프 쪽으로 뻗는 반직선(양쪽에 있으면 직선)을, 상대 그래프마다 같은 좌표의 직선을 점선·회색으로 한 기록에 만듭니다. **점을 따라가기**가 켜져 있으면 지금 그래프의 선이 점을 따라갑니다.
-- **맞추기:** store의 `emit`이 `resolveRelations` 다음에 `syncLinks(diagrams, activeDiagramId)`를 부릅니다. 점을 따라가는 구성원이 있으면 그 값이, 없으면 방금 편집한(활성 그래프의) 구성원 값이 다른 구성원에 복사됩니다. 점을 따라가는 구성원이 있는 동안 다른 그래프의 구성원은 끌어 옮길 수 없습니다(`linkHeld`). 구성원의 기울기는 고정이며 회전 손잡이와 기울기 조절이 꺼집니다. 종류(직선·반직선·선분)·실선/점선·이름은 각자 바꿉니다. 구성원이 하나만 남으면 `link`가 지워져 보통 직선이 됩니다. 복제본은 `link`가 없는 보통 직선입니다.
-- **축 눈금 공유:** 같은 배치의 칸은 크기가 같아 기본 단위가 같습니다. 연결선으로 묶인 그래프는 확대 배율을 함께 씁니다(`setDiagramZoom`이 `linkedDiagramIds` 전체에 적용). 연결선을 만들 때 상대 그래프는 지금 그래프의 배율을 받습니다. 묶이지 않은 그래프는 지금처럼 따로 확대합니다.
-- **틈 잇기:** `workspace.js`가 그래프 칸 위에 그리기 전용 SVG(`.link-bridges`)를 두고, 그림이 바뀌거나 크기가 바뀔 때마다 `linkBridges`로 다시 그립니다. 두 구성원이 화면에서 0.5px 안에 정렬되고, 각자 마주 보는 그래프 가장자리(축 띄우기 간격 포함)까지 닿을 때만 그 사이를 같은 색·모양으로 잇습니다. 화면 좌표는 저장하지 않습니다.
-- **JSON:** 각 구성원 직선에 `link`가 붙고, 문서 최상위 `links`에 `{id, axis, value, lines:[{diagramId, lineId}]}`, `legend.links`에 설명이 들어갑니다(연결선이 있을 때만).
+사용자 요청으로 그래프 1개를 뺀 배치(가로/세로 2·3개, ㄴ자, 격자, 직접 배치)와 그래프 사이 연결선(`links.js`, 점 설정의 세로/가로 연결선, 카드 사이 덧그림)을 지웠습니다. 불안정해서 나중에 다시 구현합니다. 남긴 것: `diagrams` 배열과 활성 그래프 투영(`diagramState`, `selectDiagram`), 그래프 이름·축 반전. 지운 것: `layout` 상태·`configureLayout`(→ `configureWorkspace`)·작업 영역 창의 배치 칸·'모든 그래프에 적용'·직선 `link` 필드·JSON `layout`/`links`/`legend.links`. 이전 구현은 `v10` 태그에 있습니다.
 
 ## 편집 기록
 
-store는 모든 그래프의 도형·점·폴더·생성 순서·사분면·축 이름·격자·그래프 이름·축 방향과 전체 배치를 깊은 복사한 문서 스냅샷으로 기록합니다. 활성 그래프 ID는 스냅샷의 복원 문맥에 포함하되 문서 변경 비교에서 제외하므로 그래프 선택만으로 기록이 생기지 않습니다. 실제 문서가 변경됐을 때만 기록하며 선택·접기·마우스 옵션·호버는 기록하지 않습니다. `undo`/`redo`는 문서와 당시 선택을 복원하며 ID 카운터는 되돌리지 않아 새 ID가 중복되지 않습니다. 새로운 편집은 다시 실행 기록을 지우고 최근 100단계만 유지합니다. `clearAll`은 활성 그래프의 모든 도형과 폴더를 지우는 하나의 편집이며 축·영역·마우스 옵션을 유지합니다.
+store는 모든 그래프의 도형·점·폴더·생성 순서·사분면·축 이름·격자·그래프 이름·축 방향을 깊은 복사한 문서 스냅샷으로 기록합니다. 활성 그래프 ID는 스냅샷의 복원 문맥에 포함하되 문서 변경 비교에서 제외하므로 그래프 선택만으로 기록이 생기지 않습니다. 실제 문서가 변경됐을 때만 기록하며 선택·접기·마우스 옵션·호버는 기록하지 않습니다. `undo`/`redo`는 문서와 당시 선택을 복원하며 ID 카운터는 되돌리지 않아 새 ID가 중복되지 않습니다. 새로운 편집은 다시 실행 기록을 지우고 최근 100단계만 유지합니다. `clearAll`은 활성 그래프의 모든 도형과 폴더를 지우는 하나의 편집이며 축·영역·마우스 옵션을 유지합니다.
 
 `beginHistory`/`endHistory`로 그래프 드래그·슬라이더 조작·텍스트 입력을 묶습니다. 텍스트·숫자 입력은 focusin~focusout, 슬라이더는 pointerdown~pointerup/cancel 또는 키 누름~떼기입니다. 기록 복원·전체 삭제 시 `historyRevision`을 증가시켜 진행 중인 그래프 드래그를 해제합니다. 상단 버튼은 `canUndo`/`canRedo`와 문서가 비었는지에 따라 비활성화됩니다. Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl/Cmd+Y를 처리하되 텍스트 입력·JSON 창의 기본 편집은 유지합니다. 기록은 메모리에만 있으며 JSON으로 내보내지 않습니다.
 

@@ -136,8 +136,6 @@ test('point magnets use only the active graph and keep mathematical coordinates 
     const viewport=createViewport(800,600,'first',{flipX,flipY}),snap=snapShapeToPoint(shape,store.getState(),viewport.bounds,viewport.unit);
     assert.ok(snap);near(snap.anchor.y,point.anchor.y);
   }
-  store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);store.selectDiagram(store.getState().diagrams[1].id);const other=line(store);
-  assert.equal(snapShapeToPoint(other,store.getState(),bounds,56),null);
 });
 
 test('a curve drag through a marked point is one undo with source points and shape metadata intact',()=>{

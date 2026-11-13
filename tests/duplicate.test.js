@@ -98,15 +98,15 @@ test('an entire copied hierarchy is one undo step, redo restores it and branchin
 });
 
 test('copies stay within their active diagram and serialize as normal editable objects', () => {
-  const store=createStore(); store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]); store.addLine(); store.updateSelected({slope:-1,name:'D',anchor:{x:4,y:6}});
+  const store=createStore(); store.updateDiagram({ flipX: true }); store.addLine(); store.updateSelected({slope:-1,name:'D',anchor:{x:4,y:6}});
   store.update({duplicatePanel:true}); const copy=store.duplicateSelected({slopeFactor:2});
   const doc=serializeActive(store.getState());
-  assert.equal(doc.lines.length,2); assert.equal(doc.diagrams[1].lines.length,0);
+  assert.equal(doc.lines.length,2); assert.equal(doc.diagrams.length,1);
   assert.ok(Math.abs(doc.lines.find(o=>o.id===copy).intercept-(14+Math.sqrt(5)))<1e-10); assert.equal(doc.lines.find(o=>o.id===copy).slope,-2);
   assert.equal(doc.coordinateSystem.xPositive,'left'); assert.equal('duplicatePanel' in doc,false);
   store.selectObject('line-1'); store.duplicateSelected({slopeFactor:2});
   assert.equal(new Set(store.getState().lines.map(line=>line.name)).size,3);
-  store.selectDiagram(store.getState().diagrams[1].id); assert.equal(store.duplicateSelected(),null);
+  store.selectObject(null); assert.equal(store.duplicateSelected(),null);
 });
 
 test('copy names remain bounded and ruler data is excluded while other parent links are retained', () => {

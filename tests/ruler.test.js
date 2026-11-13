@@ -59,16 +59,14 @@ test('moving a ruler preserves its length and limits the complete segment to the
   assert.equal(rulerMetrics(moved).length,5);
 });
 
-test('rulers participate in hierarchy, independent diagrams, deletion and whole-document history', () => {
-  const store=createStore(); store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);
+test('rulers participate in hierarchy, deletion and whole-document history', () => {
+  const store=createStore(); store.updateDiagram({ flipX: true });
   const id=store.addRuler({x:1,y:2},{x:4,y:6}), group=store.addGroup();
   store.moveObject(id,group); store.selectObject(id);
   const original=serializeActive(store.getState());
   store.beginHistory(); store.updateSelected({end:{x:5,y:7}}); store.updateSelected({end:{x:7,y:9}}); store.endHistory();
   store.undo(); assert.deepEqual(serializeActive(store.getState()),original);
-  const second=store.getState().diagrams[1].id; store.selectDiagram(second);
-  assert.equal(store.getState().rulers.length,0);
-  store.selectDiagram('diagram-1'); store.selectObject(id); store.removeSelected();
+  store.selectObject(id); store.removeSelected();
   assert.equal(store.getState().rulers.length,0); store.undo();
   assert.equal(objectsOf(store.getState()).find(o=>o.id===id).parentId,group);
   store.clearAll(); assert.equal(store.getState().rulers.length,0); store.undo();

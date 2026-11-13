@@ -118,8 +118,7 @@ test('contact targets disappear after geometry/history/graph changes and obey ex
   store.undo(); assert.ok(hasContact(store.getState()));
   store.selectObject(target); store.removeSelected(); assert.equal(hasContact(store.getState()), false);
   store.undo(); assert.ok(hasContact(store.getState()));
-  store.configureLayout('horizontal2'); store.selectDiagram(store.getState().diagrams[1].id);
-  assert.equal(hasContact(store.getState()), false);
+  store.clearAll(); assert.equal(hasContact(store.getState()), false);
 });
 
 test('near misses, ordinary crossings, coincident curves and nonsmooth families never invent tangent points', () => {

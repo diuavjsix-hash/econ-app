@@ -4,7 +4,6 @@ import { TOOL_MODES, toolModeFlags, toolModeOf, requestedToolMode, isOperationMo
 import { DEFAULT_AXIS_GAP, MIN_AXIS_GAP, MAX_AXIS_GAP } from './graph/display.js';
 import { prepareDuplicate, DUPLICATABLE, placeCopiesNearby } from './duplicate.js';
 import { validPoint, rulerMetrics } from './graph/ruler.js';
-import { LAYOUTS, normalizeSlots } from './layouts.js';
 import { normalizeSlope, directionOf } from './graph/math.js';
 import { LINE_KINDS, LINE_STYLES, lineFromPoints, lineKindOf } from './graph/line-extent.js';
 import { QUADRANT_MODES, clampZoom } from './graph/viewport.js';
@@ -20,7 +19,6 @@ import { validFill, fillKey } from './graph/fill.js';
 import { nextFillColor, nextFillLabel } from './graph/fill-style.js';
 
 import { INK, ROLE_COLORS, lineColor, sumColor } from './models/palette.js';
-import { LINK_AXES, alignedPartners, isLinkAxis, linkedDiagramIds, sourceExtent, syncLinks } from './links.js';
 
 
 /** Internal mathematical coordinates; hierarchy only organizes objects. */
@@ -55,9 +53,6 @@ export function createStore() {
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
   const zooms = new Map(); // diagram id → view zoom; kept out of documentState on purpose
-  let layout = { preset: 'single', slots: structuredClone(LAYOUTS.single.slots) };
-  let nextDiagramId = 2;
-  let nextLinkId = 1;
   const syncDiagram = () => Object.assign(diagrams.find(d => d.id === activeDiagramId), Object.fromEntries(documentKeys.map(key => [key, state[key]])));
   const loadDiagram = () => {
     const diagram = diagrams.find(d => d.id === activeDiagramId);
@@ -67,7 +62,7 @@ export function createStore() {
   const documentState = () => {
     syncDiagram();
     return {
-      document: structuredClone({ layout, diagrams: diagrams.map(diagram => ({
+      document: structuredClone({ diagrams: diagrams.map(diagram => ({
         ...diagram,
         ...Object.fromEntries(OBJECT_COLLECTIONS.map(key => [key, diagram[key].map(({ collapsed, ...object }) => object)])),
       })) }),
@@ -83,7 +78,7 @@ export function createStore() {
     syncDiagram();
     const active = diagrams.find(d => d.id === activeDiagramId);
     return {
-      ...structuredClone(state), diagrams: structuredClone(diagrams).map(d => ({ ...d, zoom: zooms.get(d.id) ?? 1 })), layout: structuredClone(layout),
+      ...structuredClone(state), diagrams: structuredClone(diagrams).map(d => ({ ...d, zoom: zooms.get(d.id) ?? 1 })),
       zoom: zooms.get(activeDiagramId) ?? 1,
       fillColor: state.fillAutoColor ? nextFillColor(state.fills) : state.fillColor, fillNextLabel: nextFillLabel(state.fills),
       activeDiagramId, flipX: active.flipX, flipY: active.flipY,
@@ -92,8 +87,7 @@ export function createStore() {
   };
   const emit = () => {
     resolveRelations(state);
-    // Link lines in other graphs follow the one just edited (or the one following a point).
-    syncDiagram(); syncLinks(diagrams, activeDiagramId);
+    syncDiagram();
     const next = documentState();
     if (!restoring && different(baseline, next)) {
       if (!transaction) remember(baseline);
@@ -111,7 +105,7 @@ export function createStore() {
   const restore = (entry) => {
     syncDiagram();
     const folds = new Map(diagrams.flatMap(d => objectsOf(d)).map(({ id, collapsed }) => [id, collapsed]));
-    ({ diagrams, layout } = structuredClone(entry.document));
+    ({ diagrams } = structuredClone(entry.document));
     activeDiagramId = entry.activeDiagramId;
     for (const diagram of diagrams) for (const object of objectsOf(diagram)) object.collapsed = folds.get(object.id) ?? false;
     loadDiagram();
@@ -134,11 +128,10 @@ export function createStore() {
     return object.id;
   };
   /** View zoom of one graph: not part of the document, its history or the JSON. */
-  // Graphs joined by a link share one zoom, so the linked coordinate stays lined up on screen.
   const setDiagramZoom = (id, zoom) => {
     const next = clampZoom(zoom);
     if (!diagrams.some(d => d.id === id) || next === (zooms.get(id) ?? 1)) return;
-    for (const linked of linkedDiagramIds(diagrams, id)) zooms.set(linked, next);
+    zooms.set(id, next);
     emit();
   };
   return {
@@ -146,29 +139,21 @@ export function createStore() {
     setDiagramZoom,
     setZoom(zoom) { setDiagramZoom(activeDiagramId, zoom); },
     selectDiagram(id) {
-      if (id === activeDiagramId || !diagrams.slice(0, layout.slots.length).some(d => d.id === id)) return;
+      if (id === activeDiagramId || !diagrams.some(d => d.id === id)) return;
       if (isOperationMode(state)) enterToolMode('hand');
       endHistory(); syncDiagram(); activeDiagramId = id; loadDiagram(); historyRevision++; emit();
     },
-    configureLayout(preset, customSlots, quadrantMode, { allQuadrants = true, preserveDirections = false, boxSize = null } = {}) {
-      const slots = normalizeSlots(preset === 'custom' ? customSlots : LAYOUTS[preset]?.slots);
-      if (!slots) return false;
+    /** The workspace dialog's format choice for the graph (and the Edgeworth box totals). */
+    configureWorkspace(quadrantMode, { boxSize = null } = {}) {
+      if (!Object.hasOwn(QUADRANT_MODES, quadrantMode)) return false;
       endHistory(); syncDiagram();
-      while (diagrams.length < slots.length) {
-        const index = nextDiagramId++;
-        diagrams.push({ id: `diagram-${index}`, name: `그래프 ${index}`, flipX: false, flipY: false, ...emptyDocument() });
+      const diagram = diagrams.find(d => d.id === activeDiagramId);
+      diagram.quadrantMode = quadrantMode;
+      if (quadrantMode === 'edgeworth') {
+        const previous = { ...diagram.boxSize };
+        for (const key of ['width', 'height']) if (Number.isFinite(boxSize?.[key]) && boxSize[key] >= 1 && boxSize[key] <= 100) diagram.boxSize[key] = boxSize[key];
+        followBoxOrigin(diagram, previous);
       }
-      layout = { preset, slots };
-      if (!diagrams.slice(0, slots.length).some(d => d.id === activeDiagramId)) activeDiagramId = diagrams[0].id;
-      slots.forEach((slot, index) => {
-        if (!preserveDirections) { diagrams[index].flipX = slot.flipX; diagrams[index].flipY = slot.flipY; }
-        if ((allQuadrants || diagrams[index].id === activeDiagramId) && Object.hasOwn(QUADRANT_MODES, quadrantMode)) diagrams[index].quadrantMode = quadrantMode;
-        if (quadrantMode==='edgeworth' && (allQuadrants || diagrams[index].id===activeDiagramId)) {
-          const previous={...diagrams[index].boxSize};
-          for (const key of ['width','height']) if (Number.isFinite(boxSize?.[key]) && boxSize[key]>=1 && boxSize[key]<=100) diagrams[index].boxSize[key]=boxSize[key];
-          followBoxOrigin(diagrams[index],previous);
-        }
-      });
       loadDiagram(); historyRevision++; emit();
       return true;
     },
@@ -320,35 +305,6 @@ export function createStore() {
       if (!point) return null;
       const index=nextId++;
       return add('lines',{id:`line-${index}`,type:'line',name:`통과 직선 ${index}`,color:lineColor(index-1,'solid'),anchor:{...point.anchor},slope:normalizeSlope(slope),binding:follow ? {kind:'through-point',sourceId:point.id}:null});
-    },
-    /** Graphs a link from the selected point would reach (same column for 'x', same row for 'y'). */
-    linkPartners(axis) {
-      syncDiagram();
-      return alignedPartners(layout, diagrams, activeDiagramId, axis).map(({ diagram }) => diagram.id);
-    },
-    /**
-     * A vertical ('x') or horizontal ('y') link through the selected point: a line here that
-     * reaches toward the partner graphs, and a full line at the same coordinate in each of them.
-     */
-    linkThroughSelectedPoint({ axis = 'x', follow = true } = {}) {
-      const point = state.points.find(point => point.id === state.selectedId);
-      if (!point || !isLinkAxis(axis)) return null;
-      syncDiagram();
-      const partners = alignedPartners(layout, diagrams, activeDiagramId, axis);
-      if (!partners.length) return null;
-      endHistory();
-      const index = nextLinkId++, link = { id: `link-${index}`, axis }, name = `${LINK_AXES[axis].label} ${String(index).padStart(2, '0')}`;
-      const slope = LINK_AXES[axis].slope, zoom = zooms.get(activeDiagramId) ?? 1;
-      const source = { diagram: diagrams.find(d => d.id === activeDiagramId), slot: layout.slots[diagrams.findIndex(d => d.id === activeDiagramId)] };
-      for (const { diagram } of partners) {
-        const anchor = axis === 'x' ? { x: point.anchor.x, y: 0 } : { x: 0, y: point.anchor.y };
-        const line = { id: `line-${nextId++}`, type: 'line', name, color: ROLE_COLORS.dashedLine, anchor, slope, style: 'dashed', link: { ...link }, parentId: null, collapsed: false };
-        diagram.lines.push(line); diagram.objectOrder.push(line.id);
-        zooms.set(diagram.id, zoom);
-      }
-      const extent = sourceExtent(source, partners, axis);
-      return add('lines', { id: `line-${nextId++}`, type: 'line', name, color: ROLE_COLORS.dashedLine, anchor: { ...point.anchor }, slope, style: 'dashed',
-        ...(extent ? { extent } : {}), link, binding: follow ? { kind: 'through-point', sourceId: point.id } : null });
     },
     addSum(sourceIds, { direction = 'vertical', nonnegative = true } = {}) {
       if (!Array.isArray(sourceIds) || new Set(sourceIds).size !== sourceIds.length) return null;

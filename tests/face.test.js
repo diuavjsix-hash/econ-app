@@ -38,15 +38,11 @@ test('one line crosses the shared axis as a single object', () => {
   assert.deepEqual(crossing?.at, { x: 0, y: 3 }, 'the line meets the shared y axis');
 });
 
-test('the facing x axis name belongs to each graph and follows history', () => {
+test('the facing x axis name belongs to the graph and follows history', () => {
   const store = createStore();
-  store.configureLayout('horizontal2', null, 'face');
+  store.configureWorkspace('face');
   assert.equal(store.getState().faceAxisName, 'x′');
   store.update({ faceAxisName: 'L₂' });
-  const other = store.getState().diagrams[1].id;
-  store.selectDiagram(other);
-  assert.equal(store.getState().faceAxisName, 'x′');
-  store.selectDiagram(store.getState().diagrams[0].id);
   assert.equal(store.getState().faceAxisName, 'L₂');
   store.undo();
   assert.equal(store.getState().faceAxisName, 'x′');

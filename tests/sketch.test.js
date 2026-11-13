@@ -117,13 +117,11 @@ test('sketches copy independently, preserve hierarchy and export full internal g
   doc.sketches[0].geometry.controlPoints[0][0].x=998;assert.equal(exportedState.sketches[0].start.x,1);
 });
 
-test('diagram isolation, hidden layouts, whole-document history, clear and monotone IDs include sketches',()=>{
-  const store=createStore(), id=cup(store);store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);const first=store.getState().activeDiagramId;
-  store.selectDiagram(store.getState().diagrams[1].id);assert.equal(store.getState().sketches.length,0);cup(store);
-  store.configureLayout('single');assert.equal(sketch(store).id,id);
-  assert.equal(serializeActive(store.getState()).diagrams[1].sketches.length,1);
+test('whole-document history, clear and monotone IDs include sketches',()=>{
+  const store=createStore(), id=cup(store);store.updateDiagram({ flipX: true });const first=store.getState().activeDiagramId;
+  assert.equal(serializeActive(store.getState()).diagrams[0].sketches.length,1);
   store.clearAll();assert.equal(store.getState().sketches.length,0);store.undo();assert.equal(sketch(store).id,id);
-  store.selectObject(id);store.removeSelected();assert.equal(cup(store),'sketch-3');
+  store.selectObject(id);store.removeSelected();assert.equal(cup(store),'sketch-2');
   assert.equal(store.getState().activeDiagramId,first);
 });
 

@@ -33,8 +33,7 @@ function lineHandles(object, viewport, state) {
   const editing = lineEditingGeometry(object, displayedLineSegments(object, viewport.bounds, state));
   if (!editing) return null;
   const anchor = toScreen(editing.anchor, viewport), group = node('g', { class: 'line-handles', style: `--line-color:${object.color}` });
-  // A link line keeps its direction, so it has no rotation handles.
-  for (const [index, endpoint] of (object.link ? [] : editing.points.entries())) {
+  for (const [index, endpoint] of editing.points.entries()) {
     const edge = toScreen(endpoint, viewport), distance = Math.hypot(edge.x - anchor.x, edge.y - anchor.y);
     const fraction = distance === 0 ? 0 : Math.min(90, distance * 0.7) / distance;
     const point = { x: editing.anchor.x + (endpoint.x - editing.anchor.x) * fraction, y: editing.anchor.y + (endpoint.y - editing.anchor.y) * fraction };

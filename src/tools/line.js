@@ -81,8 +81,6 @@ export function mountLineTool(root, store) {
     slopeInput.placeholder = slope === null ? '수직' : '';
     root.querySelector('#equation-value').textContent = lineEquation(selected);
     showSelected(lineKindOf(selected), selected.style === 'dashed' ? 'dashed' : 'solid');
-    // A link line keeps its direction: only its position, kind and style change.
-    for (const control of [slider.input, slopeInput, root.querySelector('#reset-line'), ...presets]) control.disabled = Boolean(selected.link);
     for (const preset of presets) preset.setAttribute('aria-pressed', String(preset.dataset.slope === 'vertical' ? slope === null : slope !== null && Number(preset.dataset.slope) === slope));
   });
 }

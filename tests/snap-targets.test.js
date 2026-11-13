@@ -81,8 +81,7 @@ test('cached targets refresh after undo, redo, deletion and graph switching', ()
   store.redo(); assert.deepEqual(cache.get(store.getState(), bounds), moved);
   store.removeSelected(); assert.ok(!referenced(cache.get(store.getState(), bounds), line));
   store.undo(); assert.ok(referenced(cache.get(store.getState(), bounds), line));
-  store.configureLayout('horizontal2'); store.selectDiagram(store.getState().diagrams[1].id);
-  assert.ok(!referenced(cache.get(store.getState(), bounds), line));
+  store.clearAll(); assert.ok(!referenced(cache.get(store.getState(), bounds), line));
 });
 
 test('moving points and curves never snap to geometry that follows their own movement', () => {

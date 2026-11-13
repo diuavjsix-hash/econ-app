@@ -20,7 +20,7 @@ export class LineObject extends StrokeObject {
   updateGeometry(patch) {
     const before = { slope: this.data.slope, extent: this.data.extent ?? null };
     super.updateGeometry(patch);
-    if ('slope' in patch && !this.data.link) {
+    if ('slope' in patch) {
       this.data.slope = normalizeSlope(patch.slope);
       // Without an explicit extent, keep the ends on the side nearest their old direction.
       if (!('extent' in patch) && before.extent) this.setExtent(rotatedExtent(before.extent, this.data.slope, directionOf(before.slope)));
@@ -46,7 +46,6 @@ export class LineObject extends StrokeObject {
     return Math.abs(d.x * e.y - d.y * e.x) < 1e-10 && Math.abs((a.anchor.x - b.anchor.x) * d.y - (a.anchor.y - b.anchor.y) * d.x) < 1e-8;
   }
   transformDuplicate(object, { slopeFactor }) {
-    delete object.link; // A copy is a plain line of this graph.
     if (object.slope !== null) {
       const slope = object.slope * slopeFactor;
       if (!Number.isFinite(slope) || (object.slope !== 0 && slope === 0)) return { error: '이 기울기는 숫자 범위를 벗어납니다.' };
@@ -59,7 +58,7 @@ export class LineObject extends StrokeObject {
     const [start, end] = lineEndPoints(line);
     return { ...super.serialize(), slope: line.slope, intercept: interceptOf(line), anchor: { ...line.anchor },
       style: line.style ?? 'solid', ...(isTrimmed(line) ? { extent: [...line.extent], segment: { start, end } } : {}),
-      ...(line.binding ? { binding: { ...line.binding } } : {}), ...(line.link ? { link: { ...line.link } } : {}), vertical: line.slope === null, xIntercept: line.slope === null ? line.anchor.x : null,
+      ...(line.binding ? { binding: { ...line.binding } } : {}), vertical: line.slope === null, xIntercept: line.slope === null ? line.anchor.x : null,
       implicit: { a: -direction.y, b: direction.x, c: direction.y * line.anchor.x - direction.x * line.anchor.y } };
   }
 }

@@ -121,14 +121,14 @@ test('a curve moved onto a sum with the magnet is exported as a contact, with no
 
 test('the export lists each diagram once with its relations, a legend and rounded numbers', () => {
   const store = createStore();
-  store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);
+  store.updateDiagram({ flipX: true });
   store.addLine({ x: 0, y: 6 }, { x: 6, y: 0 });
   store.addPoint({ x: 1 / 3, y: 6 - 1 / 3 });
   const document = serializeDocument(store.getState());
   assert.equal(document.schemaVersion, SCHEMA_VERSION);
   assert.equal(SCHEMA_VERSION, 13);
   for (const key of ['lines', 'points', 'coordinateSystem', 'objectOrder']) assert.ok(!(key in document), `no top-level ${key} copy`);
-  assert.equal(document.diagrams.length, 2);
+  assert.equal(document.diagrams.length, 1);
   assert.ok(document.diagrams.every(diagram => Array.isArray(diagram.relations)));
   assert.equal(typeof document.legend.relations, 'string');
   assert.equal(document.diagrams[0].points[0].anchor.x, 1 / 3, 'the document keeps full precision');

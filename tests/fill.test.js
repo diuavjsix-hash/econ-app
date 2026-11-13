@@ -143,18 +143,15 @@ test('paint is an independent movable shape, and moving/deleting its former boun
   store.undo(); assert.deepEqual(store.getState().fills[0], original);
 });
 
-test('fills participate in object lists, hierarchy, area selection, clear and graph isolation', () => {
-  const store = createStore(); store.configureLayout('horizontal2');
+test('fills participate in object lists, hierarchy, area selection and clear', () => {
+  const store = createStore();
   const id = store.addFill(triangle), folder = store.addGroup(); store.moveObject(id, folder);
   assert.ok(objectsOf(store.getState()).some(object => object.id === id));
   assert.ok(objectsInRectangle(store.getState(), { xMin: 1, xMax: 2, yMin: 1, yMax: 2 }).includes(id));
   store.clearAll(); assert.equal(store.getState().fills.length, 0); store.undo();
   assert.equal(store.getState().fills[0].parentId, folder);
-  const first = store.getState().activeDiagramId, second = store.getState().diagrams[1].id;
-  store.update({ fillSelected: true }); assert.equal(diagramState(store.getState(), second).fillSelected, false);
-  store.selectDiagram(second); assert.equal(store.getState().fills.length, 0);
-  store.selectDiagram(first); assert.equal(store.getState().fills[0].id, id);
-  store.configureLayout('single'); store.configureLayout('horizontal2'); assert.equal(store.getState().fills.length, 1);
+  store.update({ fillSelected: true }); assert.equal(diagramState(store.getState(), store.getState().activeDiagramId).fillSelected, true);
+  assert.equal(store.getState().fills[0].id, id);
 });
 
 test('JSON 10 exports independent deep-copied mathematical rings including holes', () => {

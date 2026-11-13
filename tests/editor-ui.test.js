@@ -25,14 +25,12 @@ test('inspector follows the current task and object, then returns from sum to th
   assert.equal(editorContext(store.getState()).kind,'selection');
 });
 
-test('changing diagrams exits an operation and preserves drawing preferences and document serialization',()=>{
-  const store=createStore();store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);store.addLine();
+test('operation panels and drawing preferences stay out of document serialization',()=>{
+  const store=createStore();store.updateDiagram({ flipX: true });store.addLine();
   store.update({pointSnap:false,segmentSnap:false});const original=serializeActive(store.getState());
   store.update({sumPanel:true});assert.deepEqual(serializeActive(store.getState()),original);
-  const second=store.getState().diagrams[1].id;store.selectDiagram(second);
-  assert.equal(store.getState().sumPanel,false);assert.equal(store.getState().handSelected,true);
-  store.update({duplicatePanel:true});store.selectDiagram(store.getState().diagrams[0].id);
-  assert.equal(store.getState().duplicatePanel,false);assert.equal(store.getState().pointSnap,false);assert.equal(store.getState().segmentSnap,false);
+  store.update({duplicatePanel:true});assert.deepEqual(serializeActive(store.getState()),original);
+  assert.equal(store.getState().pointSnap,false);assert.equal(store.getState().segmentSnap,false);
 });
 
 test('explicit rising and falling curve commands create the requested shape in a single undo step',()=>{

@@ -68,6 +68,5 @@ test('hyperbola size, copies, undo, graph isolation and JSON keep the exact curv
   assert.equal(json.schemaVersion,13);assert.equal(json.curves.length,3);
   assert.equal(json.curves[0].geometry.domain,'nonnegative');
   assert.equal(json.curves[0].family,'rectangular-hyperbola');
-  store.configureLayout('horizontal2');store.selectDiagram(store.getState().diagrams[1].id);
-  assert.equal(store.getState().curves.length,0);
+  store.clearAll();assert.equal(store.getState().curves.length,0);
 });

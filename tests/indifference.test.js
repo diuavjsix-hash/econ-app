@@ -137,7 +137,7 @@ test('creation, preference edits, repeated copies, history, graph isolation, del
   assert.equal(doc.curves.length,3*Object.keys(INDIFFERENCE_FAMILIES).length);assert.deepEqual(doc.curves,doc.diagrams[0].curves);
   assert.ok(!JSON.stringify(doc).includes('quadratic-bezier'));
   for (const c of JSON.parse(JSON.stringify(doc)).curves) assert.ok(Number.isFinite(c.anchor.x) && Number.isFinite(c.anchor.y) && Number.isFinite(c.shape));
-  store.configureLayout('horizontal2');store.selectDiagram(store.getState().diagrams[1].id);assert.equal(store.getState().curves.length,0);
+  store.clearAll();assert.equal(store.getState().curves.length,0);
   store.addIndifference('quasilinear');store.updateSelected({linearAxis:'x'});assert.equal(store.getState().curves[0].linearAxis,'x');
   const c=store.getState().curves[0];store.updateSelected({anchor:{x:-3,y:c.anchor.y}});assert.equal(store.getState().curves[0].anchor.x,-3);
   store.updateSelected({linearAxis:'y'});assert.equal(store.getState().curves[0].anchor.y,-3);

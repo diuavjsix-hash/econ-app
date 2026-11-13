@@ -12,7 +12,7 @@ import { prepareDuplicate } from '../src/duplicate.js';
 const close = (a, b, message) => assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 1e-7, message ?? `${JSON.stringify(a)} != ${JSON.stringify(b)}`);
 const reflect = (o, p) => ({ x: o.x - p.x, y: o.y - p.y });
 const box = { width: 10, height: 8 }, boxBounds = { xMin: 0, xMax: 10, yMin: 0, yMax: 8 };
-const edgeworth = () => { const store = createStore(); store.configureLayout('single', null, 'edgeworth', { boxSize: box }); return store; };
+const edgeworth = () => { const store = createStore(); store.configureWorkspace('edgeworth', { boxSize: box }); return store; };
 const curveOf = (store, id) => store.getState().curves.find(c => c.id === id);
 
 test('the opposite wrapper mirrors every family method, so no path falls back to origin-side geometry', () => {
@@ -50,7 +50,7 @@ test('Edgeworth curves start from the B origin and stay attached when the totals
   assert.deepEqual(curve.oppositeOrigin, { x: 12, y: 9 }); close(curve.anchor, { x: 8, y: 5.8 });
   store.undo();
   assert.deepEqual(curveOf(store, id).oppositeOrigin, { x: 10, y: 8 }, 'box change and following curve are one undo step');
-  store.configureLayout('single', null, 'edgeworth', { boxSize: { width: 6, height: 5 } });
+  store.configureWorkspace('edgeworth', { boxSize: { width: 6, height: 5 } });
   close(curveOf(store, id).anchor, { x: 2, y: 1.8 });
 });
 

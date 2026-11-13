@@ -83,8 +83,6 @@ test('offscreen and axis-gap contacts, own curves, bound moving curves and other
   assert.equal(snapCurveToCurveTangency(curve, { ...state, sketches: [curve] }, bounds, unit), null);
   state.sketches[0].binding = { sourceId: curve.id };
   assert.equal(snapCurveToCurveTangency(curve, state, bounds, unit), null);
-  store.configureLayout('horizontal2'); store.selectDiagram(store.getState().diagrams[1].id);
-  assert.equal(snapCurveToCurveTangency(curve, store.getState(), bounds, unit), null);
 });
 
 test('PPC and Cobb-Douglas contact by radial size change with an exact shared negative slope', () => {

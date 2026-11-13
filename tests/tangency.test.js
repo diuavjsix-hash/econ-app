@@ -117,14 +117,12 @@ test('nearest tangent wins; a captured target stays stable when another curve ge
   assert.equal(retained.sourceId,first);near(retained.anchor.y,2);
 });
 
-test('dependent curves and point-bound lines are excluded; other graphs never contribute magnets',()=>{
+test('dependent curves and point-bound lines are excluded',()=>{
   const store=createStore();const moving=line(store);
   store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2},{lineId:moving.id});
   assert.equal(snapLineToTangency(moving,store.getState(),bounds,56),null);
   store.selectObject(store.getState().sketches[0].id);store.detachSelected();
   assert.equal(snapLineToTangency({...moving,binding:{kind:'through-point',sourceId:'point-1'}},store.getState(),bounds,56),null);
-  store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);store.selectDiagram(store.getState().diagrams[1].id);
-  const other=line(store);assert.equal(snapLineToTangency(other,store.getState(),bounds,56),null);
 });
 
 test('axis flips keep the same mathematical tangent and a snapped drag is one undo/redo step',()=>{

@@ -5,7 +5,6 @@ import { objectModel } from '../models/objects.js';
 import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions } from './display.js';
 import { createViewport, toScreen as projectPoint, toWorld, gridStep, wheelZoom, zoomable, faceToFace } from './viewport.js';
 import { pointCoordinatesLabel } from './point.js';
-import { linkHeld } from '../links.js';
 import { SnapTargetCache, snapPoint } from './snap.js';
 import { LINE_END_ACTIONS } from './line-extent.js';
 import { geometryKey, independentSnapState } from './snap-context.js';
@@ -405,7 +404,7 @@ export function mountGraph(container, store) {
       event.preventDefault();svg.focus({preventScroll:true});store.selectObject(object.id,{toggle:true});return;
     }
     const controller=interactionFor(object);
-    if (!controller.canDrag(object,target.dataset.action)||(target.dataset.action==='move'&&linkHeld(currentState.diagrams,object))) {event.preventDefault();store.selectObject(object.id);return;}
+    if (!controller.canDrag(object,target.dataset.action)) {event.preventDefault();store.selectObject(object.id);return;}
     const anchor=controller.start(object,interactionContext());
     if (!anchor) return;
     const startPatch=controller.startPatch(object,anchor);

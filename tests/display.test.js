@@ -133,21 +133,17 @@ test('gap preferences export, undo and group slider changes without modifying ob
   assert.equal(store.getState().axisGap, 2);
 });
 
-test('axis gap settings belong to each diagram and survive selection, layouts and undo', () => {
-  const store = createStore(); store.configureLayout('custom', [{ row: 0, column: 0, flipX: true }, { row: 0, column: 1 }]);
-  store.update({ axisGapEnabled: true, axisGap: 0.5 }); store.addLine();
-  const [first, second] = store.getState().diagrams.map(diagram => diagram.id);
-  store.selectDiagram(second);
+test('axis gap settings belong to the diagram and follow undo', () => {
+  const store = createStore(); store.updateDiagram({ flipX: true });
   assert.equal(store.getState().axisGapEnabled, false);
   assert.equal(store.getState().axisGap, 0.75);
+  store.update({ axisGapEnabled: true, axisGap: 0.5 }); store.addLine();
   store.update({ axisGapEnabled: true, axisGap: 1.5 });
-  store.undo(); assert.equal(store.getState().axisGapEnabled, false);
+  store.undo(); assert.equal(store.getState().axisGap, 0.5);
   assert.equal(store.getState().diagrams[0].axisGap, 0.5);
   store.redo(); assert.equal(store.getState().axisGap, 1.5);
-  store.configureLayout('single'); assert.equal(store.getState().activeDiagramId, first);
-  store.configureLayout('vertical2'); store.selectDiagram(second);
   const exported = serializeActive(store.getState());
-  assert.deepEqual(exported.diagrams.map(diagram => diagram.coordinateSystem.lineAxisGap), [{enabled:true,distance:0.5},{enabled:true,distance:1.5}]);
+  assert.deepEqual(exported.diagrams.map(diagram => diagram.coordinateSystem.lineAxisGap), [{enabled:true,distance:1.5}]);
   assert.equal(exported.diagrams[0].lines.length, 1);
 });
 

@@ -6,25 +6,10 @@
     "axes": "axis-x·axis-y는 x축·y축, axis-b-x·axis-b-y는 에지워드 상자 B의 축입니다."
   },
   "activeDiagramId": "diagram-1",
-  "layout": {
-    "preset": "horizontal2",
-    "slots": [
-      {
-        "diagramId": "diagram-1",
-        "row": 0,
-        "column": 0
-      },
-      {
-        "diagramId": "diagram-2",
-        "row": 0,
-        "column": 1
-      }
-    ]
-  },
   "diagrams": [
     {
       "id": "diagram-1",
-      "name": "합산과 접점",
+      "name": "예시 그림",
       "coordinateSystem": {
         "origin": "bottom-left",
         "quadrants": [
@@ -48,7 +33,20 @@
         "fill-1",
         "curve-1",
         "sum-1",
-        "sketch-1"
+        "sketch-1",
+        "group-1",
+        "sketch-2",
+        "point-1",
+        "line-2",
+        "line-3",
+        "curve-2",
+        "curve-3",
+        "curve-4",
+        "curve-5",
+        "curve-6",
+        "line-4",
+        "line-5",
+        "line-6"
       ],
       "lines": [
         {
@@ -71,246 +69,7 @@
             "b": 0.707107,
             "c": -5.656854
           }
-        }
-      ],
-      "curves": [
-        {
-          "id": "curve-1",
-          "type": "curve",
-          "name": "기본 곡선",
-          "color": "#2a5db0",
-          "variant": "descending",
-          "parentId": null,
-          "anchor": {
-            "x": 4,
-            "y": 4
-          },
-          "span": 3,
-          "slope": -0.75,
-          "bend": 0.25,
-          "geometry": {
-            "type": "quadratic-bezier",
-            "controlPoints": [
-              {
-                "x": 1,
-                "y": 7
-              },
-              {
-                "x": 4,
-                "y": 3.25
-              },
-              {
-                "x": 7,
-                "y": 2.5
-              }
-            ],
-            "extensions": {
-              "type": "tangent-rays",
-              "rays": [
-                {
-                  "anchor": {
-                    "x": 1,
-                    "y": 7
-                  },
-                  "direction": {
-                    "x": -1,
-                    "y": 1.25
-                  }
-                },
-                {
-                  "anchor": {
-                    "x": 7,
-                    "y": 2.5
-                  },
-                  "direction": {
-                    "x": 1,
-                    "y": -0.25
-                  }
-                }
-              ]
-            }
-          }
-        }
-      ],
-      "sketches": [
-        {
-          "start": {
-            "x": 1,
-            "y": 8
-          },
-          "end": {
-            "x": 8,
-            "y": 2
-          },
-          "anchor": {
-            "x": 4,
-            "y": 4
-          },
-          "tangent": {
-            "x": 0.707107,
-            "y": -0.707107
-          },
-          "leftReach": 0.5,
-          "rightReach": 0.5,
-          "id": "sketch-1",
-          "type": "sketch",
-          "name": "직선에 접한 자유 곡선",
-          "color": "#17808a",
-          "binding": {
-            "kind": "tangent",
-            "sourceId": "line-1",
-            "parameter": 5.656854,
-            "direction": {
-              "x": 0.707107,
-              "y": -0.707107
-            }
-          },
-          "parentId": null,
-          "geometry": {
-            "type": "piecewise-quadratic-bezier",
-            "controlPoints": [
-              [
-                {
-                  "x": 1,
-                  "y": 8
-                },
-                {
-                  "x": 2.232233,
-                  "y": 5.767767
-                },
-                {
-                  "x": 4,
-                  "y": 4
-                }
-              ],
-              [
-                {
-                  "x": 4,
-                  "y": 4
-                },
-                {
-                  "x": 5.581139,
-                  "y": 2.418861
-                },
-                {
-                  "x": 8,
-                  "y": 2
-                }
-              ]
-            ]
-          }
-        }
-      ],
-      "sums": [
-        {
-          "id": "sum-1",
-          "type": "sum",
-          "name": "수평합 01",
-          "color": "#b06f12",
-          "parentId": null,
-          "direction": "horizontal",
-          "nonnegative": true,
-          "sourceIds": [
-            "line-1",
-            "curve-1"
-          ]
-        }
-      ],
-      "points": [],
-      "fills": [
-        {
-          "id": "fill-1",
-          "type": "fill",
-          "name": "칠한 구역",
-          "label": "A",
-          "color": "#2a5db0",
-          "opacity": 0.24,
-          "parentId": null,
-          "anchor": {
-            "x": 0,
-            "y": 0
-          },
-          "rings": [
-            [
-              {
-                "x": 0,
-                "y": 0
-              },
-              {
-                "x": 8,
-                "y": 0
-              },
-              {
-                "x": 0,
-                "y": 8
-              }
-            ]
-          ]
-        }
-      ],
-      "groups": [],
-      "rulers": [],
-      "relations": [
-        {
-          "at": {
-            "x": 4,
-            "y": 4
-          },
-          "on": [
-            "sketch-1",
-            "line-1",
-            "curve-1"
-          ],
-          "tangent": [
-            [
-              "sketch-1",
-              "line-1"
-            ]
-          ],
-          "slopes": {
-            "sketch-1": -1,
-            "curve-1": -0.75
-          }
-        }
-      ]
-    },
-    {
-      "id": "diagram-2",
-      "name": "최저점 표시와 일반 점",
-      "coordinateSystem": {
-        "origin": "bottom-left",
-        "quadrants": [
-          1
-        ],
-        "xPositive": "right",
-        "yPositive": "up",
-        "axesVisible": true,
-        "axisNames": {
-          "x": "x",
-          "y": "y"
         },
-        "lineAxisGap": {
-          "enabled": false,
-          "distance": 0.75
-        }
-      },
-      "showGrid": true,
-      "objectOrder": [
-        "group-1",
-        "sketch-2",
-        "point-1",
-        "line-2",
-        "line-3",
-        "curve-2",
-        "curve-3",
-        "curve-4",
-        "curve-5",
-        "curve-6",
-        "line-4",
-        "line-5",
-        "line-6"
-      ],
-      "lines": [
         {
           "id": "line-2",
           "type": "line",
@@ -470,6 +229,63 @@
       ],
       "curves": [
         {
+          "id": "curve-1",
+          "type": "curve",
+          "name": "기본 곡선",
+          "color": "#2a5db0",
+          "variant": "descending",
+          "parentId": null,
+          "anchor": {
+            "x": 4,
+            "y": 4
+          },
+          "span": 3,
+          "slope": -0.75,
+          "bend": 0.25,
+          "geometry": {
+            "type": "quadratic-bezier",
+            "controlPoints": [
+              {
+                "x": 1,
+                "y": 7
+              },
+              {
+                "x": 4,
+                "y": 3.25
+              },
+              {
+                "x": 7,
+                "y": 2.5
+              }
+            ],
+            "extensions": {
+              "type": "tangent-rays",
+              "rays": [
+                {
+                  "anchor": {
+                    "x": 1,
+                    "y": 7
+                  },
+                  "direction": {
+                    "x": -1,
+                    "y": 1.25
+                  }
+                },
+                {
+                  "anchor": {
+                    "x": 7,
+                    "y": 2.5
+                  },
+                  "direction": {
+                    "x": 1,
+                    "y": -0.25
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
           "id": "curve-2",
           "type": "curve",
           "name": "콥더글라스 02",
@@ -565,6 +381,73 @@
         {
           "start": {
             "x": 1,
+            "y": 8
+          },
+          "end": {
+            "x": 8,
+            "y": 2
+          },
+          "anchor": {
+            "x": 4,
+            "y": 4
+          },
+          "tangent": {
+            "x": 0.707107,
+            "y": -0.707107
+          },
+          "leftReach": 0.5,
+          "rightReach": 0.5,
+          "id": "sketch-1",
+          "type": "sketch",
+          "name": "직선에 접한 자유 곡선",
+          "color": "#17808a",
+          "binding": {
+            "kind": "tangent",
+            "sourceId": "line-1",
+            "parameter": 5.656854,
+            "direction": {
+              "x": 0.707107,
+              "y": -0.707107
+            }
+          },
+          "parentId": null,
+          "geometry": {
+            "type": "piecewise-quadratic-bezier",
+            "controlPoints": [
+              [
+                {
+                  "x": 1,
+                  "y": 8
+                },
+                {
+                  "x": 2.232233,
+                  "y": 5.767767
+                },
+                {
+                  "x": 4,
+                  "y": 4
+                }
+              ],
+              [
+                {
+                  "x": 4,
+                  "y": 4
+                },
+                {
+                  "x": 5.581139,
+                  "y": 2.418861
+                },
+                {
+                  "x": 8,
+                  "y": 2
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "start": {
+            "x": 1,
             "y": 6
           },
           "end": {
@@ -623,7 +506,21 @@
           }
         }
       ],
-      "sums": [],
+      "sums": [
+        {
+          "id": "sum-1",
+          "type": "sum",
+          "name": "수평합 01",
+          "color": "#b06f12",
+          "parentId": null,
+          "direction": "horizontal",
+          "nonnegative": true,
+          "sourceIds": [
+            "line-1",
+            "curve-1"
+          ]
+        }
+      ],
       "points": [
         {
           "id": "point-1",
@@ -638,7 +535,37 @@
           "showCoordinates": false
         }
       ],
-      "fills": [],
+      "fills": [
+        {
+          "id": "fill-1",
+          "type": "fill",
+          "name": "칠한 구역",
+          "label": "A",
+          "color": "#2a5db0",
+          "opacity": 0.24,
+          "parentId": null,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "rings": [
+            [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 8,
+                "y": 0
+              },
+              {
+                "x": 0,
+                "y": 8
+              }
+            ]
+          ]
+        }
+      ],
       "groups": [
         {
           "id": "group-1",
@@ -659,6 +586,7 @@
           ],
           "on": [
             "curve-4",
+            "line-1",
             "line-2"
           ]
         },
@@ -780,6 +708,28 @@
               "kind": "kink"
             }
           ]
+        },
+        {
+          "at": {
+            "x": 4,
+            "y": 4
+          },
+          "on": [
+            "sketch-1",
+            "line-1",
+            "line-6",
+            "curve-1"
+          ],
+          "tangent": [
+            [
+              "sketch-1",
+              "line-1"
+            ]
+          ],
+          "slopes": {
+            "sketch-1": -1,
+            "curve-1": -0.75
+          }
         }
       ]
     }

@@ -42,7 +42,7 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
  send('pointerdown',{x:4,y:2.2},{},svg.querySelector(`[data-id="${movingCurve}"][data-action="move"]`));move({x:4,y:2.15});
  check(same(style(),commonStyle)&&svg.querySelector(`[data-snap-source="${line}"]`),'moving a curve onto a line shares the same feedback');send('pointercancel',{x:4,y:2.15});check(!marker(),'pointer cancellation clears the common feedback');
  setup('sketch',true);click({x:1,y:7});click({x:7,y:7});move({x:6.17,y:4.17});check(same(style(),commonStyle),'reversed axes preserve common tangent feedback');
- store.configureLayout('horizontal2');check(!marker(),'layout/history revision clears transient feedback');
+ store.configureWorkspace('first');check(marker()?.dataset.snapKind!=='tangent'&&!svg.querySelector('.sketch-draft'),'format/history revision clears the draft and its tangent feedback');
  stage.style.width='312px';stage.style.height='400px';await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
  setup('sketch');click({x:1,y:7});click({x:7,y:7});move({x:6.17,y:4.17});const label=svg.querySelector('.snap-feedback-label'),box=label.getBBox();
  check(marker()&&box.x>=0&&box.x+box.width<=stage.clientWidth&&box.y>=0&&box.y+box.height<=stage.clientHeight,'common tangent label stays inside a mobile canvas');

@@ -62,7 +62,6 @@ export class LineInteraction extends StrokeInteraction {
   canDrag(object, action) {
     // Only a drawn end has a handle; an open end never starts trimming.
     if (Object.hasOwn(LINE_END_ACTIONS, action)) return object.extent?.[LINE_END_ACTIONS[action]] != null;
-    if (object.link && action === 'rotate') return false;
     return !(object.binding && action === 'move');
   }
   // A followed point stays the pivot; re-anchoring would fight the relation.

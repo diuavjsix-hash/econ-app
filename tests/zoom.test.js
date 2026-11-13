@@ -29,10 +29,9 @@ test('zoom limits, wheel steps, the exact default and the grid spacing', () => {
   assert.equal(gridStep(200), 0.2); assert.equal(gridStep(560), 0.1);
 });
 
-test('zoom is per graph view state: no undo step, no JSON field, kept across graph switches', () => {
+test('zoom is graph view state: no undo step, no JSON field, kept across format changes', () => {
   const store = createStore();
-  store.configureLayout('horizontal2', null, 'first');
-  const [first, second] = store.getState().diagrams.map(d => d.id);
+  const [first] = store.getState().diagrams.map(d => d.id);
   const fresh = createStore();
   fresh.setZoom(3);
   assert.equal(fresh.getState().canUndo, false, 'zooming is not an undo step');
@@ -41,11 +40,8 @@ test('zoom is per graph view state: no undo step, no JSON field, kept across gra
   store.setZoom(2);
   let state = store.getState();
   assert.equal(state.zoom, 2); assert.equal(state.diagrams.find(d => d.id === first).zoom, 2);
-  assert.equal(state.diagrams.find(d => d.id === second).zoom, 1, 'the other graph keeps its own view');
   assert.equal(JSON.stringify(serializeActive(state)), before, 'zoom is not saved in the JSON');
-  store.setDiagramZoom(second, 0.5);
-  store.selectDiagram(second); assert.equal(store.getState().zoom, 0.5);
-  store.selectDiagram(first); assert.equal(store.getState().zoom, 2);
+  store.configureWorkspace('upper'); assert.equal(store.getState().zoom, 2);
   store.addPoint({ x: 1, y: 1 }); store.undo();
   assert.equal(store.getState().zoom, 2, 'undo leaves the view alone');
   store.setDiagramZoom('missing', 3); assert.equal(store.getState().zoom, 2);

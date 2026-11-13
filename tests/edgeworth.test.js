@@ -23,22 +23,21 @@ test('Edgeworth totals define one coordinate box with equal scale in every viewp
   }
 });
 
-test('Edgeworth format, totals and B axis names are independent documents with undo and hidden-layout retention',()=>{
+test('Edgeworth format, totals and B axis names belong to the document with undo',()=>{
   const store=createStore(),before=serializeActive(store.getState());
-  store.configureLayout('horizontal2',null,'edgeworth',{boxSize:{width:12,height:6}});
+  assert.equal(store.configureWorkspace('unknown'),false);
+  store.configureWorkspace('edgeworth',{boxSize:{width:12,height:6}});
   assert.ok(store.getState().diagrams.every(d=>d.quadrantMode==='edgeworth'&&d.boxSize.width===12));
   store.undo();assert.deepEqual(serializeActive(store.getState()),before);store.redo();
-  const [a,b]=store.getState().diagrams.map(d=>d.id);store.addPoint({x:3,y:2});
-  store.update({boxSize:{width:15},boxAxisNames:{x:'재화 1 B'}});store.undo();assert.equal(store.getState().boxSize.width,12);store.redo();
-  store.selectDiagram(b);assert.equal(store.getState().boxSize.width,12);assert.equal(store.getState().boxAxisNames.x,'xᴮ');
-  store.configureLayout('single');store.configureLayout('horizontal2',null,'first',{allQuadrants:false});
-  store.selectDiagram(b);assert.equal(store.getState().quadrantMode,'edgeworth');
-  store.selectDiagram(a);assert.equal(store.getState().points[0].anchor.x,3);
+  store.addPoint({x:3,y:2});
+  store.update({boxSize:{width:15},boxAxisNames:{x:'재화 1 B'}});store.undo();assert.equal(store.getState().boxSize.width,12);assert.equal(store.getState().boxAxisNames.x,'xᴮ');store.redo();
+  store.configureWorkspace('first');assert.equal(store.getState().quadrantMode,'first');assert.equal(store.getState().points[0].anchor.x,3);
+  store.undo();assert.equal(store.getState().quadrantMode,'edgeworth');
   store.update({boxSize:{width:0,height:Infinity}});assert.equal(store.getState().boxSize.width,15);assert.equal(store.getState().boxSize.height,6);
 });
 
 test('Edgeworth four walls share point/dashed snap targets, common feedback and closed-region painting',()=>{
-  const store=createStore();store.configureLayout('single',null,'edgeworth');
+  const store=createStore();store.configureWorkspace('edgeworth');
   let state=store.getState();const v=createViewport(700,600,'edgeworth',state),targets=buildSnapTargets(state,v.bounds);
   const ids=targets.shapes.map(s=>s.id);for (const id of ['axis-x','axis-y','axis-b-x','axis-b-y']) assert.ok(ids.includes(id));
   const top=snapPoint({x:5,y:7.95},targets,40);close(top.point.y,8);assert.ok(top.ids.includes('axis-b-x'));
@@ -52,7 +51,7 @@ test('Edgeworth four walls share point/dashed snap targets, common feedback and 
 });
 
 test('Edgeworth JSON stores totals and the opposite origin without screen-dependent geometry',()=>{
-  const store=createStore();store.configureLayout('single',null,'edgeworth',{boxSize:{width:12,height:7}});
+  const store=createStore();store.configureWorkspace('edgeworth',{boxSize:{width:12,height:7}});
   store.updateDiagram({flipX:true,flipY:true});store.addPoint({x:3,y:2});
   const doc=JSON.parse(JSON.stringify(serializeActive(store.getState()))),coordinates=doc.coordinateSystem;
   assert.equal(coordinates.type,'edgeworth');assert.deepEqual(coordinates.totals,{width:12,height:7});
@@ -63,7 +62,7 @@ test('Edgeworth JSON stores totals and the opposite origin without screen-depend
 
 test('new Edgeworth lines use box-relative placement and the first line connects both origins at every aspect ratio',()=>{
   for (const boxSize of [{width:10,height:8},{width:12,height:7},{width:1,height:100},{width:100,height:1}]) {
-    const store=createStore();store.configureLayout('single',null,'edgeworth',{boxSize});store.addLine();
+    const store=createStore();store.configureWorkspace('edgeworth',{boxSize});store.addLine();
     const state=store.getState(),line=state.lines[0],v=createViewport(312,400,'edgeworth',state);
     assert.deepEqual(line.anchor,{x:boxSize.width/2,y:boxSize.height/2});close(line.slope,boxSize.height/boxSize.width);
     const segment=displayedLineSegments(line,v.bounds,state)[0];
@@ -73,7 +72,7 @@ test('new Edgeworth lines use box-relative placement and the first line connects
 });
 
 test('A and B origins share exact point/dashed and line-translation targets without axis or slope changes',()=>{
-  const store=createStore();store.configureLayout('single',null,'edgeworth',{boxSize:{width:10,height:8}});store.addLine();
+  const store=createStore();store.configureWorkspace('edgeworth',{boxSize:{width:10,height:8}});store.addLine();
   const state=store.getState(),v=createViewport(800,600,'edgeworth',state),targets=buildSnapTargets({...state,lines:[]},v.bounds);
   for (const point of [{x:0,y:0},{x:10,y:8}]) {
     const snapped=snapPoint({x:point.x+(point.x?-.1:.1),y:point.y+(point.y?-.1:.1)},targets,v.unit);
@@ -91,7 +90,7 @@ test('A and B origins share exact point/dashed and line-translation targets with
 
 test('rotating a line snaps to either box origin before the near-vertical heuristic and supports Alt bypass',()=>{
   for (const boxSize of [{width:10,height:8},{width:1,height:100},{width:100,height:1}]) {
-    const store=createStore();store.configureLayout('single',null,'edgeworth',{boxSize});store.addLine();store.updateSelected({slope:0});
+    const store=createStore();store.configureWorkspace('edgeworth',{boxSize});store.addLine();store.updateSelected({slope:0});
     const state=store.getState(),line=state.lines[0],viewport=createViewport(312,400,'edgeworth',state),controller=interactionFor(line),ctx={state,viewport,snapTargets:()=>buildSnapTargets(state,viewport.bounds)};
     for(const point of [{x:0,y:0},{x:boxSize.width,y:boxSize.height}]) {
       const result=controller.drag(line,'rotate',line.anchor,point,{},ctx);
@@ -111,9 +110,9 @@ test('corner projection round trips retain exact boundary coordinates for fracti
 });
 
 test('rotating from a line through A onto B keeps A pinned even after editing-anchor rebasing',()=>{
-  const store=createStore();store.addLine();store.configureLayout('horizontal2',null,'edgeworth',{boxSize:{width:12,height:7}});
-  store.selectDiagram(store.getState().diagrams[1].id);store.addLine();
-  assert.equal(store.getState().lines[0].slope,7/12,'The first line in a new diagram is independent of global object IDs');
+  const store=createStore();store.addLine();store.clearAll();store.configureWorkspace('edgeworth',{boxSize:{width:12,height:7}});
+  store.addLine();
+  assert.equal(store.getState().lines[0].slope,7/12,'The first line in an empty box is independent of global object IDs');
   store.updateSelected({anchor:{x:3,y:1},slope:1/3});
   const state=store.getState(),line=state.lines[0],viewport=createViewport(800,540,'edgeworth',state),controller=interactionFor(line),ctx={state,viewport,snapTargets:()=>buildSnapTargets(state,viewport.bounds)};
   const anchor=controller.start(line,ctx),raw={...line,anchor};

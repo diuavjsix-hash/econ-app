@@ -32,7 +32,7 @@ const header = () => `
       ${iconButton({ id: 'undo-action', icon: icon('undo'), label: '되돌리기', title: '되돌리기 (Ctrl+Z)', disabled: true })}${iconButton({ id: 'redo-action', icon: icon('redo'), label: '다시 실행', title: '다시 실행 (Ctrl+Shift+Z / Ctrl+Y)', disabled: true })}
     </div>
     <div class="document-actions">
-      ${button({ id: 'choose-quadrants', label: '배치 · 1개', labelId: 'choose-quadrants-label', icon: icon('layout'), variant: 'ghost', ariaLabel: '작업 영역 설정', popup: 'dialog' })}
+      ${button({ id: 'choose-quadrants', label: '포맷', icon: icon('layout'), variant: 'ghost', ariaLabel: '작업 영역 설정', popup: 'dialog' })}
       ${button({ id: 'graph-settings-action', label: '그래프 설정', icon: icon('settings'), variant: 'ghost', ariaLabel: '그래프 설정', title: '축·사분면·축 방향 설정', popup: 'dialog' })}
       ${button({ id: 'export-json', label: '저장', icon: icon('export'), popup: 'dialog' })}
     </div>
@@ -166,8 +166,6 @@ const selectionInspector = () => `
           ${switchField({ id: 'point-show-coordinates', label: '좌표 표시' })}
           ${checkField({ id: 'point-line-follow', label: '점을 따라가기', checked: true })}
           ${button({ id: 'point-through-line', label: '이 점을 지나는 직선', icon: icon('line'), block: true })}
-          ${button({ id: 'point-link-x', label: '세로 연결선', title: '같은 열의 그래프까지 같은 x로 잇기', block: true, hidden: true })}
-          ${button({ id: 'point-link-y', label: '가로 연결선', title: '같은 행의 그래프까지 같은 y로 잇기', block: true, hidden: true })}
         </section></div>`;
 
 const inspector = () => `
@@ -219,11 +217,6 @@ const dialogs = () => `
   <dialog id="quadrant-dialog" class="dialog quadrant-dialog" aria-labelledby="quadrant-title">
     <div class="dialog-heading"><h2 id="quadrant-title">작업 영역</h2>${iconButton({ id: 'close-workspace', icon: icon('close'), label: '작업 영역 닫기' })}</div>
     <section class="dialog-section">
-      <h3 class="section-title">배치</h3>
-      <div id="layout-choices" class="layout-choices"></div>
-      <details id="custom-layout" class="disclosure"><summary>직접 배치</summary><div id="custom-layout-grid" class="custom-layout-grid" role="group" aria-label="최대 3행 3열 배치"></div></details>
-    </section>
-    <section class="dialog-section">
       <h3 class="section-title">포맷</h3>
       <div class="quadrant-choices">
         ${choice('first', '1사분면', '<rect x="32" y="8" width="24" height="24" class="quadrant-fill"/><path d="M8 32h48M32 8v48"/>', true)}
@@ -236,9 +229,8 @@ const dialogs = () => `
         ${numberField({ id: 'workspace-box-width', label: '가로 총량', min: 1, max: 100, step: 0.5, value: 10, required: true })}
         ${numberField({ id: 'workspace-box-height', label: '세로 총량', min: 1, max: 100, step: 0.5, value: 8, required: true })}
       </div>
-      ${checkField({ id: 'apply-all-quadrants', label: '모든 그래프에 적용', checked: true })}
     </section>
-    <div class="dialog-footer"><span class="footer-note">배치를 줄여도 기존 그래프는 보관됩니다.</span>${button({ id: 'apply-workspace', label: '시작', variant: 'primary' })}</div>
+    <div class="dialog-footer"><span class="footer-spacer"></span>${button({ id: 'apply-workspace', label: '시작', variant: 'primary' })}</div>
   </dialog>
   <dialog id="json-dialog" class="dialog json-dialog" aria-labelledby="json-title">
     <div class="dialog-heading"><h2 id="json-title">그림 저장 · JSON</h2>${iconButton({ id: 'close-json', icon: icon('close'), label: 'JSON 닫기' })}</div>

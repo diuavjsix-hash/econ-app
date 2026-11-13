@@ -89,15 +89,14 @@ test('deleting selected ancestors and descendants lifts only surviving children 
   store.undo();assert.equal(store.getState().points[0].parentId,child);assert.deepEqual(store.getState().selectedIds,[parent,child]);
 });
 
-test('selection is graph-local, clears on layout and creation changes, and does not invalidate redo',()=>{
-  const store=createStore();store.configureLayout('horizontal2');const first=store.getState().activeDiagramId;
-  const a=store.addLine(),b=store.addLine(),second=store.getState().diagrams[1].id;
-  store.selectObjects([a,b]);assert.deepEqual(diagramState(store.getState(),second).selectedIds,[]);
-  store.selectDiagram(second);assert.deepEqual(store.getState().selectedIds,[]);store.selectObjects([a,b]);assert.deepEqual(store.getState().selectedIds,[]);
-  store.selectDiagram(first);store.selectObjects([a,b]);store.update({sketchSelected:true});assert.deepEqual(store.getState().selectedIds,[]);
+test('selection clears on format and creation changes, and does not invalidate redo',()=>{
+  const store=createStore();const first=store.getState().activeDiagramId;
+  const a=store.addLine(),b=store.addLine();
+  store.selectObjects([a,b]);assert.deepEqual(diagramState(store.getState(),first).selectedIds,[a,b]);
+  store.selectObjects([a,b]);store.update({sketchSelected:true});assert.deepEqual(store.getState().selectedIds,[]);
   store.update({handSelected:true});store.selectObjects([a,b]);store.removeSelected();store.undo();assert.equal(store.getState().canRedo,true);
   store.selectObject(null);store.selectObjects([a,b]);assert.equal(store.getState().canRedo,true);
-  store.configureLayout('single');assert.deepEqual(store.getState().selectedIds,[]);
+  store.selectObjects([a,b]);store.configureWorkspace('upper');assert.deepEqual(store.getState().selectedIds,[]);
 });
 
 test('selection itself adds no history or JSON fields and undo still removes the last document edit',()=>{

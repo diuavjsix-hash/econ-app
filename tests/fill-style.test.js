@@ -41,15 +41,11 @@ test('deletion does not renumber surviving labels; undo and redo preserve colors
   store.undo();store.undo();assert.deepEqual(serializeActive(store.getState()),before);
 });
 
-test('colors and alphabets start independently in each graph, including hidden graphs', () => {
-  const store=createStore();store.configureLayout('horizontal2');
-  const first=store.getState().activeDiagramId, second=store.getState().diagrams[1].id;
-  store.addFill(shape(0));store.addFill(shape(2));
-  store.selectDiagram(second);assert.equal(store.getState().fillNextLabel,'A');
+test('colors and alphabets continue in the graph and restart after clearing it', () => {
+  const store=createStore();
+  store.addFill(shape(0));store.addFill(shape(2));assert.equal(store.getState().fillNextLabel,'C');
+  store.clearAll();assert.equal(store.getState().fillNextLabel,'A');
   store.addFill(shape(0));assert.equal(store.getState().fills[0].label,'A');assert.equal(store.getState().fills[0].color,FIRST);
-  store.selectDiagram(first);assert.equal(store.getState().fillNextLabel,'C');
-  store.configureLayout('single');store.configureLayout('horizontal2');store.selectDiagram(second);
-  assert.equal(store.getState().fills[0].label,'A');
 });
 
 test('manual editing preserves the alphabet, and automatic colors avoid manual overrides', () => {
