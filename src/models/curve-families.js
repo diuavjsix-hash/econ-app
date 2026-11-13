@@ -20,6 +20,8 @@ export class AnalyticCurveFamily {
   get editableShape() { return true; }
   get contactGeometry() { return 'smooth'; }
   movement() { return this.metadata.movement; }
+  /** The same movement in English for the exported JSON (the panel keeps the Korean wording). */
+  motion() { return this.metadata.motion; }
   value() { throw new TypeError('A curve family must implement value()'); }
   contact() { throw new TypeError('A curve family must implement contact()'); }
   tangentVector() { return null; } // A kink has no single smooth tangent.
@@ -145,7 +147,7 @@ export class AnalyticCurveFamily {
   shapeFromValue(c, value) { return { shape: value }; }
   shapeFromPoint() { throw new TypeError('A curve family must implement shapeFromPoint()'); }
   nearbyOffset() { return { x: 1, y: 0 }; }
-  geometry(c) { return { type: 'indifference', domain: 'nonnegative', movement: this.movement(c) }; }
+  geometry(c) { return { type: 'indifference', domain: 'nonnegative', movement: this.motion(c) }; }
   applyPatch(c, patch) {
     if (validPoint(patch.anchor)) {
       const next = patch.reshape && this.reshapesAnchor ? patch.anchor : this.move(c, c.anchor, patch.anchor);
@@ -226,7 +228,7 @@ export class PpcFamily extends RadialCurveFamily {
   shapeValue(c) { return c.anchor.y / c.anchor.x; }
   shapeFromValue(c, value) { const area = c.anchor.x * c.anchor.y; return { anchor: { x: Math.sqrt(area / value), y: Math.sqrt(area * value) }, reshape: true }; }
   shapeFromPoint(c, p) { return p.x > 0 && p.y > 0 ? this.shapeFromValue(c, clampShape(p.y / p.x * Math.sqrt(3))) : {}; }
-  geometry(c) { return { type: 'ellipse-arc', center: { x: 0, y: 0 }, radii: ppcRadii(c), angleRange: [0, Math.PI / 2], domain: 'nonnegative', movement: this.movement(c) }; }
+  geometry(c) { return { type: 'ellipse-arc', center: { x: 0, y: 0 }, radii: ppcRadii(c), angleRange: [0, Math.PI / 2], domain: 'nonnegative', movement: this.motion(c) }; }
 }
 
 export class ComplementsFamily extends RadialCurveFamily {
@@ -294,6 +296,7 @@ export class QuasilinearFamily extends AnalyticCurveFamily {
   tangentVector(c, p) { return this.swapped(c) ? { x: c.shape, y: -p.y } : { x: p.x, y: -c.shape }; }
   get translationAxis() { return linearAxisOf; }
   movement(c) { return `${linearAxisOf(c)}축으로 평행이동`; }
+  motion(c) { return `translates along the ${linearAxisOf(c)} axis`; }
   swapped(c) { return linearAxisOf(c) === 'x'; }
   value(c, input, direction = 'vertical') {
     const a = c.anchor, r = c.shape;
@@ -336,12 +339,12 @@ export function registerCurveFamilies(entries) {
 }
 
 export const CURVE_FAMILIES = registerCurveFamilies({
-  ppc: new PpcFamily({ label: 'PPC', movement: '원점 기준 크기 조절 · 양 끝점으로 타원 조절', shape: '세로 / 가로 비율', color: ROLE_COLORS.ppc }),
-  'rectangular-hyperbola': new RectangularHyperbolaFamily({ label: '직각 쌍곡선', movement: '축을 점근선으로 유지 · 크기 조절', shape: '크기', color: ROLE_COLORS.hyperbola }),
-  'cobb-douglas': new CobbDouglasFamily({ label: '콥더글라스', movement: '원점 기준 확대·축소', shape: '휘어짐', color: ROLE_COLORS.cobbDouglas }),
-  substitutes: new SubstitutesFamily({ label: '완전대체재', movement: '기울기 유지 · 평행이동', shape: '기울기', color: ROLE_COLORS.substitutes }),
-  complements: new ComplementsFamily({ label: '완전보완재', movement: '원점 기준 · 꺾임 이동', shape: '꺾임 비율', color: ROLE_COLORS.complements }),
-  quasilinear: new QuasilinearFamily({ label: '준선형효용', movement: '선형 축으로 평행이동', shape: '휘어짐', color: ROLE_COLORS.quasilinear }),
+  ppc: new PpcFamily({ label: 'PPC', movement: '원점 기준 크기 조절 · 양 끝점으로 타원 조절', motion: 'scales about the origin; the axis end points set the ellipse radii', shape: '세로 / 가로 비율', color: ROLE_COLORS.ppc }),
+  'rectangular-hyperbola': new RectangularHyperbolaFamily({ label: '직각 쌍곡선', movement: '축을 점근선으로 유지 · 크기 조절', motion: 'keeps the axes as asymptotes; resizes', shape: '크기', color: ROLE_COLORS.hyperbola }),
+  'cobb-douglas': new CobbDouglasFamily({ label: '콥더글라스', movement: '원점 기준 확대·축소', motion: 'scales about the origin', shape: '휘어짐', color: ROLE_COLORS.cobbDouglas }),
+  substitutes: new SubstitutesFamily({ label: '완전대체재', movement: '기울기 유지 · 평행이동', motion: 'keeps its slope; translates', shape: '기울기', color: ROLE_COLORS.substitutes }),
+  complements: new ComplementsFamily({ label: '완전보완재', movement: '원점 기준 · 꺾임 이동', motion: 'kink moves along a ray from the origin', shape: '꺾임 비율', color: ROLE_COLORS.complements }),
+  quasilinear: new QuasilinearFamily({ label: '준선형효용', movement: '선형 축으로 평행이동', motion: 'translates along its linear axis', shape: '휘어짐', color: ROLE_COLORS.quasilinear }),
 });
 /** Families whose mirrored drawing is offered in the indifference library. */
 export const OPPOSITE_CURVE_FAMILIES = Object.freeze(['cobb-douglas', 'substitutes', 'complements', 'quasilinear']);
@@ -377,6 +380,7 @@ export class OppositeCurveFamily {
   piece(c, piece) { return piece.map(p => this.point(c, p)); }
   patch(c, patch) { return patch && validPoint(patch.anchor) ? { ...patch, anchor: this.point(c, patch.anchor) } : patch; }
   movement(c) { return this.base.movement(this.local(c)).replace('원점', '반대 원점'); }
+  motion(c) { return this.base.motion(this.local(c)).replace('the origin', 'the opposite origin'); }
   value(c, input, direction = 'vertical') {
     const o = c.oppositeOrigin;
     return direction === 'horizontal' ? o.x - this.base.value(this.local(c), o.y - input, 'horizontal') : o.y - this.base.value(this.local(c), o.x - input, 'vertical');
@@ -417,7 +421,7 @@ export class OppositeCurveFamily {
   shapeFromValue(c, value) { return this.patch(c, this.base.shapeFromValue(this.local(c), value)); }
   shapeFromPoint(c, p) { return this.patch(c, this.base.shapeFromPoint(this.local(c), this.point(c, p))); }
   nearbyOffset(c) { return negate(this.base.nearbyOffset(this.local(c))); }
-  geometry(c) { return { ...this.base.geometry(this.local(c)), orientation: 'opposite', oppositeOrigin: { ...c.oppositeOrigin } }; }
+  geometry(c) { return { ...this.base.geometry(this.local(c)), movement: this.motion(c), orientation: 'opposite', oppositeOrigin: { ...c.oppositeOrigin } }; }
   applyPatch(c, patch) {
     const local = this.local(c);
     this.base.applyPatch(local, this.patch(c, patch));

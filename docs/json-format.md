@@ -5,7 +5,7 @@
 ## 버전 13의 변경 (2026-11-12)
 
 - **최상위 사본 제거:** 버전 12까지 최상위에 있던 활성 그래프의 `lines`·`points`·`coordinateSystem` 등 사본을 없앴습니다. 모든 그래프는 `diagrams`에만 한 번씩 들어갑니다. 활성 그래프는 `activeDiagramId`로 찾습니다.
-- **`legend`:** 최상위에 짧은 한국어 설명(좌표 의미·`relations` 키·축 ID)을 넣어, 파일만 받은 사람이나 AI가 형식을 읽을 수 있게 했습니다.
+- **`legend`:** 최상위에 짧은 설명을 넣어, 파일만 받은 사람이나 AI가 형식을 읽을 수 있게 했습니다. 2026-11-13부터 영어이며 `coordinates`·`relations`·`axes`·`lines`(extent 단위·implicit)·`curves`(family·opposite 좌표틀)·`sketches`·`sums`(합 계산 규칙)·`bindings`(through-point·tangent 따라가기, parentId는 폴더일 뿐)·`fills`·`display`(보기 전용 필드)를 항상 담고, 해당 포맷이 있을 때만 `faceToFace`·`stacked`·`edgeworth`를 붙입니다. JSON에서 한국어는 도형·그래프 **이름**(사용자가 쓴 이름과 기본 이름 "직선 01" 등)에만 남습니다. 곡선 `geometry.movement`도 영어입니다(예: `scales about the origin`, 반대 방향은 `the opposite origin`).
 - **`relations`:** 각 그래프 마지막에 계산된 위치 관계 목록을 넣습니다(아래 절).
 - **반올림:** 저장 창·복사·다운로드의 숫자는 소수 6자리로 반올림하고 `-0`은 `0`으로 씁니다. 앱 안의 문서와 `serializeDocument`는 전체 정밀도를 유지합니다.
 
