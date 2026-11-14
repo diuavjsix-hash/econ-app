@@ -5,23 +5,63 @@ export const QUADRANT_MODES = {
   edgeworth: { label: '에지워드 상자', quadrants: [1], origin: 'bottom-left' },
   // Two graphs back to back on one sheet: a shared y axis, x read as positive on both sides.
   face: { label: '대면', quadrants: [1, 2], origin: 'bottom-center' },
-  // Two graphs stacked on one sheet with one x scale: the upper origin is (0,0), the lower one (0,-lowerHeight).
+  // Several graphs on one sheet with one scale. The upper-left origin is (0,0); rows step down by
+  // lowerHeight and the right column starts at x = leftWidth (see PANEL_SHEETS).
   stacked: { label: '상하 2단', quadrants: [1, 4], origin: 'middle-left' },
+  stacked3: { label: '상하 3단', quadrants: [1, 4], origin: 'middle-left' },
+  grid: { label: '2×2', quadrants: [1, 4], origin: 'middle-left' },
 };
 /** Face-to-face sheets read internal x < 0 as the facing graph's positive x. */
 export const faceToFace = mode => mode === 'face';
 
-/** Stacked sheets: the lower graph's origin sits lowerHeight below the upper one (math units). */
-export const stacked = mode => mode === 'stacked';
+/**
+ * Panel sheets: rows of graphs (top first), each row listing its graphs from left to right.
+ * Every graph is a first-quadrant graph with its own origin and axes in one coordinate plane.
+ */
+export const PANEL_SHEETS = Object.freeze({
+  stacked: [['upper'], ['lower']],
+  stacked3: [['upper'], ['middle'], ['lower']],
+  grid: [['upper', 'right'], ['lower', 'lower-right']],
+});
+/** Korean names of the graphs that are not the upper-left one, for axis labels and settings. */
+export const PANEL_NAMES = Object.freeze({ upper: '', middle: '가운데', lower: '아래', right: '오른쪽', 'lower-right': '오른쪽 아래' });
+export const panelSheet = mode => Object.hasOwn(PANEL_SHEETS, mode ?? '');
 export const DEFAULT_LOWER_HEIGHT = 6, MIN_LOWER_HEIGHT = 2, MAX_LOWER_HEIGHT = 40;
-/** The lower graph's y axis ends this far (math units) below the upper x axis. */
-export const LOWER_TOP = -0.5;
-export const lowerHeightOf = state => {
-  const value = state?.lowerHeight;
-  return Number.isFinite(value) ? Math.max(MIN_LOWER_HEIGHT, Math.min(MAX_LOWER_HEIGHT, value)) : DEFAULT_LOWER_HEIGHT;
-};
-/** 'upper' for y ≥ 0, 'lower' below; null on any other format. */
-export const stackedPanel = (point, state) => stacked(state?.quadrantMode) ? (point.y >= 0 ? 'upper' : 'lower') : null;
+export const DEFAULT_LEFT_WIDTH = 9, MIN_LEFT_WIDTH = 2, MAX_LEFT_WIDTH = 40;
+/** A graph's axes end this far (math units) short of the next graph's axes. */
+export const PANEL_GAP = 0.5;
+const clampSize = (value, min, max, fallback) => Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+/** Height of each graph below the top row. */
+export const lowerHeightOf = state => clampSize(state?.lowerHeight, MIN_LOWER_HEIGHT, MAX_LOWER_HEIGHT, DEFAULT_LOWER_HEIGHT);
+/** Width of the left column on a 2×2 sheet; the right column gets the rest of the view. */
+export const leftWidthOf = state => clampSize(state?.leftWidth, MIN_LEFT_WIDTH, MAX_LEFT_WIDTH, DEFAULT_LEFT_WIDTH);
+
+/**
+ * The graphs of a panel sheet with their origins and the far ends of their axes (xEnd/yEnd null:
+ * to the edge of the view). Empty on any other format.
+ */
+export function sheetPanels(state) {
+  const rows = PANEL_SHEETS[state?.quadrantMode];
+  if (!rows) return [];
+  const height = lowerHeightOf(state), width = leftWidthOf(state);
+  return rows.flatMap((keys, row) => keys.map((key, column) => ({
+    key, row, column, name: PANEL_NAMES[key],
+    origin: { x: column * width, y: row === 0 ? 0 : -row * height },
+    xEnd: column === keys.length - 1 ? null : (column + 1) * width - PANEL_GAP,
+    yEnd: row === 0 ? null : -(row - 1) * height - PANEL_GAP,
+    axisIds: key === 'upper' ? ['axis-x', 'axis-y'] : [`axis-${key}-x`, `axis-${key}-y`],
+    label: key === 'upper' ? '원점' : `${PANEL_NAMES[key]} 원점`,
+  })));
+}
+/** The graph a point belongs to: rows split at each x axis, columns at the right graph's y axis. */
+export function panelAt(point, state) {
+  const panels = sheetPanels(state);
+  if (!panels.length) return null;
+  const rows = PANEL_SHEETS[state.quadrantMode], height = lowerHeightOf(state), width = leftWidthOf(state);
+  const row = point.y >= 0 ? 0 : Math.max(1, Math.min(rows.length - 1, Math.ceil(-point.y / height - 1e-9)));
+  const column = Math.max(0, Math.min(rows[row].length - 1, Math.floor(point.x / width + 1e-9)));
+  return panels.find(panel => panel.row === row && panel.column === column);
+}
 
 /** View zoom limits; within 3% of 1 it returns to exactly 1 so the default view is reachable. */
 export const ZOOM_MIN = 0.2, ZOOM_MAX = 10;
@@ -32,7 +72,7 @@ export function clampZoom(zoom) {
 }
 /** Mouse wheel → next zoom: one notch (100px) scales by about 1.16; the box format keeps its fit. */
 export function wheelZoom(zoom, deltaY) { return clampZoom((zoom ?? 1) * Math.exp(-deltaY * 0.0015)); }
-export const zoomable = mode => mode !== 'edgeworth' && mode !== 'stacked';
+export const zoomable = mode => mode !== 'edgeworth' && !panelSheet(mode);
 
 /** Grid spacing in math units: 1 near the default, coarser zoomed out, finer zoomed in. */
 export function gridStep(unit) {
@@ -41,16 +81,19 @@ export function gridStep(unit) {
   return 1;
 }
 
-export function createViewport(width, height, mode, { flipX = false, flipY = false, boxSize = { width: 10, height: 8 }, zoom = 1, lowerHeight } = {}) {
-  if (mode === 'stacked') {
-    // The lower graph fills the bottom half at its height; the upper graph gets the rest. No zoom.
-    const depth = lowerHeightOf({ lowerHeight }), padding = 36;
+export function createViewport(width, height, mode, { flipX = false, flipY = false, boxSize = { width: 10, height: 8 }, zoom = 1, lowerHeight, leftWidth } = {}) {
+  if (panelSheet(mode)) {
+    // Each lower row is lowerHeight tall and the left column leftWidth wide; the top row and the
+    // right column get the rest of the view. No zoom.
+    const rows = PANEL_SHEETS[mode], columns = rows[0].length, padding = 36;
+    const depth = lowerHeightOf({ lowerHeight }), across = leftWidthOf({ leftWidth });
     const plot = { left: padding, right: width - padding, top: padding, bottom: height - padding };
-    const unit = Math.max(0.5, Math.min(56, width / 16, (plot.bottom - plot.top) / (2 * depth)));
-    const baseCx = plot.left, baseCy = plot.bottom - depth * unit;
+    const unit = Math.max(0.5, Math.min(56, width / 16, (plot.bottom - plot.top) / (rows.length * depth),
+      columns > 1 ? (plot.right - plot.left) / (columns * across) : Infinity));
+    const baseCx = plot.left, baseCy = plot.bottom - (rows.length - 1) * depth * unit;
     const xDirection = flipX ? -1 : 1, yDirection = flipY ? -1 : 1;
     return { width, height, unit, plot, xDirection, yDirection, cx: flipX ? width - baseCx : baseCx, cy: flipY ? height - baseCy : baseCy,
-      bounds: { xMin: 0, xMax: (plot.right - plot.left) / unit, yMin: -depth, yMax: (baseCy - plot.top) / unit } };
+      bounds: { xMin: 0, xMax: (plot.right - plot.left) / unit, yMin: -(rows.length - 1) * depth, yMax: (baseCy - plot.top) / unit } };
   }
   if (mode==='edgeworth') {
     const unit=Math.max(0.01,Math.min((width-96)/boxSize.width,(height-96)/boxSize.height));

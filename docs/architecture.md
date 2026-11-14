@@ -290,6 +290,7 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `scripts/check.mjs`, `test.mjs`, `browser-test.mjs`, `.github/workflows/check.yml` | 구문/경계·앱·독립 브라우저 회귀와 CI 진입점; 배포 없음 |
 | `tests/architecture.test.js`, `models.test.js`, `interactions.test.js` | 등록 실패·공통 모델 행동·포인터/키보드 제약 |
 | `tests/ppc.test.js`, `edgeworth.test.js` | 타원/반지름·상자/양 원점 축·기록/JSON 회귀 9개 |
+| `tests/panels.test.js` | 상하 3단·2×2 보기 영역·그래프별 원점/축·좌표 표시·다른 그래프 축 자석·관계·축 띄우기·설정·기록·JSON 6개 |
 | `tests/stacked.test.js` | 상하 2단 보기 영역·그린 대로 표시(미리보기 = 결과)·아래 축 자석(점·선분 끝)·관계·좌표 표시·기록·JSON 4개 |
 | `tests/curve-curve-tangency.test.js`, `snap-contact-contract.test.js`, `snap-targets.test.js` | 곡선 접점·전체 종류 연속 계약·공통 제외/캐시/의존 회귀 32개 |
 | `tests/browser/`, `tests/fixtures/` | 실제 canvas 합성 입력·전체 앱 화면 검사와 공유 곡선 사례 |
@@ -473,11 +474,21 @@ binding은 `{kind:'tangent',sourceId:lineId,parameter}`(직선 기준점에서 �
 
 위 IS-LM·아래 AD처럼 쌓은 그림을 한 그래프 안에서 그립니다. 에지워드 상자(B 원점)·대면처럼 **같은 좌표 평면에 두 번째 원점과 축**을 둡니다. 그래서 보조선은 새 도형이나 관계가 아니라 보통 선분이고, 자석·관계·기록·JSON이 따로 작업 없이 동작합니다. 이전의 '그래프 두 개를 연결선으로 잇는' 방식(`v10`)은 화면 틈 계산·확대 공유·좌표 동기화·경계를 넘지 못하는 입력 때문에 불안정해서 지웠습니다.
 
-- **좌표:** 위 원점 (0,0), 아래 원점 (0, −`lowerHeight`)(문서 필드, 기본 6, 2~40). `viewport.js`의 `stacked`·`lowerHeightOf`·`stackedPanel`·`LOWER_TOP`(−0.5: 아래 그래프 y축이 끝나는 높이)을 공유합니다. 기본 크기에서 두 그래프 높이가 같도록 단위를 정하고 확대/축소는 하지 않습니다(`zoomable`).
+- **좌표:** 위 원점 (0,0), 아래 원점 (0, −`lowerHeight`)(문서 필드, 기본 6, 2~40). 2026-11-14부터 `viewport.js`의 `PANEL_SHEETS`·`sheetPanels`·`panelAt`·`PANEL_GAP`(0.5: 축이 다음 그래프 축 앞에서 끝나는 간격)을 상하 3단·2×2와 함께 씁니다(아래 절). 기본 크기에서 두 그래프 높이가 같도록 단위를 정하고 확대/축소는 하지 않습니다(`zoomable`).
 - **축:** `axes.js`의 `axisSegments`가 위 y축을 y≥0으로 자르고 `axis-lower-x`·`axis-lower-y`를, `coordinateOrigins`가 '아래 원점'을 등록합니다. 스냅·맞춤 표시·칠하기 경계·`relations`(`STRAIGHT_AXES`)가 이 목록을 그대로 씁니다. 아래 x축과의 교차는 일반 교점(교점 맞춤)입니다.
 - **그래프별로 자르지 않음:** 모든 선은 보이는 그대로 그려집니다. 처음에는 직선·곡선을 기준점이 있는 그래프 안으로 잘랐지만, 그리는 중의 미리보기와 결과가 달라 불편하다는 사용자 의견에 따라 같은 날 지웠습니다(노트처럼 그린 대로, 숨은 규칙 없음). 끝이 없는 직선은 두 그래프를 지나가며 다른 그래프의 선·축과 교점이 생깁니다. 한 그래프 안에 두려면 선분으로 그립니다. 축 띄우기는 위·아래 x축과 y축 모두에 적용합니다.
 - **표시·설정·JSON:** 아래 그래프 점의 좌표 표시는 y+lowerHeight(`pointCoordinatesLabel`). 그래프 설정의 '아래 그래프 높이·아래 수평축·아래 수직축'. JSON은 `type:'stacked'`와 `lower`, `legend.stacked`.
-- **하지 않은 것:** 원클릭 보조선 버튼(사용자 결정으로 뺌), 아래 그래프 높이를 끌어서 바꾸기, 3단 이상·좌우 2단, 확대/축소. 상하 반전(y 증가 아래쪽)은 계산상 지원하지만 화면으로 확인하지 않았습니다.
+- **하지 않은 것:** 원클릭 보조선 버튼(사용자 결정으로 뺌), 아래 그래프 높이를 끌어서 바꾸기, 확대/축소(3단·2×2는 2026-11-14에 추가). 상하 반전(y 증가 아래쪽)은 계산상 지원하지만 화면으로 확인하지 않았습니다.
+
+## 상하 3단·2×2 포맷 (2026-11-14)
+
+상하 2단을 '패널 시트'로 일반화했습니다. 포맷마다 그래프 행 목록을 `PANEL_SHEETS`에 두고(`stacked` 2행, `stacked3` 3행, `grid` 2행×2열), 모든 소비자가 `sheetPanels(state)`의 같은 목록을 씁니다.
+
+- **좌표:** 행 r·열 c 그래프의 원점은 (c·`leftWidth`, −r·`lowerHeight`). 맨 위 행과 오른쪽 열은 보기에 남는 만큼 차지합니다. `createViewport`는 아래 행 높이·왼쪽 열 너비가 모두 들어가도록 단위를 정하고 확대/축소는 하지 않습니다. `leftWidth`는 문서 필드(기본 9, 2~40).
+- **축·자석:** 각 그래프의 x축은 원점에서 오른쪽 열 y축 0.5 앞(마지막 열은 보기 끝)까지, y축은 원점에서 윗행 x축 0.5 앞(맨 위 행은 보기 끝)까지입니다. `axisSegments`·`coordinateOrigins`가 이 목록을 등록하므로 스냅·맞춤 표시·칠하기 경계·`relations`(`STRAIGHT_AXES`는 패널 키에서 생성)가 따로 작업 없이 동작합니다. 축 id는 맨 왼쪽 위가 `axis-x`·`axis-y`, 나머지는 `axis-<key>-x/y`입니다.
+- **표시:** 선은 그린 대로 그립니다. 축 띄우기는 그래프마다 사각 영역 하나(`lineDisplayRegions`). 점 좌표는 `panelAt`이 찾은 그래프의 원점 기준(`pointCoordinatesLabel(anchor, mode, sheet)`).
+- **설정·상태:** 축 이름은 맨 왼쪽 위 `axisNames`, 나머지 `panelAxisNames[key]`(이전 `lowerAxisNames`). 그래프 설정의 `#panel-settings`가 포맷에 있는 그래프의 필드만 보입니다.
+- **하지 않은 것:** 높이·너비를 바꿀 때 도형을 같이 옮기기(축만 옮겨짐), 행마다 다른 높이, 2×2 외의 열 구성, 상하 반전 화면 확인.
 
 ## 여러 그래프 배치·연결선 제거 (2026-11-13)
 

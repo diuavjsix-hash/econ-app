@@ -3,7 +3,7 @@ import { renderEditingHandles } from './editing-handles.js';
 import { SVG_RENDERER, STROKE_RENDERER } from './svg-renderer.js';
 import { objectModel } from '../models/objects.js';
 import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions } from './display.js';
-import { createViewport, toScreen as projectPoint, toWorld, gridStep, wheelZoom, zoomable, faceToFace, stacked, lowerHeightOf, LOWER_TOP } from './viewport.js';
+import { createViewport, toScreen as projectPoint, toWorld, gridStep, wheelZoom, zoomable, faceToFace, sheetPanels } from './viewport.js';
 import { pointCoordinatesLabel } from './point.js';
 import { SnapTargetCache, snapPoint } from './snap.js';
 import { LINE_END_ACTIONS } from './line-extent.js';
@@ -179,19 +179,8 @@ export function mountGraph(container, store) {
     }
     svg.append(fillLayer);
     appendCreationLayers('fills');
-    const axes = element('g', { class: 'graph-axes', 'aria-label': '좌표축' });
     const xEnd = xDirection === 1 ? plot.right : plot.left;
     const yEnd = yDirection === 1 ? plot.top : plot.bottom;
-    // A face-to-face sheet points its x axis both ways from the shared y axis.
-    const faceEnd = faceToFace(currentState.quadrantMode) ? (xDirection === 1 ? plot.left : plot.right) : null;
-    // A stacked sheet's upper y axis starts at its own origin; the lower graph draws below it.
-    const stackedSheet = stacked(currentState.quadrantMode);
-    axes.append(
-      element('line', { x1: plot.left, y1: cy, x2: plot.right, y2: cy }),
-      element('line', { x1: cx, y1: stackedSheet ? cy : (yDirection === 1 ? plot.bottom : plot.top), x2: cx, y2: yEnd }),
-      element('path', { d: `M${xEnd - 7 * xDirection} ${cy - 4}l${7 * xDirection} 4 ${-7 * xDirection} 4 M${cx - 4} ${yEnd + 7 * yDirection}l4 ${-7 * yDirection} 4 ${7 * yDirection}${faceEnd === null ? '' : ` M${faceEnd + 7 * xDirection} ${cy - 4}l${-7 * xDirection} 4 ${7 * xDirection} 4`}`, fill: 'none' }),
-    );
-    svg.append(axes);
     function axisName(name, attributes, maxWidth) {
       if (!name) return;
       const label = element('text', { ...attributes, class: 'axis-name' }, name);
@@ -204,20 +193,34 @@ export function mountGraph(container, store) {
         label.firstChild.textContent = `${shortened}…`;
       }
     }
-    axisName(currentState.axisNames.x, { x: xEnd - 10 * xDirection, y: cy + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'end' : 'start', 'aria-label': `수평축 ${currentState.axisNames.x}` }, faceEnd === null ? plot.right - plot.left - 20 : Math.abs(xEnd - cx) - 20);
-    if (faceEnd !== null) axisName(currentState.faceAxisName, { x: faceEnd + 10 * xDirection, y: cy + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'start' : 'end', 'aria-label': `맞은편 수평축 ${currentState.faceAxisName}` }, Math.abs(cx - faceEnd) - 20);
-    axisName(currentState.axisNames.y, { x: cx + 13 * xDirection, y: yEnd + (yDirection === 1 ? 5 : -5), 'text-anchor': xDirection === 1 ? 'start' : 'end', 'aria-label': `수직축 ${currentState.axisNames.y}` }, (xDirection === 1 ? plot.right - cx : cx - plot.left) - 13);
-    if (stackedSheet) {
-      // The lower graph: its x axis at -lowerHeight, its y axis rising to just below the upper x axis.
-      const lowerY = toScreen({ x: 0, y: -lowerHeightOf(currentState) }).y, lowerTop = toScreen({ x: 0, y: LOWER_TOP }).y;
-      const lower = element('g', { class: 'graph-axes', 'aria-label': '아래 좌표축' });
-      lower.append(element('line', { x1: plot.left, y1: lowerY, x2: plot.right, y2: lowerY }),
-        element('line', { x1: cx, y1: lowerY, x2: cx, y2: lowerTop }),
-        element('path', { d: `M${xEnd - 7 * xDirection} ${lowerY - 4}l${7 * xDirection} 4 ${-7 * xDirection} 4 M${cx - 4} ${lowerTop + 7 * yDirection}l4 ${-7 * yDirection} 4 ${7 * yDirection}`, fill: 'none' }));
-      svg.append(lower);
-      const names = currentState.lowerAxisNames ?? { x: 'x', y: 'y' };
-      axisName(names.x, { x: xEnd - 10 * xDirection, y: lowerY + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'end' : 'start', 'aria-label': `아래 수평축 ${names.x}` }, plot.right - plot.left - 20);
-      axisName(names.y, { x: cx + 13 * xDirection, y: lowerTop + (yDirection === 1 ? 5 : -5), 'text-anchor': xDirection === 1 ? 'start' : 'end', 'aria-label': `아래 수직축 ${names.y}` }, (xDirection === 1 ? plot.right - cx : cx - plot.left) - 13);
+    const panels = sheetPanels(currentState);
+    if (panels.length) {
+      // A panel sheet: each graph's axes start at its origin and end, with an arrow, short of the next graph's axes.
+      for (const panel of panels) {
+        const o = toScreen(panel.origin);
+        const toX = panel.xEnd === null ? xEnd : toScreen({ x: panel.xEnd, y: 0 }).x, toY = panel.yEnd === null ? yEnd : toScreen({ x: 0, y: panel.yEnd }).y;
+        const group = element('g', { class: 'graph-axes', 'aria-label': panel.name ? `${panel.name} 좌표축` : '좌표축' });
+        group.append(element('line', { x1: o.x, y1: o.y, x2: toX, y2: o.y }), element('line', { x1: o.x, y1: o.y, x2: o.x, y2: toY }),
+          element('path', { d: `M${toX - 7 * xDirection} ${o.y - 4}l${7 * xDirection} 4 ${-7 * xDirection} 4 M${o.x - 4} ${toY + 7 * yDirection}l4 ${-7 * yDirection} 4 ${7 * yDirection}`, fill: 'none' }));
+        svg.append(group);
+        const names = panel.key === 'upper' ? currentState.axisNames : currentState.panelAxisNames?.[panel.key] ?? { x: 'x', y: 'y' };
+        const prefix = panel.name ? `${panel.name} ` : '', room = Math.abs(toX - o.x);
+        axisName(names.x, { x: toX - 10 * xDirection, y: o.y + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'end' : 'start', 'aria-label': `${prefix}수평축 ${names.x}` }, room - 20);
+        axisName(names.y, { x: o.x + 13 * xDirection, y: toY + (yDirection === 1 ? 5 : -5), 'text-anchor': xDirection === 1 ? 'start' : 'end', 'aria-label': `${prefix}수직축 ${names.y}` }, room - 13);
+      }
+    } else {
+      const axes = element('g', { class: 'graph-axes', 'aria-label': '좌표축' });
+      // A face-to-face sheet points its x axis both ways from the shared y axis.
+      const faceEnd = faceToFace(currentState.quadrantMode) ? (xDirection === 1 ? plot.left : plot.right) : null;
+      axes.append(
+        element('line', { x1: plot.left, y1: cy, x2: plot.right, y2: cy }),
+        element('line', { x1: cx, y1: plot.bottom, x2: cx, y2: plot.top }),
+        element('path', { d: `M${xEnd - 7 * xDirection} ${cy - 4}l${7 * xDirection} 4 ${-7 * xDirection} 4 M${cx - 4} ${yEnd + 7 * yDirection}l4 ${-7 * yDirection} 4 ${7 * yDirection}${faceEnd === null ? '' : ` M${faceEnd + 7 * xDirection} ${cy - 4}l${-7 * xDirection} 4 ${7 * xDirection} 4`}`, fill: 'none' }),
+      );
+      svg.append(axes);
+      axisName(currentState.axisNames.x, { x: xEnd - 10 * xDirection, y: cy + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'end' : 'start', 'aria-label': `수평축 ${currentState.axisNames.x}` }, faceEnd === null ? plot.right - plot.left - 20 : Math.abs(xEnd - cx) - 20);
+      if (faceEnd !== null) axisName(currentState.faceAxisName, { x: faceEnd + 10 * xDirection, y: cy + (yDirection === 1 ? 24 : -16), 'text-anchor': xDirection === 1 ? 'start' : 'end', 'aria-label': `맞은편 수평축 ${currentState.faceAxisName}` }, Math.abs(cx - faceEnd) - 20);
+      axisName(currentState.axisNames.y, { x: cx + 13 * xDirection, y: yEnd + (yDirection === 1 ? 5 : -5), 'text-anchor': xDirection === 1 ? 'start' : 'end', 'aria-label': `수직축 ${currentState.axisNames.y}` }, (xDirection === 1 ? plot.right - cx : cx - plot.left) - 13);
     }
     if (currentState.quadrantMode==='edgeworth') {
       const opposite=toScreen({x:bounds.xMax,y:bounds.yMax}),b=element('g',{class:'graph-axes','aria-label':'B 좌표축'});
@@ -300,7 +303,7 @@ export function mountGraph(container, store) {
         label.setAttribute('y', String(Math.max(16, y - 12)));
       }
       if (point.showCoordinates) {
-        const label = element('text', { x: x + 12, y: Math.max(point.name ? 31 : 16, y + (point.name ? 4 : -12)), class: 'point-name point-coordinates', 'data-point-coordinates': point.id }, pointCoordinatesLabel(point.anchor, currentState.quadrantMode, lowerHeightOf(currentState)));
+        const label = element('text', { x: x + 12, y: Math.max(point.name ? 31 : 16, y + (point.name ? 4 : -12)), class: 'point-name point-coordinates', 'data-point-coordinates': point.id }, pointCoordinatesLabel(point.anchor, currentState.quadrantMode, currentState));
         label.append(element('title', {}, `(${point.anchor.x}, ${point.anchor.y})`));
         group.append(label);
         const length = label.getComputedTextLength();

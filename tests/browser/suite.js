@@ -167,12 +167,42 @@ async function stackedSmoke(width, height) {
   draw({ x: 3.04, y: 3.03 }, { x: 3.1, y: -5.92 }, { shiftKey: true });
   const json = exported(doc), guide = json.lines.at(-1), near = (p, q) => Math.hypot(p.x - q.x, p.y - q.y) < 1e-6;
   check(guide.style === 'dashed' && [guide.segment.start, guide.segment.end].some(p => near(p, { x: 3, y: 3 })) && [guide.segment.start, guide.segment.end].some(p => near(p, { x: 3, y: -6 })), `${size}: a Shift guide runs from the crossing down to the lower x axis`);
-  check(json.coordinateSystem.type === 'stacked' && json.coordinateSystem.lower.lowerHeight === 6 && json.legend.stacked
+  check(json.coordinateSystem.type === 'stacked' && json.coordinateSystem.lower.lowerHeight === 6 && json.legend.panels
     && json.relations.some(rel => near(rel.at, { x: 3, y: -6 }) && rel.on.includes('axis-lower-x')), `${size}: the JSON says the guide ends on the lower x axis`);
   doc.getElementById('graph-settings-action').click();
-  check(!doc.getElementById('stacked-settings').hidden && doc.getElementById('face-settings').hidden, `${size}: graph settings offer the lower graph`);
+  check(!doc.getElementById('panel-settings').hidden && doc.getElementById('face-settings').hidden && doc.querySelector('[data-panel-axes="middle"]').hidden && doc.getElementById('left-width-setting').hidden, `${size}: graph settings offer the lower graph only`);
   input(doc, 'lower-axis-y', 'P'); doc.getElementById('done-graph-settings').click();
   check(doc.querySelector('[aria-label="아래 수직축 P"]') && exported(doc).coordinateSystem.lower.lowerAxisNames.y === 'P', `${size}: the lower axis name is drawn and exported`);
+  el.remove();
+}
+// 상하 3단 and 2×2: every graph gets its own axes and names; guides snap to the other graphs' axes.
+async function panelSmoke(width, height, mode) {
+  const el = await frame('/', width, height), doc = el.contentDocument, win = el.contentWindow, size = `${width}x${height} ${mode}`;
+  win.addEventListener('error', e => errors.push(`${size}: ${e.message}`));
+  await wait(() => doc.querySelector('#quadrant-dialog[open]'), 'app startup');
+  doc.querySelector(`[data-quadrants="${mode}"]`).click(); doc.getElementById('apply-workspace').click();
+  const svg = doc.querySelector('.graph-svg'), r = svg.getBoundingClientRect(), v = createViewport(r.width, r.height, mode, { lowerHeight: 6, leftWidth: 9 });
+  const names = mode === 'grid' ? ['', '오른쪽 ', '아래 ', '오른쪽 아래 '] : ['', '가운데 ', '아래 '];
+  check(names.every(name => doc.querySelector(`[aria-label="${name}수평축 x"]`) && doc.querySelector(`[aria-label="${name}수직축 y"]`)) && doc.querySelectorAll('.graph-axes').length === names.length, `${size}: each graph has its own axes and names`);
+  svg.setPointerCapture = () => {}; svg.hasPointerCapture = () => false; svg.releasePointerCapture = () => {};
+  const pointer = (p, type, flags = {}) => { const s = toScreen(p, v);
+    svg.dispatchEvent(new win.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 98, pointerType: 'mouse', button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: r.left + s.x, clientY: r.top + s.y, ...flags })); };
+  const draw = (a, b, flags = {}) => { pointer(a, 'pointerdown'); pointer(b, 'pointermove', flags); pointer(b, 'pointerup', flags); };
+  doc.getElementById('line-tool').click(); doc.querySelector('#line-options [data-line-kind="segment"]').click(); doc.querySelector('#line-options [data-line-style="dashed"]').click();
+  // 상하 3단: from the top graph down to the bottom x axis. 2×2: from the left graph across to the right graph's y axis.
+  const [from, to, end, axis] = mode === 'grid' ? [{ x: 4, y: 3 }, { x: 9.08, y: 3.2 }, { x: 9, y: 3 }, 'axis-right-y'] : [{ x: 3, y: 3 }, { x: 3.1, y: -11.92 }, { x: 3, y: -12 }, 'axis-lower-x'];
+  draw(from, to, { shiftKey: true });
+  const json = exported(doc), guide = json.lines.at(-1), near = (p, q) => Math.hypot(p.x - q.x, p.y - q.y) < 1e-6;
+  check(guide?.style === 'dashed' && [guide.segment.start, guide.segment.end].some(p => near(p, end)), `${size}: a Shift guide ends on ${axis}`);
+  check(json.coordinateSystem.type === (mode === 'grid' ? 'grid-2x2' : 'stacked-3') && json.coordinateSystem.panels.length === names.length && json.legend.panels
+    && json.relations.some(rel => near(rel.at, end) && rel.on.includes(axis)), `${size}: the JSON lists the graphs and the guide's axis`);
+  doc.getElementById('graph-settings-action').click();
+  const shown = key => !doc.querySelector(`[data-panel-axes="${key}"]`).hidden;
+  check(!doc.getElementById('panel-settings').hidden && (mode === 'grid' ? shown('right') && shown('lower-right') && !shown('middle') && !doc.getElementById('left-width-setting').hidden
+    : shown('middle') && shown('lower') && !shown('right') && doc.getElementById('left-width-setting').hidden), `${size}: graph settings offer this sheet's graphs`);
+  const key = mode === 'grid' ? 'lower-right' : 'middle';
+  input(doc, `${key}-axis-y`, 'P'); doc.getElementById('done-graph-settings').click();
+  check(doc.querySelector(`[aria-label="${names[mode === 'grid' ? 3 : 1]}수직축 P"]`) && exported(doc).coordinateSystem.panels.find(p => p.id === key).axisNames.y === 'P', `${size}: a graph's axis name is drawn and exported`);
   el.remove();
 }
 // Multi-graph layouts were removed (2026-11-13): one graph card, no layout choices or link buttons.
@@ -244,7 +274,7 @@ try {
   check(tangentResult.ok,`contact tangent line fixture: ${tangentResult.error ?? 'completed'}`);
   for (const name of tangentResult.passed) passed.push(`contact tangent line: ${name}`);
   tangentLine.remove();
-  await appSmoke(1280, 800); await appSmoke(390, 844); await faceSmoke(1280, 800); await singleGraphSmoke(1280, 800); await stackedSmoke(1280, 800);
+  await appSmoke(1280, 800); await appSmoke(390, 844); await faceSmoke(1280, 800); await singleGraphSmoke(1280, 800); await stackedSmoke(1280, 800); await panelSmoke(1280, 800, 'stacked3'); await panelSmoke(1280, 800, 'grid');
   check(errors.length === 0, `no browser runtime errors: ${errors.join('; ')}`);
 } catch (error) { errors.push(error.stack ?? String(error)); }
 const report = { ok: errors.length === 0, count: passed.length, passed, errors };

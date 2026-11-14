@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore } from '../src/state.js';
-import { QUADRANT_MODES, createViewport, toScreen, toWorld, stacked, stackedPanel, zoomable, lowerHeightOf } from '../src/graph/viewport.js';
+import { QUADRANT_MODES, createViewport, toScreen, toWorld, panelSheet, panelAt, zoomable, lowerHeightOf } from '../src/graph/viewport.js';
 import { displayedLineSegments, displayedCurveSegments, lineDisplayRegions } from '../src/graph/display.js';
 import { axisSegments, coordinateOrigins } from '../src/graph/axes.js';
 import { buildSnapTargets, snapPoint, guidedSnapCandidates } from '../src/graph/snap.js';
@@ -15,7 +15,7 @@ const sheet = () => { const store = createStore(); store.configureWorkspace('sta
 const ys = pieces => pieces.flat().map(p => p.y);
 
 test('the stacked format puts a lower graph under the upper one with one x scale and no zoom', () => {
-  assert.equal(stacked('stacked'), true); assert.equal(stacked('first'), false);
+  assert.equal(panelSheet('stacked'), true); assert.equal(panelSheet('first'), false);
   assert.deepEqual(QUADRANT_MODES.stacked.quadrants, [1, 4]);
   assert.equal(zoomable('stacked'), false);
   const viewport = createViewport(1000, 680, 'stacked', { lowerHeight: 6, zoom: 3 });
@@ -27,9 +27,9 @@ test('the stacked format puts a lower graph under the upper one with one x scale
     for (const point of [{ x: 2, y: 3 }, { x: 2, y: -3 }]) near(toWorld(toScreen(point, flipped), flipped), point, 1e-10);
   }
   assert.equal(lowerHeightOf({}), 6); assert.equal(lowerHeightOf({ lowerHeight: 100 }), 40);
-  assert.equal(stackedPanel({ x: 1, y: 0 }, { quadrantMode: 'stacked' }), 'upper');
-  assert.equal(stackedPanel({ x: 1, y: -0.1 }, { quadrantMode: 'stacked' }), 'lower');
-  assert.equal(stackedPanel({ x: 1, y: -0.1 }, { quadrantMode: 'first' }), null);
+  assert.equal(panelAt({ x: 1, y: 0 }, { quadrantMode: 'stacked' }).key, 'upper');
+  assert.equal(panelAt({ x: 1, y: -0.1 }, { quadrantMode: 'stacked' }).key, 'lower');
+  assert.equal(panelAt({ x: 1, y: -0.1 }, { quadrantMode: 'first' }), null);
 });
 
 test('every stroke is drawn as drawn across both graphs; the line tool preview matches the result', () => {
@@ -76,19 +76,20 @@ test('the lower axes are shared snap targets: points, segment ends and relations
 
 test('lower-graph coordinates, settings, history and JSON', () => {
   const store = sheet();
-  assert.equal(pointCoordinatesLabel({ x: 2, y: -4 }, 'stacked', 6), '(2, 2)');
-  assert.equal(pointCoordinatesLabel({ x: 2, y: 4 }, 'stacked', 6), '(2, 4)');
-  assert.equal(pointCoordinatesLabel({ x: 2, y: -4 }, 'all', 6), '(2, -4)');
-  assert.equal(snapFeedbackModel({ point: { x: 1, y: -5 }, kind: 'point' }, { coordinates: true, quadrantMode: 'stacked', lowerHeight: 6 }).text, '점 맞춤 (1, 1)');
-  store.update({ lowerHeight: 8, lowerAxisNames: { y: 'P' } });
-  assert.equal(store.getState().lowerHeight, 8); assert.deepEqual(store.getState().lowerAxisNames, { x: 'x', y: 'P' });
+  assert.equal(pointCoordinatesLabel({ x: 2, y: -4 }, 'stacked', { lowerHeight: 6 }), '(2, 2)');
+  assert.equal(pointCoordinatesLabel({ x: 2, y: 4 }, 'stacked', { lowerHeight: 6 }), '(2, 4)');
+  assert.equal(pointCoordinatesLabel({ x: 2, y: -4 }, 'all', { lowerHeight: 6 }), '(2, -4)');
+  assert.equal(snapFeedbackModel({ point: { x: 1, y: -5 }, kind: 'point' }, { coordinates: true, quadrantMode: 'stacked', sheet: { lowerHeight: 6 } }).text, '점 맞춤 (1, 1)');
+  store.update({ lowerHeight: 8, panelAxisNames: { lower: { y: 'P' } } });
+  assert.equal(store.getState().lowerHeight, 8); assert.deepEqual(store.getState().panelAxisNames.lower, { x: 'x', y: 'P' });
   store.update({ lowerHeight: 1 }); store.update({ lowerHeight: Infinity }); assert.equal(store.getState().lowerHeight, 8);
   store.undo(); assert.equal(store.getState().lowerHeight, 6); store.redo();
   const doc = serializeDocument(store.getState()), system = doc.diagrams[0].coordinateSystem;
   assert.equal(system.type, 'stacked'); assert.equal(system.origin, 'middle-left'); assert.deepEqual(system.quadrants, [1, 4]);
   assert.deepEqual(system.lower, { lowerHeight: 8, lowerOrigin: { x: 0, y: -8 }, lowerAxisNames: { x: 'x', y: 'P' }, ownY: 'y+lowerHeight' });
-  assert.equal(typeof doc.legend.stacked, 'string');
+  assert.equal(typeof doc.legend.panels, 'string');
+  assert.deepEqual(system.panels.map(p => [p.id, p.own.y]), [['upper', 'y'], ['lower', 'y+8']]);
   store.configureWorkspace('first');
   const plain = serializeDocument(store.getState());
-  assert.equal(plain.legend.stacked, undefined); assert.equal(plain.diagrams[0].coordinateSystem.lower, undefined);
+  assert.equal(plain.legend.panels, undefined); assert.equal(plain.diagrams[0].coordinateSystem.lower, undefined); assert.equal(plain.diagrams[0].coordinateSystem.panels, undefined);
 });

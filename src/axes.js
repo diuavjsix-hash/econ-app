@@ -1,5 +1,5 @@
 import { RangeControl, NumberControl } from './ui/controls.js';
-import { faceToFace, stacked } from './graph/viewport.js';
+import { faceToFace, sheetPanels } from './graph/viewport.js';
 
 export function mountAxes(root, store) {
   const horizontal = root.querySelector('#horizontal-axis-name');
@@ -15,16 +15,30 @@ export function mountAxes(root, store) {
   gapToggle.addEventListener('change', () => store.update({ axisGapEnabled: gapToggle.checked }));
   gapSlider.bind(value => store.update({ axisGap: value }));
   const lowerHeight = new NumberControl(root, 'lower-height').bind(value => store.update({ lowerHeight: value }));
-  for (const key of ['x', 'y']) root.querySelector(`#lower-axis-${key}`).addEventListener('input', event => store.update({ lowerAxisNames: { [key]: event.target.value } }));
+  const leftWidth = new NumberControl(root, 'left-width').bind(value => store.update({ leftWidth: value }));
+  const panelAxes = [...root.querySelectorAll('[data-panel-axes]')];
+  for (const group of panelAxes) for (const axis of ['x', 'y']) {
+    const key = group.dataset.panelAxes;
+    root.querySelector(`#${key}-axis-${axis}`).addEventListener('input', event => store.update({ panelAxisNames: { [key]: { [axis]: event.target.value } } }));
+  }
   const totals={};
   for (const key of ['width','height']) totals[key]=new NumberControl(root,`box-${key}`).bind(value=>store.update({boxSize:{[key]:value}}));
   for (const key of ['x','y']) root.querySelector(`#box-axis-${key}`).addEventListener('input',event=>store.update({boxAxisNames:{[key]:event.target.value}}));
-  return store.subscribe(({ axisNames, axisGapEnabled, axisGap, quadrantMode, boxSize, boxAxisNames, faceAxisName, lowerHeight: depth, lowerAxisNames }) => {
-    root.querySelector('#stacked-settings').hidden = !stacked(quadrantMode);
-    lowerHeight.setValue(depth);
-    for (const key of ['x', 'y']) {
-      const input = root.querySelector(`#lower-axis-${key}`);
-      if (input.value !== lowerAxisNames[key]) input.value = lowerAxisNames[key];
+  return store.subscribe(state => {
+    const { axisNames, axisGapEnabled, axisGap, quadrantMode, boxSize, boxAxisNames, faceAxisName, panelAxisNames } = state;
+    // Panel sheets show the sizes and axis names of the graphs they have.
+    const panels = new Set(sheetPanels(state).map(panel => panel.key));
+    root.querySelector('#panel-settings').hidden = !panels.size;
+    root.querySelector('#left-width-setting').hidden = !panels.has('right');
+    lowerHeight.setValue(state.lowerHeight); leftWidth.setValue(state.leftWidth);
+    root.querySelector('label[for="lower-height"] .field-label').textContent = panels.has('middle') ? '가운데·아래 그래프 높이' : '아래 그래프 높이';
+    for (const group of panelAxes) {
+      const key = group.dataset.panelAxes;
+      group.hidden = !panels.has(key);
+      for (const axis of ['x', 'y']) {
+        const input = root.querySelector(`#${key}-axis-${axis}`);
+        if (input.value !== panelAxisNames[key][axis]) input.value = panelAxisNames[key][axis];
+      }
     }
     root.querySelector('#edgeworth-settings').hidden=quadrantMode!=='edgeworth';
     root.querySelector('#face-settings').hidden=!faceToFace(quadrantMode);

@@ -1,24 +1,25 @@
 import { clipLine } from './math.js';
 import { clipCurveWithExtensions } from './curve.js';
 import { isIndifference, clipIndifference } from './indifference.js';
-import { stacked, lowerHeightOf } from './viewport.js';
+import { sheetPanels, PANEL_GAP } from './viewport.js';
 
 export const DEFAULT_AXIS_GAP = 0.75;
 export const MIN_AXIS_GAP = 0.25;
 export const MAX_AXIS_GAP = 2;
 
 /**
- * Cut out mathematical bands around the axes, without modifying stored shapes. A stacked
- * sheet clips nothing else: every stroke is drawn as drawn, across both graphs.
+ * Cut out mathematical bands around the axes, without modifying stored shapes. A panel sheet
+ * keeps a band inside each graph's axes and clips nothing else: every stroke is drawn as drawn.
  */
 export function lineDisplayRegions(bounds, state) {
   if (!state.axisGapEnabled) return [bounds];
   const gap = state.axisGap ?? DEFAULT_AXIS_GAP;
-  if (stacked(state.quadrantMode)) {
-    const depth = lowerHeightOf(state), xMin = Math.max(bounds.xMin, gap);
-    if (xMin >= bounds.xMax) return [];
-    return [[Math.max(bounds.yMin, -depth + gap), Math.min(bounds.yMax, -gap)], [Math.max(bounds.yMin, gap), bounds.yMax]]
-      .filter(([from, to]) => to > from).map(([yMin, yMax]) => ({ xMin, xMax: bounds.xMax, yMin, yMax }));
+  const panels = sheetPanels(state);
+  if (panels.length) {
+    return panels.map(({ origin: o, xEnd, yEnd }) => ({
+      xMin: Math.max(bounds.xMin, o.x + gap), xMax: Math.min(bounds.xMax, xEnd === null ? Infinity : xEnd + PANEL_GAP - gap),
+      yMin: Math.max(bounds.yMin, o.y + gap), yMax: Math.min(bounds.yMax, yEnd === null ? Infinity : yEnd + PANEL_GAP - gap),
+    })).filter(r => r.xMin < r.xMax && r.yMin < r.yMax).sort((a, b) => a.yMin - b.yMin || a.xMin - b.xMin);
   }
   if (state.quadrantMode==='edgeworth') {
     const region={xMin:Math.max(bounds.xMin,gap),xMax:Math.min(bounds.xMax,state.boxSize.width-gap),

@@ -5,7 +5,7 @@
 ## 버전 13의 변경 (2026-11-12)
 
 - **최상위 사본 제거:** 버전 12까지 최상위에 있던 활성 그래프의 `lines`·`points`·`coordinateSystem` 등 사본을 없앴습니다. 모든 그래프는 `diagrams`에만 한 번씩 들어갑니다. 활성 그래프는 `activeDiagramId`로 찾습니다.
-- **`legend`:** 최상위에 짧은 설명을 넣어, 파일만 받은 사람이나 AI가 형식을 읽을 수 있게 했습니다. 2026-11-13부터 영어이며 `coordinates`·`relations`·`axes`·`lines`(extent 단위·implicit)·`curves`(family·opposite 좌표틀)·`sketches`·`sums`(합 계산 규칙)·`bindings`(through-point·tangent 따라가기, parentId는 폴더일 뿐)·`fills`·`display`(보기 전용 필드)를 항상 담고, 해당 포맷이 있을 때만 `faceToFace`·`stacked`·`edgeworth`를 붙입니다. JSON에서 한국어는 도형·그래프 **이름**(사용자가 쓴 이름과 기본 이름 "직선 01" 등)에만 남습니다. 곡선 `geometry.movement`도 영어입니다(예: `scales about the origin`, 반대 방향은 `the opposite origin`).
+- **`legend`:** 최상위에 짧은 설명을 넣어, 파일만 받은 사람이나 AI가 형식을 읽을 수 있게 했습니다. 2026-11-13부터 영어이며 `coordinates`·`relations`·`axes`·`lines`(extent 단위·implicit)·`curves`(family·opposite 좌표틀)·`sketches`·`sums`(합 계산 규칙)·`bindings`(through-point·tangent 따라가기, parentId는 폴더일 뿐)·`fills`·`display`(보기 전용 필드)를 항상 담고, 해당 포맷이 있을 때만 `faceToFace`·`panels`(상하 2단·3단·2×2)·`edgeworth`를 붙입니다. JSON에서 한국어는 도형·그래프 **이름**(사용자가 쓴 이름과 기본 이름 "직선 01" 등)에만 남습니다. 곡선 `geometry.movement`도 영어입니다(예: `scales about the origin`, 반대 방향은 `the opposite origin`).
 - **`relations`:** 각 그래프 마지막에 계산된 위치 관계 목록을 넣습니다(아래 절).
 - **반올림:** 저장 창·복사·다운로드의 숫자는 소수 6자리로 반올림하고 `-0`은 `0`으로 씁니다. 앱 안의 문서와 `serializeDocument`는 전체 정밀도를 유지합니다.
 
@@ -44,7 +44,11 @@
 
 ### 상하 2단 포맷 (2026-11-13, 버전 13 안의 선택 필드)
 
-**상하 2단**은 x 눈금을 맞춘 위·아래 두 그래프를 한 좌표계에 둔 한 장의 그래프입니다. `coordinateSystem`은 `origin:'middle-left'`, `quadrants:[1,4]`에 `type:'stacked'`, `sharedAxis:'x'`, `lower:{lowerHeight, lowerOrigin:{x:0,y:-lowerHeight}, lowerAxisNames:{x,y}, ownY:'y+lowerHeight'}`를 더합니다. y≥0인 좌표는 위 그래프, y<0인 좌표는 아래 그래프에 있고 아래 그래프에서 읽는 세로축 값은 `y+lowerHeight`입니다. 아래 그래프의 축은 `relations`에 `axis-lower-x`·`axis-lower-y`로 나옵니다. 두 그래프를 가로지르는 보조선은 보통 선분이며, 끝이 아래 x축에 있으면 그 위치의 `on`에 `axis-lower-x`가 들어갑니다. 상하 2단 그래프가 있으면 `legend.stacked`에 설명이 붙습니다. 버전 번호는 그대로 13입니다.
+**상하 2단**은 x 눈금을 맞춘 위·아래 두 그래프를 한 좌표계에 둔 한 장의 그래프입니다. `coordinateSystem`은 `origin:'middle-left'`, `quadrants:[1,4]`에 `type:'stacked'`, `sharedAxis:'x'`, `lower:{lowerHeight, lowerOrigin:{x:0,y:-lowerHeight}, lowerAxisNames:{x,y}, ownY:'y+lowerHeight'}`를 더합니다. y≥0인 좌표는 위 그래프, y<0인 좌표는 아래 그래프에 있고 아래 그래프에서 읽는 세로축 값은 `y+lowerHeight`입니다. 아래 그래프의 축은 `relations`에 `axis-lower-x`·`axis-lower-y`로 나옵니다. 두 그래프를 가로지르는 보조선은 보통 선분이며, 끝이 아래 x축에 있으면 그 위치의 `on`에 `axis-lower-x`가 들어갑니다. 2026-11-14부터 `lowerHeight`와 아래 `panels`도 함께 나오고, 설명은 `legend.panels`에 붙습니다(이전 키 `legend.stacked`). 버전 번호는 그대로 13입니다.
+
+### 상하 3단·2×2 포맷 (2026-11-14, 버전 13 안의 선택 필드)
+
+**상하 3단**(`type:'stacked-3'`, `sharedAxis:'x'`)과 **2×2**(`type:'grid-2x2'`, `leftWidth`)도 한 좌표계에 그래프 여러 개를 둔 한 장의 그래프입니다. 세 포맷 모두 `coordinateSystem.lowerHeight`와 `panels`를 냅니다. `panels`는 왼쪽 위부터 그래프마다 `{id, origin, axes, axisNames, own}`이며 `id`는 `upper`·`middle`·`lower`·`right`·`lower-right`, `axes`는 `relations`에 나오는 축 이름(`axis-x`·`axis-y` 또는 `axis-<id>-x`·`axis-<id>-y`), `own`은 그 그래프에서 읽는 좌표식(예: 2×2 오른쪽 아래 `{x:'x-9', y:'y+6'}`)입니다. 3단은 원점 (0,0)·(0,−h)·(0,−2h), 2×2는 (0,0)·(w,0)·(0,−h)·(w,−h)입니다(h=`lowerHeight`, w=`leftWidth`). 점은 그 점을 포함하는 행(y≥0이 맨 위)과 열(x≥w가 오른쪽)의 그래프에 속합니다.
 
 ### 대면 포맷 (2026-11-12, 버전 13 안의 선택 필드)
 

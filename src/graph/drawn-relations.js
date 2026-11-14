@@ -3,7 +3,7 @@ import { curveTangentsAt } from './curve-contacts.js';
 import { lineEndPoints } from './line-extent.js';
 import { directionOf } from './math.js';
 import { sumValue } from './sum.js';
-import { stacked, lowerHeightOf } from './viewport.js';
+import { PANEL_SHEETS, panelSheet, lowerHeightOf, leftWidthOf } from './viewport.js';
 
 /**
  * Relations a reader of the exported JSON cannot see from coordinates alone: which strokes
@@ -18,7 +18,9 @@ import { stacked, lowerHeightOf } from './viewport.js';
 export const ON_TOLERANCE = 2e-3;
 // |sin| of the angle between two directions; ≈0.06°. A crossing this shallow reads as a contact.
 export const TANGENT_TOLERANCE = 1e-3;
-const STRAIGHT_AXES = { 'axis-x': { x: 1, y: 0 }, 'axis-b-x': { x: 1, y: 0 }, 'axis-lower-x': { x: 1, y: 0 }, 'axis-y': { x: 0, y: 1 }, 'axis-b-y': { x: 0, y: 1 }, 'axis-lower-y': { x: 0, y: 1 } };
+// Every axis id: the plain axes, Edgeworth B's, and each panel graph's (axis-lower-x, axis-right-y, …).
+const STRAIGHT_AXES = Object.fromEntries(['', '-b', ...[...new Set(Object.values(PANEL_SHEETS).flat(2))].filter(key => key !== 'upper').map(key => `-${key}`)]
+  .flatMap(key => [[`axis${key}-x`, { x: 1, y: 0 }], [`axis${key}-y`, { x: 0, y: 1 }]]));
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const cross = (a, b) => a.x * b.y - a.y * b.x;
 const finite = p => Number.isFinite(p?.x) && Number.isFinite(p?.y);
@@ -36,7 +38,10 @@ export function documentBounds(state) {
   };
   for (const key of ['lines', 'curves', 'sketches', 'points', 'fills']) visit(state[key]);
   const r = reach * 1.5 + 10;
-  if (stacked(state.quadrantMode)) return { xMin: 0, xMax: r, yMin: -lowerHeightOf(state), yMax: r };
+  if (panelSheet(state.quadrantMode)) {
+    const rows = PANEL_SHEETS[state.quadrantMode];
+    return { xMin: 0, xMax: (rows[0].length - 1) * leftWidthOf(state) + r, yMin: -(rows.length - 1) * lowerHeightOf(state), yMax: r };
+  }
   return { xMin: state.quadrantMode === 'first' ? 0 : -r, xMax: r, yMin: state.quadrantMode === 'all' ? -r : 0, yMax: r };
 }
 

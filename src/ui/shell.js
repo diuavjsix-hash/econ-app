@@ -3,6 +3,7 @@
 // so this file only decides arrangement and wording.
 import { rangeField, numberField, textField, selectField, switchField, checkField, hint, button, iconButton, toolButton, segmented } from './controls.js';
 import { icon } from './icons.js';
+import { PANEL_NAMES } from '../graph/viewport.js';
 import { fillControls } from '../tools/fill.js';
 
 // Glyphs inside segmented choices share one 32×12 frame so every option row aligns.
@@ -192,7 +193,7 @@ const dialogs = () => `
     <section class="dialog-section panel-stack" aria-labelledby="diagram-settings-title">
       <h3 id="diagram-settings-title" class="section-title">선택한 그래프</h3>
       ${textField({ id: 'diagram-name', label: '이름' })}
-      ${selectField({ id: 'diagram-quadrant', label: '포맷', options: [['first', '1사분면'], ['upper', '1·2사분면'], ['all', '전체 사분면'], ['face', '대면'], ['stacked', '상하 2단'], ['edgeworth', '에지워드 상자']] })}
+      ${selectField({ id: 'diagram-quadrant', label: '포맷', options: [['first', '1사분면'], ['upper', '1·2사분면'], ['all', '전체 사분면'], ['face', '대면'], ['stacked', '상하 2단'], ['stacked3', '상하 3단'], ['grid', '2×2'], ['edgeworth', '에지워드 상자']] })}
       ${selectField({ id: 'diagram-x-direction', label: 'x 증가', options: [['right', '오른쪽 →'], ['left', '왼쪽 ←']] })}
       ${selectField({ id: 'diagram-y-direction', label: 'y 증가', options: [['up', '위쪽 ↑'], ['down', '아래쪽 ↓']] })}
     </section>
@@ -201,10 +202,13 @@ const dialogs = () => `
       ${textField({ id: 'horizontal-axis-name', label: '수평축', value: 'x', placeholder: 'x' })}
       ${textField({ id: 'vertical-axis-name', label: '수직축', value: 'y', placeholder: 'y' })}
       <div id="face-settings" class="panel-stack" hidden>${textField({ id: 'face-axis-name', label: '맞은편 수평축', value: 'x′' })}</div>
-      <div id="stacked-settings" class="panel-stack" hidden>
+      <div id="panel-settings" class="panel-stack" hidden>
         ${numberField({ id: 'lower-height', label: '아래 그래프 높이', min: 2, max: 40, step: 0.5 })}
-        ${textField({ id: 'lower-axis-x', label: '아래 수평축' })}
-        ${textField({ id: 'lower-axis-y', label: '아래 수직축' })}
+        <div id="left-width-setting" class="panel-stack" hidden>${numberField({ id: 'left-width', label: '왼쪽 그래프 너비', min: 2, max: 40, step: 0.5 })}</div>
+        ${['right', 'middle', 'lower', 'lower-right'].map(key => `<div class="panel-stack" data-panel-axes="${key}" hidden>
+          ${textField({ id: `${key}-axis-x`, label: `${PANEL_NAMES[key]} 수평축` })}
+          ${textField({ id: `${key}-axis-y`, label: `${PANEL_NAMES[key]} 수직축` })}
+        </div>`).join('')}
       </div>
       <div id="edgeworth-settings" class="panel-stack" hidden>
         ${numberField({ id: 'box-width', label: '가로 총량', min: 1, max: 100, step: 0.5 })}
@@ -229,6 +233,8 @@ const dialogs = () => `
         ${choice('all', '전체 사분면', '<rect x="8" y="8" width="48" height="48" class="quadrant-fill"/><path d="M8 32h48M32 8v48"/>')}
         ${choice('face', '대면', '<rect x="8" y="8" width="48" height="24" class="quadrant-fill"/><path d="M8 32h48M32 32V8M12 28l-4 4 4 4M52 28l4 4-4 4"/>')}
         ${choice('stacked', '상하 2단', '<path d="M12 6v22h44M12 36v22h44M9 9l3-3 3 3M9 39l3-3 3 3"/><path d="M34 14v40" stroke-dasharray="3 3"/>')}
+        ${choice('stacked3', '상하 3단', '<path d="M12 4v15h44M12 25v15h44M12 46v15h44M9 7l3-3 3 3M9 28l3-3 3 3M9 49l3-3 3 3"/><path d="M34 10v51" stroke-dasharray="3 3"/>')}
+        ${choice('grid', '2×2', '<path d="M8 6v22h22M36 6v22h22M8 36v22h22M36 36v22h22M5 9l3-3 3 3M33 9l3-3 3 3M5 39l3-3 3 3M33 39l3-3 3 3"/><path d="M20 14v44M12 16h38" stroke-dasharray="3 3"/>')}
         ${choice('edgeworth', '에지워드 상자', '<rect x="10" y="14" width="44" height="36" class="quadrant-fill"/><path d="M10 14h44v36H10zM10 42v8h8M46 14h8v8"/>')}
       </div>
       <div id="workspace-box-size" class="box-size-fields" hidden>

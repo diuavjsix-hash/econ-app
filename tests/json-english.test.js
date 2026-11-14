@@ -30,7 +30,7 @@ function drawEverything(store) {
 }
 
 test('the exported JSON is English everywhere except object names, in every format', () => {
-  for (const mode of ['first', 'upper', 'all', 'face', 'stacked', 'edgeworth']) {
+  for (const mode of ['first', 'upper', 'all', 'face', 'stacked', 'stacked3', 'grid', 'edgeworth']) {
     const store = createStore(); store.configureWorkspace(mode, { boxSize: { width: 10, height: 8 } }); drawEverything(store);
     const korean = textOutsideNames(serializeDocument(store.getState())).filter(([, text]) => HANGUL.test(text));
     assert.deepEqual(korean, [], `${mode}: ${JSON.stringify(korean.slice(0, 3))}`);
@@ -41,7 +41,7 @@ test('the legend explains each behavior the JSON carries, and only the formats p
   const store = createStore(); drawEverything(store);
   const doc = serializeDocument(store.getState());
   for (const key of ['coordinates', 'relations', 'axes', 'lines', 'curves', 'sketches', 'sums', 'bindings', 'fills', 'display']) assert.equal(typeof doc.legend[key], 'string', key);
-  for (const key of ['faceToFace', 'stacked', 'edgeworth']) assert.equal(doc.legend[key], undefined, key);
+  for (const key of ['faceToFace', 'panels', 'edgeworth']) assert.equal(doc.legend[key], undefined, key);
   const kinds = new Set(doc.diagrams[0].lines.concat(doc.diagrams[0].sketches).map(o => o.binding?.kind).filter(Boolean));
   assert.deepEqual([...kinds].sort(), ['tangent', 'through-point'], 'both binding kinds are exported');
   for (const kind of kinds) assert.match(doc.legend.bindings, new RegExp(kind));
