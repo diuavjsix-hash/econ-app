@@ -5,7 +5,10 @@ import { ppcValue, clipPpc, ppcContact, ppcThroughPoint, ppcOnLine, ppcLineInter
 
 const midpoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const quadratic = ([a, b]) => [a, midpoint(a, b), b];
-const clampShape = value => Math.max(0.15, Math.min(20, value));
+const SLIDER_MIN = 0.15, SLIDER_MAX = 20;
+const clampShape = value => Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, value));
+// A kink slid to the bottom-left origin keeps this much of its ray, so its direction survives.
+const KINK_MIN = 1e-6;
 const shapePatch = value => Number.isFinite(value) && value > 0 ? { shape: clampShape(value) } : {};
 export const linearAxisOf = c => c.linearAxis === 'x' ? 'x' : 'y';
 
@@ -145,13 +148,18 @@ export class AnalyticCurveFamily {
     return this.shapeFromPoint(c, p);
   }
   shapeFromValue(c, value) { return { shape: value }; }
+  /** The panel's shape slider (0–100): a log scale over shapeValue by default. */
+  sliderPosition(c) { return Math.log(this.shapeValue(c) / SLIDER_MIN) / Math.log(SLIDER_MAX / SLIDER_MIN) * 100; }
+  fromSliderPosition(c, position) { return this.shapeFromValue(c, SLIDER_MIN * Math.pow(SLIDER_MAX / SLIDER_MIN, position / 100)); }
+  /** Smallest anchor coordinate a radial family keeps. */
+  minCoordinate() { return 0.02; }
   shapeFromPoint() { throw new TypeError('A curve family must implement shapeFromPoint()'); }
   nearbyOffset() { return { x: 1, y: 0 }; }
   geometry(c) { return { type: 'indifference', domain: 'nonnegative', movement: this.motion(c) }; }
   applyPatch(c, patch) {
     if (validPoint(patch.anchor)) {
       const next = patch.reshape && this.reshapesAnchor ? patch.anchor : this.move(c, c.anchor, patch.anchor);
-      if (validPoint(next) && (!this.radial || (next.x >= 0.02 && next.y >= 0.02))) c.anchor = { ...next };
+      if (validPoint(next) && (!this.radial || Math.min(next.x, next.y) >= this.minCoordinate(patch))) c.anchor = { ...next };
     }
     if (Number.isFinite(patch.shape) && this.editableShape) c.shape = clampShape(patch.shape);
   }
@@ -257,6 +265,27 @@ export class ComplementsFamily extends RadialCurveFamily {
   shapeValue(c) { return c.anchor.y / c.anchor.x; }
   shapeFromValue(c, value) { const radius = Math.hypot(c.anchor.x, c.anchor.y), x = radius / Math.hypot(1, value); return { anchor: { x, y: x * value }, reshape: true }; }
   shapeFromPoint(c, p) { return p.x > 0 && p.y > 0 ? this.shapeFromValue(c, clampShape(p.y / p.x)) : {}; }
+  minCoordinate(patch) { return patch?.reshape ? KINK_MIN : 0.02; }
+  /**
+   * The kink ratio slider slides the kink along the ray from the bottom-left origin (0,0) through
+   * it, in either drawing direction: the left end is that origin, the right end the edge of the
+   * view, or just short of the opposite origin's axes for a mirrored curve. It takes the drawn
+   * (global) curve, so a mirrored curve uses it as is.
+   */
+  get slidesFromOrigin() { return true; }
+  kinkRay(c, bounds) {
+    const a = c.anchor, distance = Math.hypot(a.x, a.y), unit = { x: a.x / distance, y: a.y / distance };
+    const along = (x, y) => Math.min(unit.x > 0 ? x / unit.x : Infinity, unit.y > 0 ? y / unit.y : Infinity);
+    const o = c.orientation === 'opposite' && validPoint(c.oppositeOrigin) ? c.oppositeOrigin : null;
+    let reach = o ? along(o.x - 0.02, o.y - 0.02) : bounds ? along(bounds.xMax, bounds.yMax) : distance * 2;
+    if (!(reach > 0) || !Number.isFinite(reach)) reach = distance;
+    return { unit, distance, reach: Math.max(reach, distance), min: KINK_MIN / Math.min(unit.x, unit.y) };
+  }
+  sliderPosition(c, bounds) { const { distance, reach, min } = this.kinkRay(c, bounds); return distance <= min * 1.000001 ? 0 : 100 * distance / reach; }
+  fromSliderPosition(c, position, bounds) {
+    const { unit, reach, min } = this.kinkRay(c, bounds), distance = Math.max(min, Math.min(reach, position / 100 * reach));
+    return { anchor: { x: unit.x * distance, y: unit.y * distance }, reshape: true };
+  }
 }
 
 export class SubstitutesFamily extends AnalyticCurveFamily {
@@ -413,6 +442,12 @@ export class OppositeCurveFamily {
   }
   shapeHandle(c, bounds = null) { return this.point(c, this.base.shapeHandle(this.local(c), bounds && this.bounds(c, bounds))); }
   shapeValue(c) { return this.base.shapeValue(this.local(c)); }
+  minCoordinate(patch) { return this.base.minCoordinate(patch); }
+  // A family that slides from the bottom-left origin reads the drawn curve, not the mirrored one.
+  sliderPosition(c, bounds) { return this.base.slidesFromOrigin ? this.base.sliderPosition(c, bounds) : this.base.sliderPosition(this.local(c), bounds && this.bounds(c, bounds)); }
+  fromSliderPosition(c, position, bounds) {
+    return this.base.slidesFromOrigin ? this.base.fromSliderPosition(c, position, bounds) : this.patch(c, this.base.fromSliderPosition(this.local(c), position, bounds && this.bounds(c, bounds)));
+  }
   isEndpointAction(action) { return this.base.isEndpointAction(action); }
   endpointHandles(c) { return this.base.endpointHandles(this.local(c)).map(handle => ({ ...handle, point: this.point(c, handle.point) })); }
   endpointPatch(c, key, value) { return this.patch(c, this.base.endpointPatch(this.local(c), key, value)); }
@@ -429,7 +464,55 @@ export class OppositeCurveFamily {
     if (local.linearAxis) c.linearAxis = local.linearAxis;
   }
 }
-const OPPOSITE_VARIANTS = Object.freeze(Object.fromEntries(OPPOSITE_CURVE_FAMILIES.map(id => [id, new OppositeCurveFamily(CURVE_FAMILIES[id])])));
+/**
+ * A mirrored Leontief keeps its kink on a ray from the bottom-left origin (0,0), exactly like an
+ * ordinary one; only its arms are mirrored (they run left and down from the kink). Moving it,
+ * fitting it to a point or line, the ratio handle, arrow keys, the slider and the curve magnet all
+ * slide or turn the kink about (0,0). That ray reaches the opposite origin only in the special case
+ * where the kink lies on the diagonal between the two origins. The kink stays 0.02 inside the
+ * opposite origin's axes so the arms keep their length.
+ */
+export class OriginRayOppositeFamily extends OppositeCurveFamily {
+  scaleCenter() { return { x: 0, y: 0 }; }
+  movement() { return '왼쪽 아래 원점 기준 · 꺾임 이동'; }
+  motion() { return 'kink moves along a ray from the bottom-left origin (0,0); only the arms are mirrored'; }
+  /** The kink is in the positive quadrant and short of the opposite origin's axes. */
+  within(c, a) { const o = c.oppositeOrigin; return validPoint(a) && a.x > 0 && a.y > 0 && o.x - a.x >= 0.02 - 1e-9 && o.y - a.y >= 0.02 - 1e-9; }
+  /** Pull a kink back along its ray from (0,0) until it is inside the opposite origin. */
+  inside(c, a) {
+    if (!validPoint(a) || !(a.x > 0) || !(a.y > 0)) return { ...c.anchor };
+    const o = c.oppositeOrigin, scale = Math.min(1, (o.x - 0.02) / a.x, (o.y - 0.02) / a.y);
+    return scale > 0 ? { x: a.x * scale, y: a.y * scale } : { ...c.anchor };
+  }
+  moveAnchor(c, start, point) { return this.inside(c, this.base.moveAnchor(c, start, point)); }
+  move(c, start, point) { return validPoint(start) && validPoint(point) ? this.moveAnchor(c, start, point) : { ...c.anchor }; }
+  moveDistance(c, anchor) { return Math.hypot(anchor.x - c.anchor.x, anchor.y - c.anchor.y); }
+  fitLine(c, line, contact) { const anchor = this.base.fitLine(c, line, contact); return anchor && this.within(c, anchor) ? anchor : null; }
+  /** The kink on its ray whose left or lower arm passes through p. */
+  fitPoint(c, p) {
+    const a = c.anchor, scale = Math.max(p.x / a.x, p.y / a.y), anchor = { x: a.x * scale, y: a.y * scale };
+    return scale > 0 && Math.min(anchor.x, anchor.y) >= 0.02 && this.within(c, anchor) ? anchor : null;
+  }
+  throughPoint(c, p) { return validPoint(p) && p.x >= 0 && p.y >= 0 ? this.fitPoint(c, p) : null; }
+  onLine(c, line, reference = c.anchor) { return AnalyticCurveFamily.prototype.onLine.call(this, c, line, reference); }
+  nearbyOffset(c) { const length = Math.hypot(c.anchor.x, c.anchor.y); return { x: c.anchor.x / length, y: c.anchor.y / length }; }
+  shapeHandle(c, bounds = null) { return this.base.shapeHandle(c, bounds); }
+  shapeValue(c) { return c.anchor.y / c.anchor.x; }
+  /** The ratio turns the kink's ray about (0,0), keeping its distance from (0,0). */
+  shapeFromValue(c, value) { const radius = Math.hypot(c.anchor.x, c.anchor.y), x = radius / Math.hypot(1, value); return { anchor: this.inside(c, { x, y: x * value }), reshape: true }; }
+  shapeFromPoint(c, p) { return p.x > 0 && p.y > 0 ? this.shapeFromValue(c, clampShape(p.y / p.x)) : {}; }
+  shapeKeyPatch(c, positive, step) { return this.reshapeKeyPatch(c, positive, step); }
+  reshapeKeyPatch(c, positive, step) { const p = this.shapeHandle(c); p.y += positive ? step : -step; return this.shapeFromPoint(c, p); }
+  applyPatch(c, patch) {
+    if (validPoint(patch.anchor)) {
+      const next = patch.reshape ? patch.anchor : this.move(c, c.anchor, patch.anchor);
+      if (Math.min(next.x, next.y) >= this.base.minCoordinate(patch) && this.within(c, next)) c.anchor = { ...next };
+    }
+    if (Number.isFinite(patch.shape) && this.editableShape) c.shape = clampShape(patch.shape);
+  }
+}
+const OPPOSITE_VARIANTS = Object.freeze(Object.fromEntries(OPPOSITE_CURVE_FAMILIES.map(id => [id,
+  CURVE_FAMILIES[id].slidesFromOrigin ? new OriginRayOppositeFamily(CURVE_FAMILIES[id]) : new OppositeCurveFamily(CURVE_FAMILIES[id])])));
 
 export const curveFamilyOf = c => !c || !Object.hasOwn(CURVE_FAMILIES, c.family) ? null : isOppositeCurve(c) ? OPPOSITE_VARIANTS[c.family] : CURVE_FAMILIES[c.family];
 

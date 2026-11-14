@@ -149,6 +149,8 @@ classDiagram
 | `StrokeObject` / `SegmentObject` | 선의 법선 방향 복제 배치 / 점선·이전 자의 유한 두 끝점 검증·클리핑·직렬화 |
 | `CurveObject` / `AnalyticCurveObject` | 기본 곡선 공통 표시 / 해석 곡선의 고유 이동·형태·직렬화를 곡선 종류 클래스에 위임 |
 
+모양 슬라이더 위치↔값 매핑은 종류의 `sliderPosition`·`fromSliderPosition`이 맡습니다(기본: shape 0.15~20 로그; 완전보완재: 왼쪽 아래 원점에서 꺾임을 지나는 직선 위 위치, `slidesFromOrigin`이라 반대 방향도 그린 좌표 그대로 씀). `tools/curve.js`는 활성 그래프의 보기 영역만 넘깁니다. 반대 방향 완전보완재는 `OppositeCurveFamily`를 상속한 `OriginRayOppositeFamily`로, 팔의 그림·교점·접점은 반사로 계산하고 꺾임의 이동·맞춤·각도·자석 중심은 (0,0) 기준입니다(꺾임은 반대 원점 축 0.02 안).
+
 [곡선 종류 클래스](../src/models/curve-families.js)는 `AnalyticCurveFamily`에서 표시 세분화·직선 교점 탐색·점/직선 맞춤·모양 입력의 공통 절차를 상속합니다. `RadialCurveFamily`는 PPC·거듭제곱형·완전보완재의 원점 고정 확대/축소를 공유하고, `PowerCurveFamily`는 콥더글라스와 직각 쌍곡선의 값/역함수·접점·통과점 계산을 공유합니다. `PpcFamily`, `ComplementsFamily`, `SubstitutesFamily`, `QuasilinearFamily`는 실제 기하가 다른 부분만 재정의합니다. 기존 `graph/indifference.js`는 이 클래스들을 호출하는 호환 함수만 보유하며 계산 복사본을 두지 않습니다. 모양 슬라이더와 store도 같은 클래스의 `shapeValue`·`shapeFromValue`·`applyPatch`를 사용합니다.
 
 `SnapPolicy`는 16/24px 포착·유지·해제의 공통 절차를 담당합니다. 점·점선·곡선 생성은 `PrioritySnapPolicy`, 직선/곡선의 점·접선 맞춤과 절편 맞춤은 `NearestSnapPolicy`를 사용하며 원래의 우선순위/동률 규칙을 유지합니다. `SvgRenderer`는 SVG 노드·경로 작성을, 이를 상속하는 `StrokeRenderer`는 직선·기본/해석/자유 곡선·합의 획·선택 강조·히트 영역·접근성 속성을 공유합니다. 점선과 공통 맞춤 표시도 같은 SVG 생성기를 사용합니다. 도형 고유 손잡이와 생성 절차, 관계 해석·기록 정책은 각 역할에 남겨 두었습니다.

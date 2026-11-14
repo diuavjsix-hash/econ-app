@@ -17,7 +17,9 @@ export function mountCurveTool(root, store) {
     if (state.indifferenceOpposite&&supportsOpposite({family})) {
       // Mirror the usual placement: the same offset, measured from the opposite origin.
       const origin=boxOrigin(state)??{x:bounds.xMax*0.8,y:bounds.yMax*0.8};
-      store.addIndifference(family,{anchor:{x:origin.x-x,y:origin.y-y},opposite:true,oppositeOrigin:origin});
+      // A mirrored Leontief's kink rides a ray from (0,0); start it off the diagonal to the opposite origin.
+      const lower=family==='complements'?Math.max(0.2,bounds.yMax*0.6):y;
+      store.addIndifference(family,{anchor:{x:origin.x-x,y:origin.y-lower},opposite:true,oppositeOrigin:origin});
     } else store.addIndifference(family,{anchor:family==='ppc'?{x:Math.min(x,y),y:Math.min(x,y)}:{x,y}});
   });
   const oppositeNew=root.querySelector('#indifference-opposite-new'),opposite=root.querySelector('#indifference-opposite');
@@ -32,11 +34,15 @@ export function mountCurveTool(root, store) {
     const c=store.getState().curves.find(c=>c.id===store.getState().selectedId);
     if (c?.family==='ppc') store.updateSelected(curveFamilyOf(c).endpointPatch(c,key,value));
   });
+  // The family maps the slider; the kink slider needs the visible area of the active graph.
+  const visibleBounds=state=>{
+    const graph=root.querySelector('.diagram-card.is-active .graph-container');
+    return graph?.clientWidth&&graph.clientHeight?createViewport(graph.clientWidth,graph.clientHeight,state.quadrantMode,state).bounds:null;
+  };
   shapeControl.bind(position=>{
-    const c=store.getState().curves.find(c=>c.id===store.getState().selectedId);
+    const state=store.getState(),c=state.curves.find(c=>c.id===state.selectedId);
     if (!isIndifference(c)) return;
-    const value=0.15*Math.pow(20/0.15,position/100);
-    store.updateSelected(curveFamilyOf(c).shapeFromValue(c,value));
+    store.updateSelected(curveFamilyOf(c).fromSliderPosition(c,position,visibleBounds(state)));
   });
   axis.addEventListener('change',()=>store.updateSelected({linearAxis:axis.value}));
   for (const button of root.querySelectorAll('[data-add-curve]')) button.addEventListener('click', () => {
@@ -51,7 +57,8 @@ export function mountCurveTool(root, store) {
   bendControl.bind(value => store.updateSelected({ bend: value / 100 * MAX_BEND }));
   for (const preset of presets) preset.addEventListener('click', () => store.updateSelected({ variant: preset.dataset.curveVariant }));
   root.querySelector('#reset-curve').addEventListener('click', () => store.updateSelected({ bend: 0.25 }));
-  return store.subscribe(({ curves, selectedId, indifferenceOpposite }) => {
+  return store.subscribe(state => {
+    const { curves, selectedId, indifferenceOpposite } = state;
     const curve = curves.find((item) => item.id === selectedId);
     oppositeNew.checked=indifferenceOpposite;
     root.querySelector('.indifference-library').classList.toggle('is-opposite',indifferenceOpposite);
@@ -66,12 +73,11 @@ export function mountCurveTool(root, store) {
       opposite.checked=isOppositeCurve(curve);
       root.querySelector('#indifference-shape-label').textContent=preset.shape;
       axis.value=curve.linearAxis;
-      const value=curveFamilyOf(curve).shapeValue(curve);
       root.querySelector('#ppc-radii').hidden=curve.family!=='ppc';
       if (curve.family==='ppc') for (const [key,radius] of Object.entries(ppcRadii(curve))) {
         radii[key].setValue(radius,3);
       }
-      shapeControl.setValue(Math.log(value/0.15)/Math.log(20/0.15)*100);
+      shapeControl.setValue(curveFamilyOf(curve).sliderPosition(curve,visibleBounds(state)));
       return;
     }
     if (!curve) return;
