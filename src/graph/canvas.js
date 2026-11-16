@@ -425,7 +425,8 @@ export function mountGraph(container, store) {
     const anchor=controller.start(object,interactionContext());
     if (!anchor) return;
     const startPatch=controller.startPatch(object,anchor);
-    drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), object: { ...structuredClone(object), ...startPatch } };
+    const { rebase, ...placed } = startPatch;
+    drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), object: { ...structuredClone(object), ...placed } };
     segmentSnap = null;
     snapTarget = null; tangentSnap = null;
     store.beginHistory();

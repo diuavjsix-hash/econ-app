@@ -71,6 +71,28 @@ test('the direction toggle keeps the anchor and round-trips through JSON fields'
   assert.equal(isOppositeCurve(curveOf(store, ppc)), false);
 });
 
+test('an opposite rectangular hyperbola keeps the opposite origin axes as asymptotes and resizes about that origin', () => {
+  const store = createStore(), origin = { x: 10, y: 8 };
+  const id = store.addIndifference('rectangular-hyperbola', { anchor: { x: 6, y: 5 }, opposite: true, oppositeOrigin: origin });
+  let curve = curveOf(store, id);
+  assert.ok(isOppositeCurve(curve)); close(curve.anchor, { x: 6, y: 5 });
+  const family = curveFamilyOf(curve), level = (origin.x - 6) * (origin.y - 5);
+  for (const x of [2, 5, 8, 9.5]) assert.ok(Math.abs((origin.x - x) * (origin.y - family.value(curve, x)) - level) < 1e-9, `(Oₓ−x)(Oᵧ−y) is constant at x=${x}`);
+  assert.match(family.movement(curve), /반대 원점의 축을 점근선/);
+  assert.match(family.geometry(curve).movement, /opposite origin's axes/);
+  // The level handle and arrow keys resize it about the opposite origin, keeping the asymptotes.
+  store.selectObject(id); store.updateSelected(family.shapeKeyPatch(curve, true));
+  curve = curveOf(store, id);
+  const ratio = (origin.y - curve.anchor.y) / (origin.x - curve.anchor.x);
+  assert.ok(Math.abs(ratio - 3 / 4) < 1e-9, 'the anchor slides along the ray from the opposite origin');
+  assert.ok((origin.x - curve.anchor.x) * (origin.y - curve.anchor.y) > level, 'a larger level moves the curve away from the opposite origin');
+  // The toggle switches an existing hyperbola too.
+  store.updateSelected({ opposite: false });
+  assert.equal(isOppositeCurve(curveOf(store, id)), false);
+  store.updateSelected({ opposite: true, oppositeOrigin: origin });
+  assert.ok(isOppositeCurve(curveOf(store, id)));
+});
+
 test('moving the opposite origin carries the whole drawing in one undo step', () => {
   const store = createStore();
   const id = store.addIndifference('complements', { anchor: { x: 3, y: 3 }, opposite: true, oppositeOrigin: { x: 6, y: 5 } });

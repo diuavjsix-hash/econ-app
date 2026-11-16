@@ -83,7 +83,7 @@ export const CURVE_CONTACT_CASES = [
     },
   })),
   // The Edgeworth case: a curve drawn from the opposite origin touches an origin-side curve.
-  ...['cobb-douglas', 'substitutes', 'quasilinear'].map(family => ({
+  ...['rectangular-hyperbola', 'cobb-douglas', 'substitutes', 'quasilinear'].map(family => ({
     name: `opposite ${family} and cobb-douglas`, families: [], opposite: family, expected: { x: 3, y: 3 },
     setup() {
       const store = createStore(), origin = { x: 8, y: 8 };

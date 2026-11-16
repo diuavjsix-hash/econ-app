@@ -110,7 +110,7 @@ test('rotation, re-anchoring and following a point keep the drawn ends physicall
   // Re-anchoring on the same line changes no drawn point.
   const patch = handler.startPatch(line, { x: 4, y: 4 });
   assert.deepEqual(lineEndPoints({ ...line, ...patch }).map(p => p && [+p.x.toFixed(12), +p.y.toFixed(12)]), lineEndPoints(line).map(p => p && [+p.x.toFixed(12), +p.y.toFixed(12)]));
-  assert.deepEqual(handler.startPatch({ ...line, extent: undefined }, { x: 4, y: 4 }), { anchor: { x: 4, y: 4 } });
+  assert.deepEqual(handler.startPatch({ ...line, extent: undefined }, { x: 4, y: 4 }), { anchor: { x: 4, y: 4 }, rebase: true });
   // Rotating past vertical keeps the drawn end on the side the pointer carried it.
   const angle = 100 * Math.PI / 180, pointer = { x: 3 + 3 * Math.cos(angle), y: 3 + 3 * Math.sin(angle) };
   const start = linePointAt(line, 1), result = handler.drag(line, 'rotate', start, pointer, { altKey: true }, ctxFor(store, id));

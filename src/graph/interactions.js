@@ -66,7 +66,8 @@ export class LineInteraction extends StrokeInteraction {
   }
   // A followed point stays the pivot; re-anchoring would fight the relation.
   start(object, ctx) { return object.binding ? object.anchor : lineEditingGeometry(object, displayedLineSegments(object, ctx.viewport.bounds, ctx.state))?.anchor ?? null; }
-  startPatch(object, anchor) { return isTrimmed(object) ? { anchor, extent: rebasedExtent(object, anchor) } : { anchor }; }
+  // The new anchor is the same line's editing point: followers keep their place (rebase).
+  startPatch(object, anchor) { return isTrimmed(object) ? { anchor, extent: rebasedExtent(object, anchor), rebase: true } : { anchor, rebase: true }; }
   magnet(...args) { return snapMovingLine(...args); }
   // A segment or ray also offers its drawn ends to the shared targets.
   snap(object, anchor, axis, point, event, ctx) {
@@ -78,7 +79,8 @@ export class LineInteraction extends StrokeInteraction {
     if (action === 'move') return super.drag(object, action, start, point, event, ctx);
     if (Object.hasOwn(LINE_END_ACTIONS, action)) return this.dragEnd(object, LINE_END_ACTIONS[action], point, event, ctx);
     const target = event.altKey ? null : chooseSnapCandidate(this.rotationCandidates(object, point, ctx), ctx.tangentSnap);
-    if (target) return { patch: this.keepEnds(object, target.rotation, start, point), tangentSnap: target };
+    // A rotation magnet may move the pivot along the line first; that part is a rebase.
+    if (target) return { patch: { ...this.keepEnds(object, target.rotation, start, point), ...(target.rotation.anchor ? { rebase: true } : {}) }, tangentSnap: target };
     const dx = point.x - object.anchor.x, dy = point.y - object.anchor.y;
     if (Math.hypot(dx, dy) < 0.25) return { tangentSnap: null };
     return { patch: this.keepEnds(object, { slope: Math.abs(dx * ctx.viewport.unit) < 4 ? null : dy / dx }, start, point), tangentSnap: null };

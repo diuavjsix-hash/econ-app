@@ -17,8 +17,9 @@ import { assertModelContract, assertRegistryContract } from './contracts.js';
 
 export class LineObject extends StrokeObject {
   visiblePieces(bounds, state) { return displayedLineSegments(this.data, bounds, state); }
-  updateGeometry(patch) {
+  updateGeometry(patch, state) {
     const before = { slope: this.data.slope, extent: this.data.extent ?? null };
+    if (patch.rebase && validPoint(patch.anchor)) this.rebaseFollowers(patch.anchor, state);
     super.updateGeometry(patch);
     if ('slope' in patch) {
       this.data.slope = normalizeSlope(patch.slope);
@@ -30,6 +31,21 @@ export class LineObject extends StrokeObject {
       // Switching style also switches to that style's default color: dashed gray, solid by number.
       this.data.style = patch.style;
       this.data.color = lineColor(Number(/^line-(\d+)$/.exec(this.data.id)?.[1] ?? 1) - 1, patch.style);
+    }
+  }
+  /**
+   * Moving the anchor to another point of the same line (the editing point taken when the line
+   * is touched, or a rotation pivot) must not move what follows the line. A tangent binding is a
+   * distance from the anchor, so it is shifted by the same amount along the line.
+   */
+  rebaseFollowers(anchor, state) {
+    const line = this.data, d = directionOf(line.slope), dx = anchor.x - line.anchor.x, dy = anchor.y - line.anchor.y;
+    if (Math.abs(dx * d.y - dy * d.x) > 1e-7 * Math.max(1, Math.hypot(dx, dy))) return;
+    for (const sketch of state?.sketches ?? []) {
+      const binding = sketch.binding;
+      if (binding?.kind !== 'tangent' || binding.sourceId !== line.id) continue;
+      const e = binding.direction ?? d;
+      binding.parameter -= dx * e.x + dy * e.y;
     }
   }
   setExtent(extent) {

@@ -24,6 +24,8 @@ export class SvgRenderer {
 export class StrokeRenderer extends SvgRenderer {
   append(group, object, d, { selected = false, clipId, action = 'move', title, interactive = true } = {}) {
     if (!d) return group;
+    // A selected stroke sits on a wide wash of its own color, so it stands out without changing color.
+    if (selected) group.append(this.element('path', { d, fill: 'none', class: 'selection-halo', 'aria-hidden': 'true' }));
     group.append(this.element('path', { d, fill: 'none', class: `plotted-line${selected ? ' is-selected' : ''}`, 'aria-hidden': 'true' }));
     if (interactive) {
       const hit = this.element('path', { d, fill: 'none', class: 'line-hit', 'clip-path': `url(#${clipId})`, 'data-id': object.id,

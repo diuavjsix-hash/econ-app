@@ -375,8 +375,8 @@ export const CURVE_FAMILIES = registerCurveFamilies({
   complements: new ComplementsFamily({ label: '완전보완재', movement: '원점 기준 · 꺾임 이동', motion: 'kink moves along a ray from the origin', shape: '꺾임 비율', color: ROLE_COLORS.complements }),
   quasilinear: new QuasilinearFamily({ label: '준선형효용', movement: '선형 축으로 평행이동', motion: 'translates along its linear axis', shape: '휘어짐', color: ROLE_COLORS.quasilinear }),
 });
-/** Families whose mirrored drawing is offered in the indifference library. */
-export const OPPOSITE_CURVE_FAMILIES = Object.freeze(['cobb-douglas', 'substitutes', 'complements', 'quasilinear']);
+/** Families with a mirrored drawing: the indifference curves and the rectangular hyperbola (asymptotes on the opposite origin's axes). */
+export const OPPOSITE_CURVE_FAMILIES = Object.freeze(['rectangular-hyperbola', 'cobb-douglas', 'substitutes', 'complements', 'quasilinear']);
 export const supportsOpposite = c => OPPOSITE_CURVE_FAMILIES.includes(c?.family);
 export const isOppositeCurve = c => c?.orientation === 'opposite' && supportsOpposite(c) && validPoint(c.oppositeOrigin);
 
@@ -408,8 +408,9 @@ export class OppositeCurveFamily {
   bounds(c, b) { return reflectBounds(c.oppositeOrigin, b); }
   piece(c, piece) { return piece.map(p => this.point(c, p)); }
   patch(c, patch) { return patch && validPoint(patch.anchor) ? { ...patch, anchor: this.point(c, patch.anchor) } : patch; }
-  movement(c) { return this.base.movement(this.local(c)).replace('원점', '반대 원점'); }
-  motion(c) { return this.base.motion(this.local(c)).replace('the origin', 'the opposite origin'); }
+  // A mirrored hyperbola keeps the opposite origin's axes as its asymptotes.
+  movement(c) { return this.base.movement(this.local(c)).replace('원점', '반대 원점').replace('축을', '반대 원점의 축을'); }
+  motion(c) { return this.base.motion(this.local(c)).replace('the origin', 'the opposite origin').replace('the axes', "the opposite origin's axes"); }
   value(c, input, direction = 'vertical') {
     const o = c.oppositeOrigin;
     return direction === 'horizontal' ? o.x - this.base.value(this.local(c), o.y - input, 'horizontal') : o.y - this.base.value(this.local(c), o.x - input, 'vertical');

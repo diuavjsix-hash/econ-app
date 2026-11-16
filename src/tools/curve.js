@@ -61,7 +61,8 @@ export function mountCurveTool(root, store) {
     const { curves, selectedId, indifferenceOpposite } = state;
     const curve = curves.find((item) => item.id === selectedId);
     oppositeNew.checked=indifferenceOpposite;
-    root.querySelector('.indifference-library').classList.toggle('is-opposite',indifferenceOpposite);
+    // The direction applies to every family that has one (the indifference curves and the rectangular hyperbola).
+    for (const button of root.querySelectorAll('[data-add-indifference]')) button.classList.toggle('is-opposite',indifferenceOpposite&&supportsOpposite({family:button.dataset.addIndifference}));
     settings.hidden = !curve || isIndifference(curve);
     icSettings.hidden=!isIndifference(curve);
     if (isIndifference(curve)) {
