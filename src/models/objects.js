@@ -74,7 +74,7 @@ export class LineObject extends StrokeObject {
     const [start, end] = lineEndPoints(line);
     return { ...super.serialize(), slope: line.slope, intercept: interceptOf(line), anchor: { ...line.anchor },
       style: line.style ?? 'solid', ...(isTrimmed(line) ? { extent: [...line.extent], segment: { start, end } } : {}),
-      ...(line.binding ? { binding: { ...line.binding } } : {}), vertical: line.slope === null, xIntercept: line.slope === null ? line.anchor.x : null,
+      vertical: line.slope === null, xIntercept: line.slope === null ? line.anchor.x : null,
       implicit: { a: -direction.y, b: direction.x, c: direction.y * line.anchor.x - direction.x * line.anchor.y } };
   }
 }
@@ -142,7 +142,8 @@ export class SketchObject extends StrokeObject {
     if (validSketch(next)) Object.assign(object, next);
   }
   serialize() {
-    const { collapsed, ...curve } = this.data;
+    // A following relation is exported in the diagram's links list, not on the shape.
+    const { collapsed, binding, ...curve } = this.data;
     return { ...structuredClone(curve), geometry: { type: 'piecewise-quadratic-bezier', controlPoints: structuredClone(sketchControls(curve)) } };
   }
 }
@@ -157,7 +158,7 @@ export class PointObject extends MovableObject {
   highlightGeometry() { return { kind: 'point', point: this.data.anchor }; }
   serialize() {
     const p = this.data;
-    return { ...super.serialize(), anchor: { ...p.anchor }, showCoordinates: Boolean(p.showCoordinates), ...(p.binding ? { binding: { ...p.binding } } : {}) };
+    return { ...super.serialize(), anchor: { ...p.anchor }, showCoordinates: Boolean(p.showCoordinates) };
   }
 }
 
@@ -215,7 +216,23 @@ export class SumObject extends DrawableObject {
   updateGeometry(patch) { if (typeof patch.nonnegative === 'boolean') this.data.nonnegative = patch.nonnegative; }
 }
 export class GroupObject extends GraphObject {
-  updateGeometry() {} // A folder deliberately exposes name/hierarchy editing only.
+  /**
+   * A set has no geometry of its own; moving it translates its members from their snapshots
+   * ({ members, offset }). A member attached to something outside the set (a free curve on an
+   * outside line, a line through an outside point) keeps following that source instead.
+   */
+  updateGeometry(patch, state) {
+    if (!Array.isArray(patch.members) || !validPoint(patch.offset) || !state) return;
+    const byId = new Map(objectsOf(state).map(object => [object.id, object])), moving = new Set(patch.members.map(member => member.id));
+    for (const snapshot of patch.members) {
+      const target = byId.get(snapshot.id), model = target && objectModel(snapshot);
+      if (!(model instanceof MovableObject)) continue;
+      const source = snapshot.binding?.sourceId;
+      if (source && !moving.has(source)) continue;
+      const moved = model.translate(patch.offset);
+      if (moved) Object.assign(target, moved);
+    }
+  }
   get serializedFields() { return ['id', 'type', 'name', 'parentId']; }
 }
 

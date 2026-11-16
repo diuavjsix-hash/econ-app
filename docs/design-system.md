@@ -49,7 +49,7 @@
 | `src/ui/components.css` | 공통 컴포넌트: `.btn`(secondary/primary/ghost/danger, sm, block), `.icon-btn`, `.toolbar`/`.tool`, `.segmented`/`.segment`, `.field`/`.input`/`.select`, `.range-field`/`.range`, `.switch`, `.check`, `.swatch`, `.disclosure`, `.choice`, `.dialog`, `.panel-stack`/`.panel-section`, `.hint`. |
 | `src/graph/snap-feedback.css` | 맞춤 표시 전용(기존 규칙 유지). 색은 `--snap-color` 토큰을 읽습니다. |
 | `src/styles.css` | 앱 배치(헤더·작업 영역·패널·도형 트리·대화상자 내용)와 캔버스 SVG 표현 |
-| `src/ui/controls.js` | 위 컴포넌트의 마크업 생성기: `button`, `iconButton`, `toolButton`, `segmented`, `switchField`, `checkField`, `selectField`, `textField`, `numberField`, `rangeField`, `hint` |
+| `src/ui/controls.js` | 위 컴포넌트의 마크업 생성기: `button`, `iconButton`, `toolButton`, `segmented`, `switchField`, `checkField`, `selectField`, `textField`, `numberField`, `rangeField`, `hint`, `swatches`(색 칩 줄; 직접 고르기·섞임 표시 선택) |
 | `src/ui/icons.js` | 유일한 아이콘 모음(24px 격자·1.75 선)과 도형 트리용 16px 기호 `objectGlyph` |
 | `src/ui/shell.js` | 정적 화면 배치. 컨트롤 마크업은 직접 쓰지 않고 위 생성기로만 조합합니다. |
 | `src/models/palette.js` | 문서에 저장되는 도형 기본색: `INK`, `STROKE_CYCLE`, `SUM_CYCLE`, `FILL_PALETTE`, `ROLE_COLORS`, 직선 기본색 `lineColor(번호, 모양)`(점선은 `ROLE_COLORS.dashedLine` 회색, 실선은 `STROKE_CYCLE`) |

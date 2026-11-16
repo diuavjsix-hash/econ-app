@@ -128,10 +128,14 @@ test('deleting a parent lifts its children and keeps their own descendants and u
   assert.equal(state.curves[0].parentId, folder);
   assert.equal(state.points[0].parentId, curve);
   assert.equal(state.selectedId, folder);
-  store.removeSelected();
+  // Deleting a set deletes its members too; dissolving it (ungroup) keeps them.
+  store.undo(); store.selectObject(folder); store.ungroupSelected();
   state = store.getState();
   assert.equal(state.groups.length, 0);
-  assert.equal(state.curves[0].parentId, null);
+  assert.equal(state.lines[0].parentId, null);
+  store.undo(); store.selectObject(folder); store.removeSelected();
+  state = store.getState();
+  assert.equal(state.groups.length, 0); assert.equal(state.lines.length, 0); assert.equal(state.curves.length, 0); assert.equal(state.points.length, 0);
   const newPoint = store.addPoint({ x: 2, y: 2 });
   assert.notEqual(newPoint, point);
 });
@@ -148,7 +152,7 @@ test('JSON version 9 exports point labels and mixed parent links in creation ord
   store.moveObject(curve, line);
   store.moveObject(point, line);
   const exported = JSON.parse(JSON.stringify(serializeActive(store.getState())));
-  assert.equal(exported.schemaVersion, 13);
+  assert.equal(exported.schemaVersion, 14);
   assert.deepEqual(exported.objectOrder, [line, curve, point, folder]);
   assert.equal(exported.lines[0].parentId, folder);
   assert.equal(exported.curves[0].parentId, line);

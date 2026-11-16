@@ -1,23 +1,24 @@
 import { DEFAULT_AXIS_GAP } from './graph/display.js';
 import { QUADRANT_MODES, faceToFace, panelSheet, sheetPanels, lowerHeightOf, leftWidthOf } from './graph/viewport.js';
 import { objectModel } from './models/objects.js';
-import { describeRelations } from './graph/drawn-relations.js';
+import { describeDiagramRelations } from './graph/drawn-relations.js';
 const serializeObjects = objects => (objects ?? []).map(object => objectModel(object).serialize());
 
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 /** Exported text keeps this many decimals; the document itself keeps full precision. */
 export const EXPORT_DECIMALS = 6;
 
 // A short key for readers (people or AI) of the exported file. English, so any reader can use it.
 const LEGEND = Object.freeze({
   coordinates: 'All coordinates are mathematical graph coordinates, never screen pixels. Numbers are rounded to 6 decimals.',
-  relations: 'Position relations computed from the current drawing. at = the position; points = point objects at it; on = objects and axes passing through it; tangent = pairs of objects with the same direction there (touching); slopes = curve slopes there (null = vertical); features = start/end of a line or curve, kink, minimum.',
+  relations: 'Position relations measured from the current drawing, with a tolerance that scales with the size of the drawing. at = the position; points = point objects at it; on = objects and axes passing through it; tangent = pairs of objects with the same direction there (touching); slopes = curve slopes there (null = vertical); features = start/end of a line or curve, kink, minimum.',
   axes: 'axis-x and axis-y are the x and y axes; axis-b-x and axis-b-y are the axes of Edgeworth box owner B; axis-<graph>-x and axis-<graph>-y (graph = lower, middle, right or lower-right) are the axes of the other graphs on a panel sheet, listed in coordinateSystem.panels.',
   lines: 'A line passes through anchor with slope (null = vertical; then xIntercept is its x). Direction is the unit vector (1, slope)/sqrt(1 + slope^2), or (0, 1) when vertical. extent [from, to] gives distances along that direction from anchor; null means that end is open (a ray or a full line). segment lists the drawn end points. implicit is a*x + b*y + c = 0. style is solid or dashed.',
   curves: 'type curve with variant ascending/descending is a free-hand quadratic Bezier with tangent-ray extensions. With family it is a parametric curve (ppc, cobb-douglas, rectangular-hyperbola, substitutes, complements, quasilinear) passing through anchor, with shape as its parameter. orientation opposite: the curve is drawn from oppositeOrigin with both axes reversed (global point = oppositeOrigin - local point), and geometry describes it in that reversed frame.',
   sketches: 'A sketch is a free curve from start to end through anchor, with tangent the direction at anchor; geometry.controlPoints are its two quadratic Bezier pieces. showMinimum only shows its lowest point.',
   sums: 'A sum is computed, not stored as a shape. direction vertical adds the y values of sourceIds at each x; horizontal adds their x values at each y. nonnegative: inputs start at 0 and each contribution is max(0, value).',
-  bindings: 'binding is a live dependency on sourceId. through-point: the line always passes through that point and moves with it. tangent: the sketch stays tangent to that line at distance parameter along it. parentId is only folder/list nesting with no geometric meaning; groups are folders.',
+  links: 'links are the relations the user made, so they state intent the coordinates cannot. ids[0] is the subject (the shape the link belongs to); the other ids are what it was aligned to: shapes, axes such as axis-x, or placed points. role is the part of the subject: anchor (a point, or the middle point of a sketch), start, end, or shape (the whole stroke). type: point = at or through that placed point; on = on that stroke; intersection = at the crossing of the targets; intercept = where a target crosses an axis; tangent = touching with the same direction (two targets: at their contact; one target: the subject touches it); endpoint, kink, minimum = at that feature of the target. follow true is a live dependency: the subject moves with its target (a sketch kept tangent to a line at distance parameter along it; a line kept through a point). follow false was recorded when a magnet aligned it; the shapes stay free to move. status holds = still true in this drawing; broken = aligned once, but the drawing has changed since (at is then where it was made). at is the position of the relation.',
+  groups: 'A group is a set the user bundled: shapes whose parentId is the group id (directly or through nested groups) were drawn to belong together, e.g. two rays forming one kinked curve, and move as one. parentId under a non-group object is only list nesting.',
   fills: 'A fill paints the area enclosed by rings (even-odd rule, so an inner ring is a hole); label is its letter on the drawing.',
   display: 'color, opacity, label, style, showGrid, showCoordinates, showMinimum and lineAxisGap (lines kept off the axes by that distance) only change how the drawing looks. objectOrder is the order the objects were created.',
 });
@@ -64,7 +65,7 @@ function serializeDiagram(state) {
     fills: serializeObjects(state.fills),
     groups: serializeObjects(state.groups),
     rulers: serializeObjects(state.rulers),
-    relations: describeRelations(state),
+    ...describeDiagramRelations(state),
   };
 }
 

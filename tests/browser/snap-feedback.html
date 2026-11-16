@@ -9,6 +9,17 @@ const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-8,same=(a,b)=>JSON.stringify(a)
 const view=()=>createViewport(stage.clientWidth,stage.clientHeight,store.getState().quadrantMode,store.getState());
 function setup(mode='point',flip=false){dispose?.();store=createStore();line=store.addLine();store.updateSelected({slope:-1,anchor:{x:6,y:4}});store.updateDiagram({flipX:flip,flipY:flip});store.update({[mode==='point'?'mouseSelected':mode==='sketch'?'sketchSelected':mode==='line'?'lineSelected':'handSelected']:true});dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};}
 function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:71,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x*r.width/v.width,clientY:r.top+s.y*r.height/v.height,...flags}));}
+
+// The canvas starts a drag only past DRAG_START_PX; like a hand, the first move of a press first
+// crosses it toward its target (Alt: no magnet is captured on the way), then lands exactly. A press released without moving stays a click.
+const sendRaw=send;let pressAt=null;
+send=(type,p,flags={},target=svg)=>{
+  if(type==='pointerdown')pressAt=p;
+  else if(type==='pointermove'&&pressAt){const u=view().unit,dx=(p.x-pressAt.x)*u,dy=(p.y-pressAt.y)*u,d=Math.hypot(dx,dy);
+    if(d<6){const ux=d?dx/d:1,uy=d?dy/d:0;sendRaw('pointermove',{x:pressAt.x+ux*6/u,y:pressAt.y+uy*6/u},{...flags,altKey:true},svg);}pressAt=null;}
+  else if(type==='pointerup'||type==='pointercancel')pressAt=null;
+  return sendRaw(type,p,flags,target);
+};
 const move=(p,flags={})=>send('pointermove',p,flags),click=(p,flags={})=>{send('pointerdown',p,flags);send('pointerup',p,flags)};
 const marker=()=>svg.querySelector('.snap-feedback:not([data-snap-kind="free"])');
 const style=()=>{const ring=svg.querySelector('.snap-feedback-ring'),core=svg.querySelector('.snap-feedback-core'),text=svg.querySelector('.snap-feedback-label');return ring&&[ring.getAttribute('r'),core.getAttribute('r'),getComputedStyle(core).stroke,getComputedStyle(ring).strokeWidth,getComputedStyle(text).font,getComputedStyle(text).fill]};
@@ -38,8 +49,9 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
  check(same(style(),commonStyle)&&svg.querySelector(`[data-snap-source="${curve}"]`),'moving a line onto a curve uses shared target highlight and marker');
  check(store.getState().lines[0].anchor.y===2&&!store.getState().lines[0].binding,'moving tangency preserves independent line geometry');
  send('pointerup',{x:4,y:2.2});store.undo();check(same(serializeDocument(store.getState()),movingBefore),'moving tangency remains one undo step');
- setup('hand');store.selectObject(line);store.updateSelected({slope:0,anchor:{x:4,y:2}});const movingCurve=store.addSketch({x:1,y:6.2},{x:7,y:6.2},{x:4,y:2.2});
- send('pointerdown',{x:4,y:2.2},{},svg.querySelector(`[data-id="${movingCurve}"][data-action="move"]`));move({x:4,y:2.15});
+ setup('hand');store.selectObject(line);store.updateSelected({slope:0,anchor:{x:4,y:2}});const movingCurve=store.addSketch({x:1,y:6.2},{x:7,y:6.2},{x:4,y:2.2});const before2=serializeDocument(store.getState()).diagrams[0].sketches;
+ send('pointerdown',{x:4,y:2.2},{},svg.querySelector(`[data-id="${movingCurve}"][data-action="move"]`));sendRaw('pointermove',{x:4,y:2.21});
+  check(same(serializeDocument(store.getState()).diagrams[0].sketches,before2),'a press that moves less than the drag threshold changes nothing');move({x:4,y:2.15});
  check(same(style(),commonStyle)&&svg.querySelector(`[data-snap-source="${line}"]`),'moving a curve onto a line shares the same feedback');send('pointercancel',{x:4,y:2.15});check(!marker(),'pointer cancellation clears the common feedback');
  setup('sketch',true);click({x:1,y:7});click({x:7,y:7});move({x:6.17,y:4.17});check(same(style(),commonStyle),'reversed axes preserve common tangent feedback');
  store.configureWorkspace('first');check(marker()?.dataset.snapKind!=='tangent'&&!svg.querySelector('.sketch-draft'),'format/history revision clears the draft and its tangent feedback');
@@ -58,14 +70,14 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
   stage.style.width=size+'px';stage.style.height='400px';setup('hand');store.selectObject(line);store.removeSelected();
   const p=store.addPoint({x:3,y:3}),follow=store.lineThroughSelectedPoint();store.selectObject(follow);store.updateSelected({slope:0});store.selectObject(p);
   const original=serializeDocument(store.getState());
-  send('pointerdown',{x:3,y:3},{},svg.querySelector(`[data-id="${p}"][data-action="move"]`));move({x:3.08,y:3.1});
+  send('pointerdown',{x:3,y:3},{},svg.querySelector(`[data-id="${p}"][data-action="move"]`));move({x:3.5,y:3.6});move({x:3.08,y:3.1});
   check(near(store.getState().points[0].anchor,{x:3.08,y:3.1}),size+': moving point never sticks to its following line');
   check(!svg.querySelector(`[data-snap-source="${follow}"]`),size+': dependent geometry has no self-snap highlight');
   check(near(store.getState().lines[0].anchor,store.getState().points[0].anchor),size+': following line still tracks the independent point movement');
   send('pointerup',{x:3.08,y:3.1});store.undo();check(same(serializeDocument(store.getState()),original),size+': point and following line remain one undo step');
   setup('point');store.selectObject(line);store.removeSelected();
   const free=store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2});store.selectObject(free);store.update({handSelected:true});
-  const start=store.getState().sketches[0].start;send('pointerdown',start,{},svg.querySelector(`[data-id="${free}"][data-action="sketch-start"]`));move({x:start.x+0.08,y:start.y+0.1});
+  const start=store.getState().sketches[0].start;send('pointerdown',start,{},svg.querySelector(`[data-id="${free}"][data-action="sketch-start"]`));move({x:start.x+0.5,y:start.y+0.6});move({x:start.x+0.08,y:start.y+0.1});
   check(near(store.getState().sketches[0].start,{x:start.x+0.08,y:start.y+0.1})&&!svg.querySelector(`[data-snap-source="${free}"]`),size+': free-curve endpoint excludes its own stroke');send('pointerup',start);
  }
  out.textContent=JSON.stringify({ok:true,count:passed.length,passed},null,2);

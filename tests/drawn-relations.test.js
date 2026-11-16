@@ -126,7 +126,7 @@ test('the export lists each diagram once with its relations, a legend and rounde
   store.addPoint({ x: 1 / 3, y: 6 - 1 / 3 });
   const document = serializeDocument(store.getState());
   assert.equal(document.schemaVersion, SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 13);
+  assert.equal(SCHEMA_VERSION, 14);
   for (const key of ['lines', 'points', 'coordinateSystem', 'objectOrder']) assert.ok(!(key in document), `no top-level ${key} copy`);
   assert.equal(document.diagrams.length, 1);
   assert.ok(document.diagrams.every(diagram => Array.isArray(diagram.relations)));

@@ -137,7 +137,7 @@ test('snapped end drag records once and leaves the source point, line and JSON s
   }
   store.endHistory();
   const after = serializeActive(store.getState());
-  assert.equal(after.schemaVersion, 13); assert.deepEqual(after.points, before.points);
+  assert.equal(after.schemaVersion, 14); assert.deepEqual(after.points, before.points);
   assert.deepEqual(after.lines.find(line => line.id === lineId), before.lines.find(line => line.id === lineId));
   const segment = after.lines.find(line => line.id === segmentId);
   assert.deepEqual(segment.segment.end, { x: 5, y: 3 }); assert.equal(segment.style, 'dashed');

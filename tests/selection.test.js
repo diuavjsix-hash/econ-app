@@ -82,11 +82,15 @@ test('a multi-delete is one undo/redo and restores all original geometry, select
 });
 
 test('deleting selected ancestors and descendants lifts only surviving children to the nearest surviving parent',()=>{
-  const store=createStore(),root=store.addGroup(),parent=store.addGroup(),child=store.addGroup(),point=store.addPoint({x:2,y:3});
+  // List nesting under shapes lifts survivors; a deleted set takes its members with it.
+  const store=createStore(),root=store.addGroup(),parent=store.addLine(),child=store.addCurve(),point=store.addPoint({x:2,y:3});
   store.moveObject(parent,root);store.moveObject(child,parent);store.moveObject(point,child);
   store.selectObjects([parent,child]);store.removeSelected();
   assert.equal(store.getState().points[0].parentId,root);assert.equal(store.getState().groups.length,1);
   store.undo();assert.equal(store.getState().points[0].parentId,child);assert.deepEqual(store.getState().selectedIds,[parent,child]);
+  store.selectObject(root);store.removeSelected();
+  const after=store.getState();assert.deepEqual([after.groups.length,after.lines.length,after.curves.length,after.points.length],[0,0,0,0]);
+  store.undo();assert.equal(store.getState().points[0].parentId,child);
 });
 
 test('selection clears on format and creation changes, and does not invalidate redo',()=>{

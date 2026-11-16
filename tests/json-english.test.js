@@ -40,11 +40,14 @@ test('the exported JSON is English everywhere except object names, in every form
 test('the legend explains each behavior the JSON carries, and only the formats present', () => {
   const store = createStore(); drawEverything(store);
   const doc = serializeDocument(store.getState());
-  for (const key of ['coordinates', 'relations', 'axes', 'lines', 'curves', 'sketches', 'sums', 'bindings', 'fills', 'display']) assert.equal(typeof doc.legend[key], 'string', key);
+  for (const key of ['coordinates', 'relations', 'axes', 'lines', 'curves', 'sketches', 'sums', 'links', 'groups', 'fills', 'display']) assert.equal(typeof doc.legend[key], 'string', key);
   for (const key of ['faceToFace', 'panels', 'edgeworth']) assert.equal(doc.legend[key], undefined, key);
-  const kinds = new Set(doc.diagrams[0].lines.concat(doc.diagrams[0].sketches).map(o => o.binding?.kind).filter(Boolean));
-  assert.deepEqual([...kinds].sort(), ['tangent', 'through-point'], 'both binding kinds are exported');
-  for (const kind of kinds) assert.match(doc.legend.bindings, new RegExp(kind));
+  // Following relations moved from each shape into the diagram's links list (schemaVersion 14).
+  const diagram = doc.diagrams[0], follow = diagram.links.filter(link => link.follow);
+  assert.ok(diagram.lines.concat(diagram.sketches, diagram.points).every(o => !('binding' in o)), 'no binding on shapes');
+  assert.deepEqual([...new Set(follow.map(link => link.type))].sort(), ['point', 'tangent'], 'both following relations are exported');
+  assert.ok(follow.every(link => link.status === 'holds'), 'following relations hold by construction');
+  for (const word of ['follow', 'tangent', 'holds', 'broken', 'role']) assert.match(doc.legend.links, new RegExp(word));
   const opposite = doc.diagrams[0].curves.filter(c => c.orientation === 'opposite');
   assert.ok(opposite.length && opposite.every(c => !/the origin/.test(c.geometry.movement)), 'opposite curves never claim to move about A\'s origin');
   assert.ok(opposite.some(c => /the opposite origin/.test(c.geometry.movement)));

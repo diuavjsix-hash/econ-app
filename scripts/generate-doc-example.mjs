@@ -37,7 +37,7 @@ store.updateSelected({ name: '꺾인 선 (오른쪽)', slope: -0.5, anchor: { x:
 store.addLine();
 store.updateSelected({ name: '점선 반직선', slope: 0, anchor: { x: 2, y: 4 }, extent: [0, null], style: 'dashed' });
 
-const output = new URL('../docs/examples/editor-v13.json', import.meta.url);
+const output = new URL('../docs/examples/editor-v14.json', import.meta.url);
 await mkdir(new URL('../docs/examples/', import.meta.url), { recursive: true });
 await writeFile(output, `${exportJson(store.getState())}\n`);
-console.log('Generated docs/examples/editor-v13.json');
+console.log('Generated docs/examples/editor-v14.json');

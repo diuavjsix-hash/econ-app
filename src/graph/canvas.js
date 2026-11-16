@@ -8,7 +8,7 @@ import { pointCoordinatesLabel } from './point.js';
 import { SnapTargetCache, snapPoint } from './snap.js';
 import { LINE_END_ACTIONS } from './line-extent.js';
 import { geometryKey, independentSnapState } from './snap-context.js';
-import { objectsOf, selectedIdsOf } from '../objects.js';
+import { objectsOf, selectedIdsOf, canvasPick, outermostGroup, selectionClosure } from '../objects.js';
 import { distance, displayedSketchMinimum } from './sketch.js';
 import { drawSketch } from './sketch-view.js';
 import { axisAlignedSnap } from './movement.js';
@@ -17,10 +17,15 @@ import { snapSegmentPoint } from './segment-magnets.js';
 import { buildFillRegions, fillLabelPosition } from './fill.js';
 import { renderSnapFeedback } from './snap-feedback.js';
 import { CREATION_TOOLS } from './creation-tools.js';
+import { rolesChangedBy, LINK_ROLES } from '../links.js';
 import { toolModeOf, usesDrawingPointer } from '../tool-modes.js';
 
 let nextCanvasId = 1;
 const element = (...args) => SVG_RENDERER.element(...args);
+const DOUBLE_PRESS_MS = 450, DOUBLE_PRESS_PX = 6;
+// A press becomes a drag only after the pointer travels this far, so a click that selects a
+// shape never nudges it (a sub-pixel jitter used to slide an attached contact along its line).
+export const DRAG_START_PX = 3;
 
 export function mountGraph(container, store) {
   const canvasId = nextCanvasId++;
@@ -31,6 +36,7 @@ export function mountGraph(container, store) {
   let viewport;
   let drag = null;
   let marquee = null;
+  let lastPress = null; // the previous press on a shape, for double-press detection
   let snapTarget = null;
   let tangentSnap = null;
   let segmentSnap = null;
@@ -110,6 +116,7 @@ export function mountGraph(container, store) {
     let candidate=null,point=position,coordinates=false;
     if (drag) {
       if (drag.object.type==='line'&&Object.hasOwn(LINE_END_ACTIONS,drag.action)) {candidate=tangentSnap;coordinates=true;}
+      else if (drag.object.type==='group') candidate=tangentSnap;
       else if (['line','curve','sketch'].includes(drag.object.type)&&(drag.action==='move'||drag.object.type==='line'&&drag.action==='rotate')) candidate=tangentSnap;
       else if (drag.object.type==='point'||['sketch-start','sketch-end','sketch-middle'].includes(drag.action)) {candidate=snapTarget;coordinates=true;}
     } else if (inside&&drawingPointer) {
@@ -138,7 +145,7 @@ export function mountGraph(container, store) {
     viewport = createViewport(width, height, currentState.quadrantMode, currentState);
     const { cx, cy, unit, bounds, plot, xDirection, yDirection } = viewport;
     const toScreen = point => projectPoint(point, viewport);
-    const selectedIds=new Set(selectedIdsOf(currentState));
+    const selectedIds=selectionClosure(currentState);
     const fillIds = new Set((currentState.fills ?? []).map(fill => fill.id));
     for (const id of fillLabelCache.keys()) if (id !== 'preview' && !fillIds.has(id)) fillLabelCache.delete(id);
     for (const [mode, tool] of Object.entries(CREATION_TOOLS)) if (tool.svgClass) svg.classList.toggle(tool.svgClass, toolModeOf(currentState) === mode);
@@ -369,6 +376,27 @@ export function mountGraph(container, store) {
     if (Object.hasOwn(result,'segmentSnap')) segmentSnap=result.segmentSnap;
     if (result.patch) store.updateSelected(result.patch);
   }
+  /**
+   * After a drag or nudge: forget the moved parts' old magnet alignments and record the one the
+   * gesture ended on (links). A set records on the member that landed; links inside it stay.
+   */
+  function recordGestureLinks(object, action, { snapTarget: point, tangentSnap: stroke }) {
+    if (object.type === 'group') {
+      const members = object.members ?? [], moving = new Set(members.map(member => member.id));
+      for (const member of members) store.recordSnaps(member.id, { roles: LINK_ROLES, moving,
+        snaps: stroke?.owner === member.id ? { [stroke.ownerRole]: stroke } : {} });
+      return;
+    }
+    const roles = rolesChangedBy(object.type, action), current = objectsOf(currentState).find(item => item.id === object.id);
+    const at = (key, candidate) => candidate && current?.[key] && distance(current[key], candidate.point) <= 1e-8 ? candidate : null;
+    let snaps = {};
+    if (object.type === 'point') snaps = { anchor: at('anchor', point) };
+    else if (action === 'sketch-start' || action === 'sketch-end') snaps = { [action.slice(7)]: at(action.slice(7), point) };
+    else if (action === 'sketch-middle') snaps = { anchor: at('anchor', point) };
+    else if (Object.hasOwn(LINE_END_ACTIONS, action)) snaps = { [LINE_END_ACTIONS[action] ? 'end' : 'start']: stroke };
+    else if (stroke) snaps = String(stroke.key ?? '').startsWith('line-end') ? { [stroke.endIndex ? 'end' : 'start']: stroke } : { shape: stroke };
+    store.recordSnaps(object.id, { roles, snaps });
+  }
   function worldPoint(event) {
     const bounds = svg.getBoundingClientRect();
     const x = (event.clientX - bounds.left) * viewport.width / bounds.width;
@@ -383,7 +411,9 @@ export function mountGraph(container, store) {
     if (!marquee.active && distance(marquee.start,point)*viewport.unit<4) return;
     marquee.active=true;
     const ids=objectsInRectangle(currentState,selectionRectangle(marquee.start,point,viewport.bounds));
-    store.selectObjects(marquee.additive?[...marquee.base,...ids]:ids);
+    // A shape inside a set brings in the whole set.
+    const picked=[...new Set(ids.map(id=>outermostGroup(currentState,id)?.id??id))];
+    store.selectObjects(marquee.additive?[...marquee.base,...picked]:picked);
   }
   function cancelMarquee(restore=true) {
     if (!marquee) return;
@@ -403,7 +433,8 @@ export function mountGraph(container, store) {
     if (creation?.tool.pointerDown(creation.session, event, creationContext)) return;
     if (currentState.duplicatePanel) {
       event.preventDefault();
-      store.selectObject(event.target.closest('[data-id]')?.dataset.id ?? null);
+      const id=event.target.closest('[data-id]')?.dataset.id;
+      store.selectObject(id?canvasPick(currentState,id):null);
       return;
     }
     const target = event.target.closest('[data-id]');
@@ -415,7 +446,13 @@ export function mountGraph(container, store) {
       } else store.selectObject(null);
       return;
     }
-    const object = objectsOf(currentState).find((item) => item.id === target.dataset.id);
+    // A second press on the same shape picks that one shape inside its set. The browser sends no
+    // dblclick here: the first press re-renders the SVG and captures the pointer.
+    const rawId=target.dataset.id;
+    const double=lastPress&&lastPress.id===rawId&&event.timeStamp-lastPress.time<DOUBLE_PRESS_MS&&Math.hypot(event.clientX-lastPress.x,event.clientY-lastPress.y)<DOUBLE_PRESS_PX;
+    lastPress=double?null:{id:rawId,time:event.timeStamp,x:event.clientX,y:event.clientY};
+    const pickedId=double&&outermostGroup(currentState,rawId)?rawId:canvasPick(currentState,rawId);
+    const object = objectsOf(currentState).find((item) => item.id === pickedId);
     if (!object) return;
     if (currentState.handSelected && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();svg.focus({preventScroll:true});store.selectObject(object.id,{toggle:true});return;
@@ -426,7 +463,7 @@ export function mountGraph(container, store) {
     if (!anchor) return;
     const startPatch=controller.startPatch(object,anchor);
     const { rebase, ...placed } = startPatch;
-    drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), object: { ...structuredClone(object), ...placed } };
+    drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), client: { x: event.clientX, y: event.clientY }, moving: false, object: { ...structuredClone(object), ...placed, ...controller.dragSnapshot(object,interactionContext()) } };
     segmentSnap = null;
     snapTarget = null; tangentSnap = null;
     store.beginHistory();
@@ -446,6 +483,10 @@ export function mountGraph(container, store) {
       return;
     }
     if (event.pointerId !== drag.pointerId) return;
+    if (!drag.moving) {
+      if (Math.hypot(event.clientX - drag.client.x, event.clientY - drag.client.y) < DRAG_START_PX) return;
+      drag.moving = true;
+    }
     const point = worldPoint(event);
     applyInteraction(interactionFor(drag.object).drag(drag.object,drag.action,drag.start,point,event,interactionContext()));
   };
@@ -477,6 +518,7 @@ export function mountGraph(container, store) {
     }
     if (!drag) creation?.tool.pointerEnd(creation.session, event, creationContext);
     if (!drag || event.pointerId !== drag.pointerId) return;
+    if (drag.moving) recordGestureLinks(drag.object, drag.action, { snapTarget, tangentSnap });
     drag = null;
     snapTarget = null;
     tangentSnap = null;
@@ -511,15 +553,22 @@ export function mountGraph(container, store) {
     const keys = ['Enter', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
     if (!keys.includes(event.key)) return;
     event.preventDefault();
-    const id = target.dataset.id;
-    if (currentState.duplicatePanel) { store.selectObject(id); return; }
+    const id = target.dataset.id, picked = canvasPick(currentState, id);
+    if (currentState.duplicatePanel) { store.selectObject(picked); return; }
     const action = target.dataset.action;
     const label = target.getAttribute('aria-label');
-    if ((event.ctrlKey || event.metaKey) && ['Enter',' '].includes(event.key)) {store.selectObject(id,{toggle:true});return;}
-    store.selectObject(id);
-    const line = objectsOf(currentState).find((item) => item.id === id);
+    if ((event.ctrlKey || event.metaKey) && ['Enter',' '].includes(event.key)) {store.selectObject(picked,{toggle:true});return;}
+    store.selectObject(picked);
+    const line = objectsOf(currentState).find((item) => item.id === picked);
     if (!line) return;
-    if (event.key.startsWith('Arrow')) applyInteraction(interactionFor(line).keyboard(line,action,event,interactionContext()));
+    if (event.key.startsWith('Arrow')) {
+      // A nudge re-places the shape by hand: its alignments for the moved parts are forgotten.
+      store.beginHistory();
+      const result=interactionFor(line).keyboard(line,action,event,interactionContext());
+      applyInteraction(result);
+      if (result?.patch) recordGestureLinks(line.type==='group'?{...line,members:result.patch.members}:line,action,{});
+      store.endHistory();
+    }
     // Rendering recreates SVG nodes, so restore keyboard focus to the same control.
     [...svg.querySelectorAll('[data-id]')].find((node) => node.dataset.id === id && node.getAttribute('aria-label') === label)?.focus();
   });

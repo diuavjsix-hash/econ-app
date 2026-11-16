@@ -3,7 +3,7 @@ import { directionOf } from './graph/math.js';
 
 export const dependencyId = object => object.binding?.sourceId ?? null;
 export const dependencyIds = object => [...new Set([dependencyId(object), ...(object.sourceIds ?? [])].filter(Boolean))];
-/** Geometry exclusion follows calculation dependencies, never list/folder membership. */
+/** Geometry exclusion follows calculation dependencies; set (group) membership is added only by independentSnapState while that set moves. */
 export function dependentIds(state, id) {
   const excluded = new Set([id]), followers = new Map();
   for (const object of objectsOf(state)) for (const source of dependencyIds(object)) {

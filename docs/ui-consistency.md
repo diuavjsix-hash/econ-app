@@ -9,6 +9,8 @@
 - 생성 도구와 복제는 결과 하나를 만든 뒤 **선택 도구로 돌아가고 결과를 선택합니다.** store의 `add()`·`addFill`·`duplicateSelected`가 공통으로 처리하며 도구별로 '계속 그리기' 예외를 만들지 않습니다. 도구에서 고른 설정(직선 종류·모양 등)은 다음 사용에도 유지합니다.
 - 직선·점·곡선·칠하기처럼 캔버스를 눌러 만드는 도구는 `graph/creation-tools.js`의 `CreationTool`로 구현하고 `CREATION_TOOLS`에 등록합니다. 맞춤 표시는 `feedback`으로 공통 렌더러에 후보만 전달합니다.
 - 도형의 드래그/키보드는 `graph/interactions.js`, 손잡이는 `editing-handles.js`에서 확장합니다. canvas에 새로운 도형 종류 분기를 추가하기 전에 해당 컨트롤러/곡선 종류 훅을 확장합니다. 제어 결과는 patch와 현재 맞춤 후보이며 store·기록·피드백 생명주기는 canvas가 관리합니다.
+- 누른 도형은 포인터가 `DRAG_START_PX`(3px) 이상 움직여야 끌기를 시작합니다(2026-11-16). 선택하려는 클릭의 손떨림이 접점 등 정확한 관계를 밀지 않게 하는 공통 규칙이며 도구별로 따로 두지 않습니다. 미세 이동은 방향키로 합니다. 브라우저 검사 fixture의 `send`는 첫 이동에서 임계값을 Alt로 먼저 넘깁니다.
+- 접점과 교점 구분은 `snap.js`의 `DOUBLE_ROOT_TOLERANCE`·`TANGENT_SINE`·`CONTACT_MERGE` 한곳에서 정합니다. 같은 두 도형의 후보가 보기 크기의 10⁻⁶ 안에 둘 이상이면 접점 하나로 합칩니다(다시 그은 직선의 계산 오차로 접점 옆에 교점이 생기던 문제).
 - 검증은 `node scripts/check.mjs`, `node scripts/test.mjs`, `node scripts/browser-test.mjs`로 반복합니다. 브라우저 검사는 실제 브라우저 안의 1280×800/390×844 앱 화면과 합성 포인터/터치 회귀를 구분하며 물리 모바일 조작으로 표현하지 않습니다.
 
 ## 화면 구성

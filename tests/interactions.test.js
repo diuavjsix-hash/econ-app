@@ -63,7 +63,7 @@ test('bound free-curve gestures keep line constraints and selection-only objects
   const state = { ...ctx.state, lines: [{ id: 'line-1', type: 'line', slope: 1, anchor: { x: 4, y: 4 } }] };
   const result = interactionFor(curve).drag(curve, 'move', curve.anchor, { x: 5, y: 4.1 }, { shiftKey: true }, { ...ctx, state });
   assert.deepEqual(result.patch.anchor, curve.anchor); assert.equal(result.patch.translate, true);
-  for (const type of ['sum', 'group', 'ruler']) {
+  for (const type of ['sum', 'ruler']) {
     const handler = interactionFor({ type }); assert.equal(handler.canDrag({}, 'move'), false); assert.equal(handler.keyboard({}, 'move', {}, ctx), null);
   }
 });

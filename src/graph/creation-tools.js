@@ -45,7 +45,8 @@ export class PointCreation extends CreationTool {
   pointerDown(session, event, ctx) {
     if (ctx.state.activeTool !== 'point') return false; // point creation switched off: select instead
     const point = ctx.worldPoint(event);
-    if (ctx.inside(point)) ctx.store.addPoint(ctx.snappedPosition(point, event));
+    // The point records what its magnet aligned it to (a link), next to its coordinates.
+    if (ctx.inside(point)) { const placed = ctx.snappedPosition(point, event); ctx.store.addPoint(placed, { snap: ctx.snapTarget }); }
     event.preventDefault();
     return true;
   }
@@ -93,10 +94,10 @@ export class TwoPointCreation extends CreationTool {
     return curveTangentsAt(ctx.state, ctx.viewport.bounds, anchor, ids);
   }
   finish(session, ctx) {
-    const completed = session.draft; session.draft = null;
+    const completed = session.draft, endSnap = ctx.segmentSnap; session.draft = null;
     ctx.setSegmentSnap(null);
     ctx.releasePointer(completed?.pointerId);
-    if (completed) this.commit(completed, ctx);
+    if (completed) this.commit(completed, ctx, endSnap);
     ctx.redraw(this);
   }
   pointerDown(session, event, ctx) {
@@ -106,7 +107,7 @@ export class TwoPointCreation extends CreationTool {
     if (!ctx.inside(ctx.worldPoint(event))) return true;
     const anchor = this.position(session, event, ctx);
     session.draft = { anchor, end: { ...anchor }, pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY,
-      tangents: this.startTangents(ctx.segmentSnap, anchor, ctx), lock: null };
+      tangents: this.startTangents(ctx.segmentSnap, anchor, ctx), lock: null, startSnap: ctx.segmentSnap };
     ctx.store.selectObject(null); ctx.capturePointer(event.pointerId); ctx.redraw(this);
     return true;
   }
@@ -142,7 +143,11 @@ export class TwoPointCreation extends CreationTool {
 export class LineCreation extends TwoPointCreation {
   get flag() { return 'lineSelected'; }
   layerAttributes(ctx) { return { class: 'line-draft-layer', 'clip-path': `url(#${ctx.clipId})`, 'pointer-events': 'none' }; }
-  commit(draft, ctx) { ctx.store.addLine(draft.anchor, draft.end, { kind: ctx.state.lineKind, style: ctx.state.lineStyle }); }
+  /** The line records the targets of both clicks, and a Shift tangent lock as touching that curve. */
+  commit(draft, ctx, endSnap = null) {
+    const tangent = draft.lock?.kind === 'tangent' ? draft.lock : null;
+    ctx.store.addLine(draft.anchor, draft.end, { kind: ctx.state.lineKind, style: ctx.state.lineStyle, snaps: { start: draft.startSnap, end: endSnap, ...(tangent ? { shape: tangent } : {}) } });
+  }
   draw(session, layer, ctx) {
     const { draft } = session, { viewport, state } = ctx;
     if (draft) {
@@ -162,7 +167,7 @@ const SKETCH_STEPS = ['시작점', '끝점', '지나는 점'];
 export class SketchCreation extends CreationTool {
   get slot() { return 'sketches'; }
   layerAttributes() { return { class: 'sketch-draft-layer', 'pointer-events': 'none' }; }
-  createSession() { return { points: [], hover: null }; }
+  createSession() { return { points: [], snaps: [], hover: null }; }
   tangentTarget(point, event, ctx, session) {
     return snapSketchTangent(point, ctx.state, ctx.viewport.bounds, ctx.viewport.unit, { previous: session.hover?.target,
       altKey: event.altKey, enabled: ctx.state.pointSnap, directId: event.target?.closest?.('[data-id]')?.dataset.id });
@@ -178,11 +183,13 @@ export class SketchCreation extends CreationTool {
     const point = ctx.snappedPosition(raw, event);
     if (session.points.length < 2) {
       if (session.points.length && distance(session.points[0], point) < 1e-6) return true;
-      session.points.push(point); session.hover = null; ctx.redraw(this); return true;
+      session.points.push(point); session.snaps.push(ctx.snapTarget); session.hover = null; ctx.redraw(this); return true;
     }
     const target = this.passTarget(raw, event, ctx, session);
-    const id = ctx.store.addSketch(session.points[0], session.points[1], target?.point ?? point, { lineId: target?.line.id });
-    if (id) { session.points = []; session.hover = null; ctx.redraw(this); }
+    // Touching a line is a following relation (binding); other magnets are recorded as links.
+    const id = ctx.store.addSketch(session.points[0], session.points[1], target?.point ?? point, { lineId: target?.line.id,
+      snaps: { start: session.snaps[0], end: session.snaps[1], anchor: target ? null : ctx.snapTarget } });
+    if (id) { session.points = []; session.snaps = []; session.hover = null; ctx.redraw(this); }
     return true;
   }
   pointerMove(session, event, ctx) {
@@ -195,7 +202,7 @@ export class SketchCreation extends CreationTool {
   sync(session, next, previous) {
     const history = next.historyRevision !== previous.historyRevision;
     if (history || next.activeDiagramId !== previous.activeDiagramId || next.pointSnap !== previous.pointSnap || toolModeOf(next) !== toolModeOf(previous)) session.hover = null;
-    if ((!next.sketchSelected || history) && session.points.length) { session.points = []; session.hover = null; }
+    if ((!next.sketchSelected || history) && session.points.length) { session.points = []; session.snaps = []; session.hover = null; }
   }
   draw(session, layer, ctx) {
     const { viewport, state } = ctx, drafted = session.points, hover = session.hover;

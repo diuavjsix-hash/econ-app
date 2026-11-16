@@ -1,7 +1,8 @@
 // Static application shell. Every control is built with ui/controls.js and every icon
 // comes from ui/icons.js; tool modules find their elements by id and data attributes,
 // so this file only decides arrangement and wording.
-import { rangeField, numberField, textField, selectField, switchField, checkField, hint, button, iconButton, toolButton, segmented } from './controls.js';
+import { rangeField, numberField, textField, selectField, switchField, checkField, hint, button, iconButton, toolButton, segmented, swatches } from './controls.js';
+import { STROKE_PALETTE } from '../models/palette.js';
 import { icon } from './icons.js';
 import { PANEL_NAMES } from '../graph/viewport.js';
 import { fillControls } from '../tools/fill.js';
@@ -121,10 +122,14 @@ const sketchShapes = () => segmented({ label: '자유 곡선 모양', className:
   { data: { 'sketch-shape': 'right' }, ariaLabel: '오른쪽으로 볼록 ⊃', title: '⊃', glyph: glyph('<path d="M11 1.5h4.5a4.5 4.5 0 0 1 0 9H11"/>') },
 ] });
 
+// One color row for a shape, a set or several shapes; colorSelected decides what it paints.
+const colorRow = scope => swatches({ label: '색', colors: STROKE_PALETTE, data: { 'color-scope': scope }, customId: `${scope}-color-custom`, mixedId: `${scope}-color-mixed` });
 const selectionInspector = () => `
         <div id="selection-inspector" hidden><section id="object-settings" class="object-settings panel-stack" aria-label="도형 설정" hidden>
           <div class="name-heading"><label for="object-name" class="field-label">이름</label>${button({ id: 'delete-object', label: '삭제', icon: icon('trash'), variant: 'danger', size: 'sm', ariaLabel: '선택한 항목 삭제', title: '삭제 (Delete)' })}</div>
           <input id="object-name" class="input" type="text" maxlength="80" autocomplete="off" />
+          <div id="object-color-row" class="field field-stacked"><span class="field-label">색</span>${colorRow('object')}</div>
+          <div id="group-settings" class="panel-stack" hidden>${hint('더블클릭: 안의 도형 하나 선택')}${button({ id: 'ungroup-selection', label: '묶기 해제', block: true, title: '묶기 해제 (Ctrl+Shift+G)' })}</div>
           <details class="disclosure"><summary>분류</summary><div class="panel-stack">${selectField({ id: 'object-parent', label: '상위 항목', options: [['', '최상위']] })}</div></details>
           <div id="binding-settings" class="panel-stack" hidden><p id="binding-description" class="hint"></p>${button({ id: 'detach-binding', label: '연결 해제', block: true })}</div>
           <div id="sum-selected-settings" class="panel-stack" hidden>
@@ -176,12 +181,14 @@ const inspector = () => `
         <p id="inspector-empty" class="empty-state">빈 공간을 드래그해 여러 도형을 선택합니다.</p>
         <section id="multi-selection-inspector" class="panel-stack" aria-label="여러 도형 선택" hidden>
           <ul id="multi-selection-list" class="multi-selection-list"></ul>
+          <div class="field field-stacked"><span class="field-label">색</span>${colorRow('multi')}</div>
+          ${button({ id: 'group-selection', label: '묶기', variant: 'primary', block: true, title: '묶기 (Ctrl+G)' })}
           ${hint('Ctrl+클릭: 선택 추가·해제')}
           <button type="button" id="delete-multiple" class="btn btn-danger btn-block">선택한 도형 삭제</button>${button({ id: 'clear-selection', label: '선택 해제', block: true })}
         </section>${creationInspector()}${operationInspector()}${selectionInspector()}
       </section>
       <section class="object-section" aria-label="도형 목록">
-        <div class="object-heading"><h2 class="panel-title">도형 <span id="object-count" class="count">0</span></h2>${iconButton({ id: 'add-group', icon: icon('folder'), label: '폴더 추가' })}</div>
+        <div class="object-heading"><h2 class="panel-title">도형 <span id="object-count" class="count">0</span></h2>${iconButton({ id: 'add-group', icon: icon('folder'), label: '빈 묶음 추가' })}</div>
         <p id="objects-empty" class="empty-state">아직 도형이 없습니다.</p><div id="object-list" class="object-list" role="tree" aria-multiselectable="true" aria-label="그래프 목록"></div>
         <div id="object-root-drop" class="root-drop-zone" hidden>최상위로 이동</div>
       </section>

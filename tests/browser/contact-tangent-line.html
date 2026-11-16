@@ -15,6 +15,17 @@ const near=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)<1e-7;
 const sameSlope=(a,b)=>a===null||b===null?a===b:Math.abs(Math.atan(a)-Math.atan(b))<1e-6;
 const view=()=>createViewport(stage.clientWidth,stage.clientHeight,store.getState().quadrantMode,store.getState());
 function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:95,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x*r.width/v.width,clientY:r.top+s.y*r.height/v.height,...flags}));}
+
+// The canvas starts a drag only past DRAG_START_PX; like a hand, the first move of a press first
+// crosses it toward its target (Alt: no magnet is captured on the way), then lands exactly. A press released without moving stays a click.
+const sendRaw=send;let pressAt=null;
+send=(type,p,flags={},target=svg)=>{
+  if(type==='pointerdown')pressAt=p;
+  else if(type==='pointermove'&&pressAt){const u=view().unit,dx=(p.x-pressAt.x)*u,dy=(p.y-pressAt.y)*u,d=Math.hypot(dx,dy);
+    if(d<6){const ux=d?dx/d:1,uy=d?dy/d:0;sendRaw('pointermove',{x:pressAt.x+ux*6/u,y:pressAt.y+uy*6/u},{...flags,altKey:true},svg);}pressAt=null;}
+  else if(type==='pointerup'||type==='pointercancel')pressAt=null;
+  return sendRaw(type,p,flags,target);
+};
 const click=p=>{send('pointerdown',p);send('pointerup',p)};
 function mount(){dispose?.();dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};}
 // A world point `along` px down the tangent from the contact and `across` px off it.

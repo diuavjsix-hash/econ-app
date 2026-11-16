@@ -52,6 +52,16 @@ export function segmented({ label, items, columns, id, className }) {
   return `<div ${attrs({ id, class: classes('segmented', className), role: 'group', 'aria-label': label, style })}>${items.map(item =>
     `<button ${attrs({ type: 'button', class: 'segment', 'aria-pressed': String(Boolean(item.pressed)), 'aria-label': item.ariaLabel, title: item.title, ...dataAttrs(item.data) })}>${item.glyph ? `<span class="segment-glyph" aria-hidden="true">${item.glyph}</span>` : ''}${item.label ? `<span class="segment-label">${escape(item.label)}</span>` : ''}${item.meta ? `<span class="segment-meta">${escape(item.meta)}</span>` : ''}</button>`).join('')}</div>`;
 }
+/**
+ * A row of color chips. Each chip carries `data` attributes plus `data-color`; `customId` adds a
+ * last chip that opens the system color picker, and `mixedId` a quiet "섞임" mark shown while
+ * the selection holds several colors. Colors come from the palette module.
+ */
+export function swatches({ label, colors, data, id, customId, mixedId }) {
+  return `<div ${attrs({ id, class: 'swatches', role: 'group', 'aria-label': label })}>${mixedId ? `<span ${attrs({ id: mixedId, class: 'swatch-mixed', hidden: true })}>섞임</span>` : ''}${colors.map(([color, name]) =>
+    `<button ${attrs({ type: 'button', class: 'swatch', style: `--swatch:${color}`, 'aria-label': name, title: name, 'aria-pressed': 'false', 'data-color': color, ...dataAttrs(data) })}></button>`).join('')}${customId
+    ? `<label class="swatch swatch-custom" title="직접 고르기"><input ${attrs({ id: customId, type: 'color', 'aria-label': '직접 고르기' })} /></label>` : ''}</div>`;
+}
 
 export class InputControl {
   constructor(root, id) {

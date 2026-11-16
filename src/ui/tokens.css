@@ -142,6 +142,8 @@
   --shadow-dialog: 0 16px 48px rgb(27 27 24 / 0.18), 0 0 0 1px rgb(27 27 24 / 0.08);
   --backdrop: rgb(27 27 24 / 0.32);
   --swatch-edge: rgb(27 27 24 / 0.12);
+  /* The "pick any color" chip: a muted hue wheel, not a drawing color. */
+  --swatch-wheel: conic-gradient(#c43d32, #b06f12, #2b7a4b, #17808a, #2a5db0, #7445a8, #c43d32);
   --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px rgb(42 93 176 / 0.45);
 
   /* Motion. */

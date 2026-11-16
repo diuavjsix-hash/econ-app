@@ -16,6 +16,17 @@ function setup(flip=false){
  dispose=mountGraph(stage,store);svg=stage.querySelector('svg');svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};
 }
 function send(type,p,flags={},target=svg){const v=view(),s=toScreen(p,v),r=svg.getBoundingClientRect();target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:81,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x,clientY:r.top+s.y,...flags}));}
+
+// The canvas starts a drag only past DRAG_START_PX; like a hand, the first move of a press first
+// crosses it toward its target (Alt: no magnet is captured on the way), then lands exactly. A press released without moving stays a click.
+const sendRaw=send;let pressAt=null;
+send=(type,p,flags={},target=svg)=>{
+  if(type==='pointerdown')pressAt=p;
+  else if(type==='pointermove'&&pressAt){const u=view().unit,dx=(p.x-pressAt.x)*u,dy=(p.y-pressAt.y)*u,d=Math.hypot(dx,dy);
+    if(d<6){const ux=d?dx/d:1,uy=d?dy/d:0;sendRaw('pointermove',{x:pressAt.x+ux*6/u,y:pressAt.y+uy*6/u},{...flags,altKey:true},svg);}pressAt=null;}
+  else if(type==='pointerup'||type==='pointercancel')pressAt=null;
+  return sendRaw(type,p,flags,target);
+};
 const marker=()=>svg.querySelector('.snap-feedback[data-snap-kind="tangent"]');
 document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok,name)=>{if(!ok)throw Error(name);passed.push(name)};try{
  for(const flip of [false,true]){

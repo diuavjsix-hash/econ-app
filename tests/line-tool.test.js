@@ -109,7 +109,7 @@ test('the line tool pointer flow: click, click or one drag; Shift locks the axis
   tool.pointerDown(session, event(1, 1), ctx); tool.pointerEnd(session, { ...event(1, 1), type: 'pointerup' }, ctx);
   assert.equal(added.length, 0, 'a click waits for the second point');
   tool.pointerDown(session, event(4, 3), ctx);
-  assert.deepEqual(added.pop(), { from: { x: 1, y: 1 }, to: { x: 4, y: 3 }, options: { kind: 'segment', style: 'solid' } });
+  assert.deepEqual(added.pop(), { from: { x: 1, y: 1 }, to: { x: 4, y: 3 }, options: { kind: 'segment', style: 'solid', snaps: { start: null, end: null } } }, 'unsnapped clicks record no link targets');
   tool.pointerDown(session, event(2, 2), ctx);
   tool.pointerMove(session, event(6, 2.4, { shiftKey: true }), ctx);
   tool.pointerEnd(session, { ...event(6, 2.4, { shiftKey: true }), type: 'pointerup' }, ctx);

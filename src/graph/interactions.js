@@ -7,12 +7,14 @@ import { distance, unitVector, sketchHandlePoints, translatedSketch } from './sk
 import { curveFamilyOf } from '../models/curve-families.js';
 import { snapMovingCurve } from './point-magnets.js';
 import { snapMovingLine } from './intercepts.js';
-import { snapSegmentPoint } from './segment-magnets.js';
+import { snapSegmentPoint, snapMovingEnds } from './segment-magnets.js';
+import { independentSnapState } from './snap-context.js';
+import { descendantsOf } from '../objects.js';
 import { OBJECT_TYPES } from '../models/object-types.js';
 import { coordinateOrigins } from './axes.js';
 import { chooseSnapCandidate, SNAP_RELEASE_PX } from './snap-policy.js';
 import { contactTangentsAt, slopeOfDirection } from './curve-contacts.js';
-import { LINE_END_ACTIONS, isTrimmed, lineParameter, rebasedExtent, rotatedExtent, visibleLineEnds } from './line-extent.js';
+import { LINE_END_ACTIONS, isTrimmed, lineEndPoints, lineParameter, rebasedExtent, rotatedExtent, visibleLineEnds } from './line-extent.js';
 
 const LINE_MIN_PX = 24;
 
@@ -29,6 +31,8 @@ export class ShapeInteraction {
   start(object) { return object.anchor; }
   /** The edit applied when a drag begins; it also becomes the drag snapshot. */
   startPatch(object, anchor) { return { anchor }; }
+  /** Extra drag-only data kept beside the snapshot (never written to the document). */
+  dragSnapshot() { return null; }
   canDrag(object, action) { return this.movable && !(object.binding && action === 'move'); }
   drag() { throw new TypeError('A shape interaction must implement drag()'); }
   keyboard() { throw new TypeError('A shape interaction must implement keyboard()'); }
@@ -230,6 +234,44 @@ export class SelectionInteraction extends ShapeInteraction {
   keyboard() { return null; }
 }
 
+/** Points a moving set can land on a shared target with: placed points and drawn ends, with their owner and role. */
+function setEnds(members) {
+  const ends = [], add = (point, owner, role) => { if (point) ends.push({ point, owner, role }); };
+  for (const member of members) {
+    if (member.type === 'point') add(member.anchor, member.id, 'anchor');
+    else if (member.type === 'line') lineEndPoints(member).forEach((end, i) => add(end, member.id, i ? 'end' : 'start'));
+    else if (member.type === 'sketch') { add(member.start, member.id, 'start'); add(member.end, member.id, 'end'); }
+    else if (member.type === 'ruler') { add(member.anchor, member.id, 'start'); add(member.end, member.id, 'end'); }
+  }
+  return ends;
+}
+const offsetPoint = (p, d) => ({ x: p.x + d.x, y: p.y + d.y });
+/**
+ * A set (group) moves all its members by one offset from where the drag began. Its points and
+ * drawn ends meet the shared targets of everything outside the set; Shift locks the axis and
+ * Alt skips the magnet, as for a single shape.
+ */
+export class GroupInteraction extends ShapeInteraction {
+  canDrag() { return true; }
+  start(object, ctx) { return ctx.state ? { x: 0, y: 0 } : null; }
+  startPatch() { return {}; }
+  /** The members as they were when the drag began; every move starts again from them. */
+  dragSnapshot(object, ctx) { return { members: structuredClone(descendantsOf(ctx.state, object.id)) }; }
+  drag(object, action, start, point, event, ctx) {
+    const members = object.members ?? [], { bounds, unit } = ctx.viewport;
+    const moved = dragTranslation({ x: 0, y: 0 }, start, point, event.shiftKey), offset = moved.anchor;
+    const ends = setEnds(members), moved_ = ends.map(end => offsetPoint(end.point, offset));
+    const hit = ends.length && ctx.snapTargets ? snapMovingEnds(moved_, ctx.snapTargets(), unit,
+      { altKey: event.altKey, axis: moved.axis, bounds, previous: ctx.tangentSnap, points: independentSnapState(ctx.state, object.id).points }) : null;
+    // The member and part that landed, so the link is recorded on that shape.
+    const landed = hit && { ...hit, owner: ends[hit.endIndex].owner, ownerRole: ends[hit.endIndex].role };
+    return { patch: { members, offset: hit ? offsetPoint(offset, hit.delta) : offset }, tangentSnap: landed ?? null };
+  }
+  keyboard(object, action, event, ctx) {
+    return { patch: { members: structuredClone(descendantsOf(ctx.state, object.id)), offset: deltaFor(event, event.shiftKey ? 1 : 0.1, ctx.viewport) } };
+  }
+}
+
 export function assertInteractionHandlers(entries) {
   const expected = [...Object.keys(OBJECT_TYPES), 'analytic'].sort();
   if (JSON.stringify(Object.keys(entries).sort()) !== JSON.stringify(expected)) throw new TypeError('Every object type must register an interaction handler');
@@ -241,7 +283,7 @@ export function assertInteractionHandlers(entries) {
   return Object.freeze(entries);
 }
 export const INTERACTION_HANDLERS = assertInteractionHandlers({ line: new LineInteraction(), curve: new CurveInteraction(), analytic: new AnalyticInteraction(), sketch: new SketchInteraction(),
-  point: new PointInteraction(), fill: new MovableInteraction(), sum: new SelectionInteraction(), group: new SelectionInteraction(), ruler: new SelectionInteraction() });
+  point: new PointInteraction(), fill: new MovableInteraction(), sum: new SelectionInteraction(), group: new GroupInteraction(), ruler: new SelectionInteraction() });
 export function interactionFor(object) {
   const key = curveFamilyOf(object) ? 'analytic' : object.type;
   if (!Object.hasOwn(INTERACTION_HANDLERS, key)) throw new TypeError(`Missing interaction handler: ${key}`);

@@ -26,6 +26,11 @@ export const FILL_PALETTE = Object.freeze([
   [INK.ochre, '황토'], [INK.plum, '보라'], [INK.teal, '청록'],
 ].map(entry => Object.freeze(entry)));
 
+/** Colors offered for a selected shape, set or multi-selection; the names label the swatches. */
+export const STROKE_PALETTE = Object.freeze([
+  ...FILL_PALETTE, [INK.graphite, '먹색'], [INK.pencil, '회색'],
+].map(entry => Object.freeze(entry)));
+
 /** Defaults by object role; new object kinds add a role here instead of a literal. */
 export const ROLE_COLORS = Object.freeze({
   point: INK.graphite,

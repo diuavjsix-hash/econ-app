@@ -14,6 +14,14 @@ import { lineEndPoints } from './line-extent.js';
 export const SNAP_RADIUS = SNAP_CAPTURE_PX;
 export const INTERSECTION_RADIUS = SNAP_CAPTURE_PX;
 const EPS = 1e-9;
+/**
+ * Touching versus crossing is ill-conditioned at a double root: a line redrawn through computed
+ * points differs from the original by ~1e-12, which used to split one contact into a tangent and
+ * a crossing 1e-7 apart (or into nothing). These tolerances stay far below anything visible.
+ */
+export const DOUBLE_ROOT_TOLERANCE = 1e-10; // relative discriminant treated as zero
+export const TANGENT_SINE = 1e-6; // a crossing this close to parallel is a touch
+export const CONTACT_MERGE = 1e-6; // same-pair targets this close (× view size) are one point
 const dot = (a, b) => a.x * b.x + a.y * b.y;
 const cross = (a, b) => a.x * b.y - a.y * b.x;
 const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
@@ -112,9 +120,10 @@ function quadraticRoots(coefficients) {
   let parameters=[];
   if (!a) { if (b) parameters=[-c/b]; }
   else {
-    const discriminant=b*b-4*a*c,tolerance=32*Number.EPSILON*(b*b+Math.abs(4*a*c));
-    // A double root is especially sensitive to rounding after translating a line.
-    // Keep a single exact critical point rather than two nearby false crossings.
+    const discriminant=b*b-4*a*c,tolerance=DOUBLE_ROOT_TOLERANCE*(b*b+Math.abs(4*a*c));
+    // A double root is especially sensitive to rounding after translating a line or redrawing it
+    // through computed points (both sides of zero). Keep one exact critical point rather than two
+    // nearby false crossings or none.
     if (Math.abs(discriminant)<=tolerance) parameters=[-b/(2*a)];
     else if (discriminant>0) {
       const q=-0.5*(b+(b<0?-1:1)*Math.sqrt(discriminant));
@@ -142,7 +151,7 @@ function quadraticLineCrossings(curve, line) {
     .map(t => {
       const point=at(curve,t),derivative={x:curve.v.x+2*t*curve.q.x,y:curve.v.y+2*t*curve.q.y};
       const scale=Math.hypot(derivative.x,derivative.y)*Math.sqrt(lengthSquared);
-      return {point,kind:scale>0 && Math.abs(cross(derivative,line.v))<=1e-9*scale?'tangent':'intersection'};
+      return {point,kind:scale>0 && Math.abs(cross(derivative,line.v))<=TANGENT_SINE*scale?'tangent':'intersection'};
     }).filter(({point}) => inside(dot(sub(point,line.a),line.v)/lengthSquared));
 }
 
@@ -265,7 +274,16 @@ export function buildSnapTargets(state, bounds, excludeObjectId = null) {
   const approximateIds = new Set((state.sums ?? []).map(sum => sum.id));
   const sameAsRegistered = (point, ids, item) => distance(point, item.point) < 1e-7
     || (distance(point, item.point) <= 2 * SUM_TOLERANCE && ids.some(id => approximateIds.has(id) && item.ids?.includes(id)));
+  // One touching point of the same two shapes is one target: a split double root (two crossings,
+  // or a tangent beside a crossing) collapses into the tangent.
+  const mergeRadius = CONTACT_MERGE * Math.max(1, bounds.xMax - bounds.xMin, bounds.yMax - bounds.yMin);
+  const samePair = (a, b) => a.length === b.length && a.every(id => b.includes(id));
   const addCrossing = (point,ids,kind='intersection') => {
+    const twin = crossings.find(item => ['tangent', 'intersection'].includes(item.kind) && item.ids && samePair(item.ids, ids) && distance(point, item.point) <= mergeRadius);
+    if (twin) {
+      if (kind === 'tangent' && twin.kind !== 'tangent') Object.assign(twin, { point, kind });
+      return;
+    }
     if (!crossings.some(item=>sameAsRegistered(point,ids,item))) crossings.push({point,ids,kind});
   };
   const exactIndifferences=new Set(state.curves.filter(isIndifference).map(c=>c.id));

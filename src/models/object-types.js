@@ -9,7 +9,7 @@ export const OBJECT_TYPES = Object.freeze({
   point: { collection: 'points', label: '점', duplicatable: true, strokeGeometry: false },
   fill: { collection: 'fills', label: '구역', duplicatable: false, strokeGeometry: false },
   ruler: { collection: 'rulers', label: '자', duplicatable: false, strokeGeometry: false },
-  group: { collection: 'groups', label: '폴더', duplicatable: true, strokeGeometry: false },
+  group: { collection: 'groups', label: '묶음', duplicatable: true, strokeGeometry: false },
 });
 for (const spec of Object.values(OBJECT_TYPES)) Object.freeze(spec);
 export const OBJECT_LABELS = Object.freeze(Object.fromEntries(Object.entries(OBJECT_TYPES).map(([type, spec]) => [type, spec.label])));

@@ -8,10 +8,11 @@ import { normalizeSlope, directionOf } from './graph/math.js';
 import { LINE_KINDS, LINE_STYLES, lineFromPoints, lineKindOf } from './graph/line-extent.js';
 import { QUADRANT_MODES, PANEL_NAMES, panelSheet, clampZoom, DEFAULT_LOWER_HEIGHT, MIN_LOWER_HEIGHT, MAX_LOWER_HEIGHT, DEFAULT_LEFT_WIDTH, MIN_LEFT_WIDTH, MAX_LEFT_WIDTH } from './graph/viewport.js';
 import { CURVE_PRESETS } from './graph/curve.js';
-import { canReparent, objectsOf } from './objects.js';
+import { canReparent, objectsOf, descendantsOf, colorTargets } from './objects.js';
 import { sumError } from './graph/sum.js';
 import { validSketch, unitVector, projectOnLine } from './graph/sketch.js';
 import { resolveRelations, canAttach, dependencyId } from './relations.js';
+import { linkFor, replaceLinks, withoutShapes, LINK_ROLES } from './links.js';
 import { INDIFFERENCE_FAMILIES } from './graph/indifference.js';
 import { orientCurve, supportsOpposite } from './models/curve-families.js';
 import { followBoxOrigin, defaultOppositeOrigin } from './graph/axes.js';
@@ -28,7 +29,7 @@ const defaultPanelAxisNames = () => Object.fromEntries(Object.keys(PANEL_NAMES).
 export function createStore() {
   const state = {
     selectedIds: [],
-    ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [],
+    ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], links: [],
     ...toolModeFlags('hand'), fillColor: INK.blue, fillAutoColor: true, fillOpacity: 0.24,
     selectedId: null, indifferenceOpposite: false, sketchMode: 'auto', activeTool: 'point', rulerSelected: false, segmentSnap: true, lineKind: 'line', lineStyle: 'solid', pointSnap: true, pointCoordinates: false, showGrid: true,
     quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', lowerHeight: DEFAULT_LOWER_HEIGHT, leftWidth: DEFAULT_LEFT_WIDTH, panelAxisNames: defaultPanelAxisNames(), axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
@@ -37,6 +38,16 @@ export function createStore() {
   let nextSumId = 1;
   let nextSketchId = 1;
   let nextFillId = 1;
+  let nextLinkId = 1;
+  /** Magnet alignments of a placed or moved shape: { role: candidate }. */
+  const linksFor = (subjectId, snaps = {}) => {
+    const links = [];
+    for (const [role, candidate] of Object.entries(snaps ?? {})) {
+      const link = linkFor(`link-${nextLinkId}`, subjectId, role, candidate);
+      if (link) { links.push(link); nextLinkId++; }
+    }
+    return links;
+  };
   const listeners = new Set();
   const setSelection = ids => {
     const requested=new Set(ids);
@@ -51,8 +62,8 @@ export function createStore() {
     if (spec.keepSelection && !spec.keepSelection(objectsOf(state).filter(object => selected.has(object.id)))) setSelection([]);
   };
   // Each registered collection is part of a diagram document, its history and deletion.
-  const documentKeys = [...OBJECT_COLLECTIONS, 'objectOrder', 'quadrantMode', 'axisNames', 'boxSize', 'boxAxisNames', 'faceAxisName', 'lowerHeight', 'leftWidth', 'panelAxisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
-  const emptyDocument = () => ({ ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', lowerHeight: DEFAULT_LOWER_HEIGHT, leftWidth: DEFAULT_LEFT_WIDTH, panelAxisNames: defaultPanelAxisNames(), axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
+  const documentKeys = [...OBJECT_COLLECTIONS, 'objectOrder', 'links', 'quadrantMode', 'axisNames', 'boxSize', 'boxAxisNames', 'faceAxisName', 'lowerHeight', 'leftWidth', 'panelAxisNames', 'showGrid', 'axisGapEnabled', 'axisGap'];
+  const emptyDocument = () => ({ ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], links: [], quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', lowerHeight: DEFAULT_LOWER_HEIGHT, leftWidth: DEFAULT_LEFT_WIDTH, panelAxisNames: defaultPanelAxisNames(), axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP, showGrid: true });
   let diagrams = [{ id: 'diagram-1', name: '그래프 1', flipX: false, flipY: false, ...emptyDocument() }];
   let activeDiagramId = 'diagram-1';
   const zooms = new Map(); // diagram id → view zoom; kept out of documentState on purpose
@@ -118,11 +129,12 @@ export function createStore() {
     emit();
     restoring = false;
   };
-  const add = (collection, object) => {
+  const add = (collection, object, snaps = null) => {
     object.parentId = null;
     object.collapsed = false;
     state[collection].push(object);
     state.objectOrder.push(object.id);
+    if (snaps) state.links = [...state.links, ...linksFor(object.id, snaps)];
     // Every creation ends in the selection tool with the new object selected,
     // so it can be moved or edited at once. Tools never stay armed after one result.
     enterToolMode('hand');
@@ -185,7 +197,7 @@ export function createStore() {
     clearAll() {
       endHistory();
       if (!state.objectOrder.length) return false;
-      for (const key of [...OBJECT_COLLECTIONS, 'objectOrder']) state[key] = [];
+      for (const key of [...OBJECT_COLLECTIONS, 'objectOrder', 'links']) state[key] = [];
       setSelection([]);
       historyRevision++;
       emit();
@@ -237,7 +249,7 @@ export function createStore() {
      * Without points: the default line of earlier versions. With two points: the line
      * tool's result, anchored at the first point, as a line, ray or segment.
      */
-    addLine(from, to, { kind = state.lineKind, style = state.lineStyle } = {}) {
+    addLine(from, to, { kind = state.lineKind, style = state.lineStyle, snaps = null } = {}) {
       if (from !== undefined || to !== undefined) {
         if (!validPoint(from) || !validPoint(to)) return null;
         const geometry = lineFromPoints(from, to, LINE_KINDS.includes(kind) ? kind : 'line');
@@ -247,7 +259,7 @@ export function createStore() {
           anchor: geometry.anchor, slope: geometry.slope, color: lineColor(index, style) };
         if (geometry.extent) line.extent = geometry.extent;
         if (style === 'dashed') line.style = 'dashed';
-        return add('lines', line);
+        return add('lines', line, snaps);
       }
       const index = nextId - 1;
       const box = state.quadrantMode === 'edgeworth' ? state.boxSize : null;
@@ -280,7 +292,7 @@ export function createStore() {
       if (family==='quasilinear') curve.shape=Math.max(0.2,Math.min(20,ownX*0.7));
       return add('curves',curve);
     },
-    addSketch(start, end, anchor, { lineId=null, tangent=null, mode=state.sketchMode } = {}) {
+    addSketch(start, end, anchor, { lineId=null, tangent=null, mode=state.sketchMode, snaps=null } = {}) {
       if (![start,end,anchor].every(validPoint)) return null;
       const target=state.lines.find(line=>line.id===lineId);
       const projection=target ? projectOnLine(anchor,target) : null;
@@ -289,7 +301,7 @@ export function createStore() {
       if (!validSketch(curve)) return null;
       const index=nextSketchId++;
       return add('sketches',{...curve,id:`sketch-${index}`,type:'sketch',name:`자유 곡선 ${String(index).padStart(2,'0')}`,color:ROLE_COLORS.sketch,
-        binding:target ? {kind:'tangent',sourceId:target.id,parameter:projection.parameter,direction:directionOf(target.slope)}:null });
+        binding:target ? {kind:'tangent',sourceId:target.id,parameter:projection.parameter,direction:directionOf(target.slope)}:null }, snaps);
     },
     attachSelectedToLine(lineId) {
       const curve=state.sketches.find(curve=>curve.id===state.selectedId), line=state.lines.find(line=>line.id===lineId);
@@ -323,14 +335,14 @@ export function createStore() {
       return add('sums', { id: `sum-${index}`, type: 'sum', name: `${direction === 'vertical' ? '수직합' : '수평합'} ${String(index).padStart(2, '0')}`,
         direction, nonnegative: Boolean(nonnegative), sourceIds: [...sourceIds], color: sumColor(index - 1) });
     },
-    addPoint(anchor) {
+    addPoint(anchor, { snap = null } = {}) {
       if (!Number.isFinite(anchor?.x) || !Number.isFinite(anchor?.y)) return null;
       const index = nextPointId++;
       return add('points', {
         id: `point-${index}`, type: 'point', name: `점 ${String(index).padStart(2, '0')}`,
         color: ROLE_COLORS.point, anchor: { x: anchor.x === 0 ? 0 : anchor.x, y: anchor.y === 0 ? 0 : anchor.y },
         showCoordinates: state.pointCoordinates,
-      });
+      }, snap ? { anchor: snap } : null);
     },
     addRuler(anchor, end) {
       if (!validPoint(anchor) || !validPoint(end)) return null;
@@ -342,7 +354,70 @@ export function createStore() {
     },
     addGroup() {
       const index = nextGroupId++;
-      return add('groups', { id: `group-${index}`, type: 'group', name: `폴더 ${String(index).padStart(2, '0')}`, color: ROLE_COLORS.group });
+      return add('groups', { id: `group-${index}`, type: 'group', name: `묶음 ${String(index).padStart(2, '0')}`, color: ROLE_COLORS.group });
+    },
+    /**
+     * Bundle the selected shapes into one set: on the canvas a click then selects, drags,
+     * copies and deletes them together. The set takes the place of its first member.
+     */
+    groupSelected() {
+      const byId = new Map(objectsOf(state).map(object => [object.id, object])), selected = new Set(state.selectedIds);
+      const insideSelected = object => { for (let p = object.parentId, seen = new Set(); p != null && !seen.has(p); p = byId.get(p)?.parentId) { seen.add(p); if (selected.has(p)) return true; } return false; };
+      const members = state.selectedIds.map(id => byId.get(id)).filter(object => object && !insideSelected(object));
+      if (members.length < 2) return null;
+      endHistory();
+      const parents = new Set(members.map(object => object.parentId ?? null)), index = nextGroupId++;
+      const group = { id: `group-${index}`, type: 'group', name: `묶음 ${String(index).padStart(2, '0')}`, color: ROLE_COLORS.group,
+        parentId: parents.size === 1 ? [...parents][0] : null, collapsed: true };
+      state.groups.push(group);
+      state.objectOrder.splice(Math.min(...members.map(object => state.objectOrder.indexOf(object.id))), 0, group.id);
+      for (const object of members) object.parentId = group.id;
+      enterToolMode('hand');
+      setSelection([group.id]);
+      historyRevision++;
+      emit();
+      return group.id;
+    },
+    /**
+     * After a gesture re-placed parts of a shape: forget its old alignments for those roles and
+     * record the magnet alignments it ended on ({ role: candidate }). `moving` holds shapes that
+     * moved with it, whose mutual links stay. Part of the gesture's history step.
+     */
+    recordSnaps(subjectId, { roles = LINK_ROLES, snaps = {}, moving = null } = {}) {
+      if (!objectsOf(state).some(object => object.id === subjectId)) return false;
+      const next = replaceLinks(state.links, subjectId, roles, linksFor(subjectId, snaps), moving);
+      if (JSON.stringify(next) === JSON.stringify(state.links)) return false;
+      state.links = next;
+      emit();
+      return true;
+    },
+    /**
+     * Paint the selection one color: a single shape, every shape in a selected set, or a
+     * multi-selection. To recolor one member of a set, select it inside the set first.
+     */
+    colorSelected(color) {
+      if (typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) return false;
+      const targets = colorTargets(state).filter(object => object.color !== color.toLowerCase());
+      if (!targets.length) return false;
+      for (const object of targets) object.color = color.toLowerCase();
+      emit();
+      return true;
+    },
+    /** Dissolve the selected sets; their members stay where they are and become the selection. */
+    ungroupSelected() {
+      const groups = state.groups.filter(group => state.selectedIds.includes(group.id));
+      if (!groups.length) return false;
+      endHistory();
+      const removed = new Set(groups.map(group => group.id)), byId = new Map(objectsOf(state).map(object => [object.id, object]));
+      const surviving = id => { while (removed.has(id)) id = byId.get(id)?.parentId ?? null; return id; };
+      const freed = objectsOf(state).filter(object => removed.has(object.parentId) && !removed.has(object.id)).map(object => object.id);
+      for (const object of byId.values()) object.parentId = surviving(object.parentId ?? null);
+      state.groups = state.groups.filter(group => !removed.has(group.id));
+      state.objectOrder = state.objectOrder.filter(id => !removed.has(id));
+      setSelection(freed);
+      historyRevision++;
+      emit();
+      return true;
     },
     addFill(region) {
       if (!validFill(region)) return null;
@@ -411,6 +486,12 @@ export function createStore() {
         object.id = object.type === 'line' ? `line-${nextId++}` : object.type === 'curve' ? `curve-${nextCurveId++}` : object.type === 'sketch' ? `sketch-${nextSketchId++}` : object.type === 'point' ? `point-${nextPointId++}` : `group-${nextGroupId++}`;
         ids.set(previous, object.id);
       }
+      // A relation inside the copied set (a free curve on a copied line) is copied with it.
+      const originalOf = new Map(originals.map(object => [ids.get(object.id), object]));
+      for (const object of copies) {
+        const binding = originalOf.get(object.id)?.binding;
+        if (binding && ids.has(binding.sourceId) && 'binding' in object) object.binding = { ...structuredClone(binding), sourceId: ids.get(binding.sourceId) };
+      }
       for (const object of copies) {
         object.parentId = ids.get(object.parentId) ?? object.parentId;
         state[OBJECT_TYPES[object.type].collection].push(object); state.objectOrder.push(object.id);
@@ -444,6 +525,8 @@ export function createStore() {
     removeSelected() {
       const selected=new Set(state.selectedIds),removed=objectsOf(state).filter(object=>selected.has(object.id));
       if (!removed.length) return false;
+      // Deleting a set deletes what is in it; "묶기 해제" keeps the members instead.
+      for (const group of removed.filter(object=>object.type==='group')) for (const member of descendantsOf(state,group.id)) selected.add(member.id);
       endHistory();
       const deleted = new Set([...selected, ...state.sums.filter(sum => sum.sourceIds.some(id=>selected.has(id))).map(sum => sum.id)]);
       // Freeze the current geometry when its relation source is deleted.
@@ -457,6 +540,7 @@ export function createStore() {
       for (const object of byId.values()) object.parentId = survivingParent(object.parentId);
       for (const collection of OBJECT_COLLECTIONS) state[collection] = state[collection].filter((item) => !deleted.has(item.id));
       state.objectOrder = state.objectOrder.filter((id) => !deleted.has(id));
+      state.links = withoutShapes(state.links, deleted);
       const next=removed.length===1?(survivingParent(removed[0].parentId) ?? state.objectOrder.at(-1) ?? null):null;
       setSelection(next?[next]:[]);
       historyRevision++;
