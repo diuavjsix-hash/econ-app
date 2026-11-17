@@ -3,7 +3,7 @@ import { curveFamilyOf, orientCurve, isOppositeCurve } from './curve-families.js
 import { directionOf, normalizeSlope, interceptOf } from '../graph/math.js';
 import { CURVE_PRESETS, MAX_BEND, curveControlPoints, curveTangentRays } from '../graph/curve.js';
 import { displayedLineSegments, displayedCurveSegments } from '../graph/display.js';
-import { sketchControls, displayedSketchSegments, validSketch, unitVector, translatedSketch, projectOnLine } from '../graph/sketch.js';
+import { sketchControls, displayedSketchSegments, validSketch, unitVector, translatedSketch, projectOnLine, normalizedThrough } from '../graph/sketch.js';
 import { displayedSumSegments } from '../graph/sum.js';
 import { clipSegment, validPoint, rulerMetrics } from '../graph/ruler.js';
 import { validFill, fillTouchesRectangle } from '../graph/fill.js';
@@ -134,12 +134,25 @@ export class SketchObject extends StrokeObject {
     for (const key of ['start', 'end']) if (validPoint(patch[key])) next[key] = { ...patch[key] };
     if (validPoint(patch.tangent) && !object.binding) next.tangent = unitVector(patch.tangent);
     for (const key of ['leftReach', 'rightReach']) if (Number.isFinite(patch[key])) next[key] = Math.max(0.05, Math.min(2, patch[key]));
+    // Through points: the whole list in curve order (a handle edit, an added or removed point).
+    if (Array.isArray(patch.through) && !patch.translate) {
+      next.through = normalizedThrough(patch.through);
+      if (!next.through.length) delete next.through;
+    }
     if (typeof patch.showMinimum === 'boolean') next.showMinimum = patch.showMinimum;
     if (next.binding && validPoint(patch.anchor)) {
       const line = state.lines.find(line => line.id === next.binding.sourceId), projection = projectOnLine(next.anchor, line);
       next.anchor = projection.point; next.binding.parameter = projection.parameter; next.binding.direction = directionOf(line.slope);
     }
-    if (validSketch(next)) Object.assign(object, next);
+    if (!validSketch(next)) return;
+    if (!next.through) delete object.through;
+    Object.assign(object, next);
+  }
+  translate(offset) {
+    const copy = super.translate(offset);
+    if (!copy || !copy.through?.length) return copy;
+    copy.through = translatedSketch(this.data, offset).through;
+    return copy.through.every(point => validPoint(point.point)) ? copy : null;
   }
   serialize() {
     // A following relation is exported in the diagram's links list, not on the shape.

@@ -1,6 +1,7 @@
 import { buildSnapTargets, guidedSnapCandidates } from './snap.js';
 import { curveTangentsAt } from './curve-contacts.js';
 import { lineEndPoints } from './line-extent.js';
+import { sketchRolePoint } from './sketch.js';
 import { directionOf } from './math.js';
 import { sumValue } from './sum.js';
 import { PANEL_SHEETS, panelSheet, lowerHeightOf, leftWidthOf } from './viewport.js';
@@ -159,7 +160,7 @@ const nearestTo = (items, at) => at ? items.sort((p, q) => distance(p, at) - dis
 /** The point of the subject a link aligned, when that part is a point (a placed point, a drawn end). */
 function subjectPoint(subject, role) {
   if (subject.type === 'point') return subject.anchor;
-  if (subject.type === 'sketch') return role === 'start' ? subject.start : role === 'end' ? subject.end : role === 'anchor' ? subject.anchor : null;
+  if (subject.type === 'sketch') return sketchRolePoint(subject, role);
   if (subject.type === 'line' && (role === 'start' || role === 'end')) return lineEndPoints(subject)[role === 'end' ? 1 : 0];
   return null;
 }

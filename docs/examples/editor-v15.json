@@ -1,0 +1,884 @@
+{
+  "schemaVersion": 15,
+  "legend": {
+    "coordinates": "All coordinates are mathematical graph coordinates, never screen pixels. Numbers are rounded to 6 decimals.",
+    "relations": "Position relations measured from the current drawing, with a tolerance that scales with the size of the drawing. at = the position; points = point objects at it; on = objects and axes passing through it; tangent = pairs of objects with the same direction there (touching); slopes = curve slopes there (null = vertical); features = start/end of a line or curve, kink, minimum.",
+    "axes": "axis-x and axis-y are the x and y axes; axis-b-x and axis-b-y are the axes of Edgeworth box owner B; axis-<graph>-x and axis-<graph>-y (graph = lower, middle, right or lower-right) are the axes of the other graphs on a panel sheet, listed in coordinateSystem.panels.",
+    "lines": "A line passes through anchor with slope (null = vertical; then xIntercept is its x). Direction is the unit vector (1, slope)/sqrt(1 + slope^2), or (0, 1) when vertical. extent [from, to] gives distances along that direction from anchor; null means that end is open (a ray or a full line). segment lists the drawn end points. implicit is a*x + b*y + c = 0. style is solid or dashed.",
+    "curves": "type curve with variant ascending/descending is a free-hand quadratic Bezier with tangent-ray extensions. With family it is a parametric curve (ppc, cobb-douglas, rectangular-hyperbola, substitutes, complements, quasilinear) passing through anchor, with shape as its parameter. orientation opposite: the curve is drawn from oppositeOrigin with both axes reversed (global point = oppositeOrigin - local point), and geometry describes it in that reversed frame.",
+    "sketches": "A sketch is a free curve from start to end through anchor, with tangent the direction at anchor. through (optional) lists more points the curve passes, in order from start to end: side start = between start and anchor, side end = between anchor and end; each has an id, point, tangent and reaches. leftReach and rightReach scale the tangent controls on each side by the distance to the neighbouring point. geometry.controlPoints are its quadratic Bezier pieces in order. showMinimum only shows its lowest point.",
+    "sums": "A sum is computed, not stored as a shape. direction vertical adds the y values of sourceIds at each x; horizontal adds their x values at each y. nonnegative: inputs start at 0 and each contribution is max(0, value).",
+    "links": "links are the relations the user made, so they state intent the coordinates cannot. ids[0] is the subject (the shape the link belongs to); the other ids are what it was aligned to: shapes, axes such as axis-x, or placed points. role is the part of the subject: anchor (a point, or the middle point of a sketch), start, end, through:<id> (that through point of a sketch), or shape (the whole stroke). type: point = at or through that placed point; on = on that stroke; intersection = at the crossing of the targets; intercept = where a target crosses an axis; tangent = touching with the same direction (two targets: at their contact; one target: the subject touches it); endpoint, kink, minimum = at that feature of the target. follow true is a live dependency: the subject moves with its target (a sketch kept tangent to a line at distance parameter along it; a line kept through a point). follow false was recorded when a magnet aligned it; the shapes stay free to move. status holds = still true in this drawing; broken = aligned once, but the drawing has changed since (at is then where it was made). at is the position of the relation.",
+    "groups": "A group is a set the user bundled: shapes whose parentId is the group id (directly or through nested groups) were drawn to belong together, e.g. two rays forming one kinked curve, and move as one. parentId under a non-group object is only list nesting.",
+    "fills": "A fill paints the area enclosed by rings (even-odd rule, so an inner ring is a hole); label is its letter on the drawing.",
+    "display": "color, opacity, label, style, showGrid, showCoordinates, showMinimum and lineAxisGap (lines kept off the axes by that distance) only change how the drawing looks. objectOrder is the order the objects were created."
+  },
+  "activeDiagramId": "diagram-1",
+  "diagrams": [
+    {
+      "id": "diagram-1",
+      "name": "예시 그림",
+      "coordinateSystem": {
+        "origin": "bottom-left",
+        "quadrants": [
+          1
+        ],
+        "xPositive": "right",
+        "yPositive": "up",
+        "axesVisible": true,
+        "axisNames": {
+          "x": "x",
+          "y": "y"
+        },
+        "lineAxisGap": {
+          "enabled": false,
+          "distance": 0.75
+        }
+      },
+      "showGrid": true,
+      "objectOrder": [
+        "line-1",
+        "fill-1",
+        "curve-1",
+        "sum-1",
+        "sketch-1",
+        "group-1",
+        "sketch-2",
+        "sketch-3",
+        "point-1",
+        "line-2",
+        "line-3",
+        "curve-2",
+        "curve-3",
+        "curve-4",
+        "curve-5",
+        "curve-6",
+        "line-4",
+        "line-5",
+        "line-6"
+      ],
+      "lines": [
+        {
+          "id": "line-1",
+          "type": "line",
+          "name": "예산선",
+          "color": "#2a5db0",
+          "parentId": null,
+          "slope": -1,
+          "intercept": 8,
+          "anchor": {
+            "x": 0,
+            "y": 8
+          },
+          "style": "solid",
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": 0.707107,
+            "b": 0.707107,
+            "c": -5.656854
+          }
+        },
+        {
+          "id": "line-2",
+          "type": "line",
+          "name": "통과 직선 2",
+          "color": "#c43d32",
+          "parentId": "point-1",
+          "slope": 1,
+          "intercept": -2,
+          "anchor": {
+            "x": 5,
+            "y": 3
+          },
+          "style": "solid",
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": -0.707107,
+            "b": 0.707107,
+            "c": 1.414214
+          }
+        },
+        {
+          "id": "line-3",
+          "type": "line",
+          "name": "독립 점선",
+          "color": "#77776f",
+          "parentId": null,
+          "slope": null,
+          "intercept": null,
+          "anchor": {
+            "x": 4,
+            "y": 0
+          },
+          "style": "dashed",
+          "extent": [
+            0,
+            2
+          ],
+          "segment": {
+            "start": {
+              "x": 4,
+              "y": 0
+            },
+            "end": {
+              "x": 4,
+              "y": 2
+            }
+          },
+          "vertical": true,
+          "xIntercept": 4,
+          "implicit": {
+            "a": -1,
+            "b": 0,
+            "c": 4
+          }
+        },
+        {
+          "id": "line-4",
+          "type": "line",
+          "name": "꺾인 선 (왼쪽)",
+          "color": "#b06f12",
+          "parentId": null,
+          "slope": -2,
+          "intercept": 8,
+          "anchor": {
+            "x": 2,
+            "y": 4
+          },
+          "style": "solid",
+          "extent": [
+            null,
+            0
+          ],
+          "segment": {
+            "start": null,
+            "end": {
+              "x": 2,
+              "y": 4
+            }
+          },
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": 0.894427,
+            "b": 0.447214,
+            "c": -3.577709
+          }
+        },
+        {
+          "id": "line-5",
+          "type": "line",
+          "name": "꺾인 선 (오른쪽)",
+          "color": "#7445a8",
+          "parentId": null,
+          "slope": -0.5,
+          "intercept": 5,
+          "anchor": {
+            "x": 2,
+            "y": 4
+          },
+          "style": "solid",
+          "extent": [
+            0,
+            null
+          ],
+          "segment": {
+            "start": {
+              "x": 2,
+              "y": 4
+            },
+            "end": null
+          },
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": 0.447214,
+            "b": 0.894427,
+            "c": -4.472136
+          }
+        },
+        {
+          "id": "line-6",
+          "type": "line",
+          "name": "점선 반직선",
+          "color": "#77776f",
+          "parentId": null,
+          "slope": 0,
+          "intercept": 4,
+          "anchor": {
+            "x": 2,
+            "y": 4
+          },
+          "style": "dashed",
+          "extent": [
+            0,
+            null
+          ],
+          "segment": {
+            "start": {
+              "x": 2,
+              "y": 4
+            },
+            "end": null
+          },
+          "vertical": false,
+          "xIntercept": null,
+          "implicit": {
+            "a": 0,
+            "b": 1,
+            "c": -4
+          }
+        }
+      ],
+      "curves": [
+        {
+          "id": "curve-1",
+          "type": "curve",
+          "name": "기본 곡선",
+          "color": "#2a5db0",
+          "variant": "descending",
+          "parentId": null,
+          "anchor": {
+            "x": 4,
+            "y": 4
+          },
+          "span": 3,
+          "slope": -0.75,
+          "bend": 0.25,
+          "geometry": {
+            "type": "quadratic-bezier",
+            "controlPoints": [
+              {
+                "x": 1,
+                "y": 7
+              },
+              {
+                "x": 4,
+                "y": 3.25
+              },
+              {
+                "x": 7,
+                "y": 2.5
+              }
+            ],
+            "extensions": {
+              "type": "tangent-rays",
+              "rays": [
+                {
+                  "anchor": {
+                    "x": 1,
+                    "y": 7
+                  },
+                  "direction": {
+                    "x": -1,
+                    "y": 1.25
+                  }
+                },
+                {
+                  "anchor": {
+                    "x": 7,
+                    "y": 2.5
+                  },
+                  "direction": {
+                    "x": 1,
+                    "y": -0.25
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "curve-2",
+          "type": "curve",
+          "name": "콥더글라스 02",
+          "color": "#7445a8",
+          "parentId": null,
+          "family": "cobb-douglas",
+          "anchor": {
+            "x": 3,
+            "y": 3
+          },
+          "shape": 1,
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "scales about the origin"
+          }
+        },
+        {
+          "id": "curve-3",
+          "type": "curve",
+          "name": "완전대체재 03",
+          "color": "#2b7a4b",
+          "parentId": null,
+          "family": "substitutes",
+          "anchor": {
+            "x": 3,
+            "y": 3
+          },
+          "shape": 1,
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "keeps its slope; translates"
+          }
+        },
+        {
+          "id": "curve-4",
+          "type": "curve",
+          "name": "완전보완재 04",
+          "color": "#b06f12",
+          "parentId": null,
+          "family": "complements",
+          "anchor": {
+            "x": 3,
+            "y": 3
+          },
+          "shape": 1,
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "kink moves along a ray from the origin"
+          }
+        },
+        {
+          "id": "curve-5",
+          "type": "curve",
+          "name": "준선형효용 05",
+          "color": "#17808a",
+          "parentId": null,
+          "family": "quasilinear",
+          "anchor": {
+            "x": 3,
+            "y": 3
+          },
+          "shape": 2.1,
+          "linearAxis": "y",
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "translates along the y axis"
+          }
+        },
+        {
+          "id": "curve-6",
+          "type": "curve",
+          "name": "직각 쌍곡선 06",
+          "color": "#17808a",
+          "parentId": null,
+          "family": "rectangular-hyperbola",
+          "anchor": {
+            "x": 3,
+            "y": 4
+          },
+          "shape": 1,
+          "geometry": {
+            "type": "indifference",
+            "domain": "nonnegative",
+            "movement": "keeps the axes as asymptotes; resizes"
+          }
+        }
+      ],
+      "sketches": [
+        {
+          "start": {
+            "x": 1,
+            "y": 8
+          },
+          "end": {
+            "x": 8,
+            "y": 2
+          },
+          "anchor": {
+            "x": 4,
+            "y": 4
+          },
+          "tangent": {
+            "x": 0.707107,
+            "y": -0.707107
+          },
+          "leftReach": 0.5,
+          "rightReach": 0.5,
+          "id": "sketch-1",
+          "type": "sketch",
+          "name": "직선에 접한 자유 곡선",
+          "color": "#17808a",
+          "parentId": null,
+          "geometry": {
+            "type": "piecewise-quadratic-bezier",
+            "controlPoints": [
+              [
+                {
+                  "x": 1,
+                  "y": 8
+                },
+                {
+                  "x": 2.232233,
+                  "y": 5.767767
+                },
+                {
+                  "x": 4,
+                  "y": 4
+                }
+              ],
+              [
+                {
+                  "x": 4,
+                  "y": 4
+                },
+                {
+                  "x": 5.581139,
+                  "y": 2.418861
+                },
+                {
+                  "x": 8,
+                  "y": 2
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "start": {
+            "x": 1,
+            "y": 6
+          },
+          "end": {
+            "x": 7,
+            "y": 6
+          },
+          "anchor": {
+            "x": 4,
+            "y": 2
+          },
+          "tangent": {
+            "x": 1,
+            "y": 0
+          },
+          "leftReach": 0.5,
+          "rightReach": 0.5,
+          "id": "sketch-2",
+          "type": "sketch",
+          "name": "U자 곡선",
+          "color": "#17808a",
+          "parentId": "group-1",
+          "showMinimum": true,
+          "geometry": {
+            "type": "piecewise-quadratic-bezier",
+            "controlPoints": [
+              [
+                {
+                  "x": 1,
+                  "y": 6
+                },
+                {
+                  "x": 1.5,
+                  "y": 2
+                },
+                {
+                  "x": 4,
+                  "y": 2
+                }
+              ],
+              [
+                {
+                  "x": 4,
+                  "y": 2
+                },
+                {
+                  "x": 6.5,
+                  "y": 2
+                },
+                {
+                  "x": 7,
+                  "y": 6
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "start": {
+            "x": 1,
+            "y": 4
+          },
+          "end": {
+            "x": 7,
+            "y": 8
+          },
+          "anchor": {
+            "x": 2.5,
+            "y": 1.5
+          },
+          "tangent": {
+            "x": 1,
+            "y": 0
+          },
+          "leftReach": 0.5,
+          "rightReach": 0.280022,
+          "id": "sketch-3",
+          "type": "sketch",
+          "name": "지나는 점이 있는 곡선",
+          "color": "#17808a",
+          "parentId": null,
+          "through": [
+            {
+              "id": "p1",
+              "side": "end",
+              "point": {
+                "x": 4,
+                "y": 2
+              },
+              "tangent": {
+                "x": 0.415239,
+                "y": 0.909712
+              },
+              "leftReach": 0.313966,
+              "rightReach": 0.410406
+            }
+          ],
+          "geometry": {
+            "type": "piecewise-quadratic-bezier",
+            "controlPoints": [
+              [
+                {
+                  "x": 1,
+                  "y": 4
+                },
+                {
+                  "x": 1.042262,
+                  "y": 1.5
+                },
+                {
+                  "x": 2.5,
+                  "y": 1.5
+                }
+              ],
+              [
+                {
+                  "x": 2.5,
+                  "y": 1.5
+                },
+                {
+                  "x": 2.942753,
+                  "y": 1.5
+                },
+                {
+                  "x": 3.368309,
+                  "y": 1.524199
+                }
+              ],
+              [
+                {
+                  "x": 3.368309,
+                  "y": 1.524199
+                },
+                {
+                  "x": 3.793866,
+                  "y": 1.548397
+                },
+                {
+                  "x": 4,
+                  "y": 2
+                }
+              ],
+              [
+                {
+                  "x": 4,
+                  "y": 2
+                },
+                {
+                  "x": 5.14319,
+                  "y": 4.50452
+                },
+                {
+                  "x": 7,
+                  "y": 8
+                }
+              ]
+            ]
+          }
+        }
+      ],
+      "sums": [
+        {
+          "id": "sum-1",
+          "type": "sum",
+          "name": "수평합 01",
+          "color": "#b06f12",
+          "parentId": null,
+          "direction": "horizontal",
+          "nonnegative": true,
+          "sourceIds": [
+            "line-1",
+            "curve-1"
+          ]
+        }
+      ],
+      "points": [
+        {
+          "id": "point-1",
+          "type": "point",
+          "name": "점 01",
+          "color": "#3f3f3b",
+          "parentId": "group-1",
+          "anchor": {
+            "x": 5,
+            "y": 3
+          },
+          "showCoordinates": false
+        }
+      ],
+      "fills": [
+        {
+          "id": "fill-1",
+          "type": "fill",
+          "name": "칠한 구역",
+          "label": "A",
+          "color": "#2a5db0",
+          "opacity": 0.24,
+          "parentId": null,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "rings": [
+            [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 8,
+                "y": 0
+              },
+              {
+                "x": 0,
+                "y": 8
+              }
+            ]
+          ]
+        }
+      ],
+      "groups": [
+        {
+          "id": "group-1",
+          "type": "group",
+          "name": "자유 도식",
+          "parentId": null
+        }
+      ],
+      "rulers": [],
+      "links": [
+        {
+          "id": "follow-line-2",
+          "type": "point",
+          "role": "shape",
+          "ids": [
+            "line-2",
+            "point-1"
+          ],
+          "follow": true,
+          "at": {
+            "x": 5,
+            "y": 3
+          },
+          "status": "holds"
+        },
+        {
+          "id": "follow-sketch-1",
+          "type": "tangent",
+          "role": "anchor",
+          "ids": [
+            "sketch-1",
+            "line-1"
+          ],
+          "follow": true,
+          "parameter": 5.656854,
+          "at": {
+            "x": 4,
+            "y": 4
+          },
+          "status": "holds"
+        },
+        {
+          "id": "link-1",
+          "type": "minimum",
+          "role": "through:p1",
+          "ids": [
+            "sketch-3",
+            "sketch-2"
+          ],
+          "follow": false,
+          "at": {
+            "x": 4,
+            "y": 2
+          },
+          "status": "holds"
+        }
+      ],
+      "relations": [
+        {
+          "at": {
+            "x": 5,
+            "y": 3
+          },
+          "points": [
+            "point-1"
+          ],
+          "on": [
+            "curve-4",
+            "line-1",
+            "line-2"
+          ]
+        },
+        {
+          "at": {
+            "x": 4,
+            "y": 0
+          },
+          "on": [
+            "line-3",
+            "axis-x"
+          ],
+          "features": [
+            {
+              "object": "line-3",
+              "kind": "start"
+            }
+          ]
+        },
+        {
+          "at": {
+            "x": 4,
+            "y": 2
+          },
+          "on": [
+            "sketch-2",
+            "line-3",
+            "line-2",
+            "curve-3",
+            "sketch-3"
+          ],
+          "slopes": {
+            "sketch-2": 0,
+            "curve-3": -1,
+            "sketch-3": 2.190816
+          },
+          "features": [
+            {
+              "object": "sketch-2",
+              "kind": "minimum"
+            },
+            {
+              "object": "line-3",
+              "kind": "end"
+            }
+          ]
+        },
+        {
+          "at": {
+            "x": 2,
+            "y": 4
+          },
+          "on": [
+            "curve-3",
+            "line-4",
+            "line-5",
+            "line-6"
+          ],
+          "slopes": {
+            "curve-3": -1
+          },
+          "features": [
+            {
+              "object": "line-4",
+              "kind": "end"
+            },
+            {
+              "object": "line-5",
+              "kind": "start"
+            },
+            {
+              "object": "line-6",
+              "kind": "start"
+            }
+          ]
+        },
+        {
+          "at": {
+            "x": 1,
+            "y": 6
+          },
+          "on": [
+            "sketch-2",
+            "line-4"
+          ],
+          "slopes": {
+            "sketch-2": -8
+          },
+          "features": [
+            {
+              "object": "sketch-2",
+              "kind": "start"
+            }
+          ]
+        },
+        {
+          "at": {
+            "x": 3,
+            "y": 3
+          },
+          "on": [
+            "curve-4",
+            "curve-2",
+            "curve-3",
+            "curve-5"
+          ],
+          "tangent": [
+            [
+              "curve-2",
+              "curve-3"
+            ]
+          ],
+          "slopes": {
+            "curve-2": -1,
+            "curve-3": -1,
+            "curve-5": -0.7
+          },
+          "features": [
+            {
+              "object": "curve-4",
+              "kind": "kink"
+            }
+          ]
+        },
+        {
+          "at": {
+            "x": 4,
+            "y": 4
+          },
+          "on": [
+            "sketch-1",
+            "line-1",
+            "line-6",
+            "curve-1"
+          ],
+          "tangent": [
+            [
+              "sketch-1",
+              "line-1"
+            ]
+          ],
+          "slopes": {
+            "sketch-1": -1,
+            "curve-1": -0.75
+          }
+        }
+      ]
+    }
+  ]
+}

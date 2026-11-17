@@ -21,6 +21,13 @@ const cup = store.addSketch({ x: 1, y: 6 }, { x: 7, y: 6 }, { x: 4, y: 2 }, { mo
 store.updateSelected({ name: 'U자 곡선' });
 store.moveObject(cup, group);
 store.markMinimum();
+// A curve that passes the U curve's minimum through an added point (schemaVersion 15).
+const rising = store.addSketch({ x: 1, y: 4 }, { x: 7, y: 8 }, { x: 2.5, y: 1.5 }, { mode: 'horizontal' });
+store.updateSelected({ name: '지나는 점이 있는 곡선' });
+store.insertSketchPoint({ x: 5, y: 4.5 });
+const added = store.getState().sketches.find(curve => curve.id === rising).through[0];
+store.updateSelected({ through: [{ ...added, point: { x: 4, y: 2 } }] });
+store.recordSnaps(rising, { roles: ['through:p1', 'shape'], snaps: { 'through:p1': { kind: 'minimum', ids: [cup], point: { x: 4, y: 2 } } } });
 const point = store.addPoint({ x: 5, y: 3 });
 store.moveObject(point, group);
 const through = store.lineThroughSelectedPoint({ slope: 1 });
@@ -37,7 +44,7 @@ store.updateSelected({ name: '꺾인 선 (오른쪽)', slope: -0.5, anchor: { x:
 store.addLine();
 store.updateSelected({ name: '점선 반직선', slope: 0, anchor: { x: 2, y: 4 }, extent: [0, null], style: 'dashed' });
 
-const output = new URL('../docs/examples/editor-v14.json', import.meta.url);
+const output = new URL('../docs/examples/editor-v15.json', import.meta.url);
 await mkdir(new URL('../docs/examples/', import.meta.url), { recursive: true });
 await writeFile(output, `${exportJson(store.getState())}\n`);
-console.log('Generated docs/examples/editor-v14.json');
+console.log('Generated docs/examples/editor-v15.json');

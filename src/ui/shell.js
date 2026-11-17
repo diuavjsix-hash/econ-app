@@ -166,6 +166,7 @@ const selectionInspector = () => `
           <details class="disclosure"><summary>휘어짐 조절</summary><div class="panel-stack">${rangeField({ id: 'sketch-left', label: '시작 쪽 휘어짐', min: 5, max: 200, step: 1, value: 50 })}
           ${rangeField({ id: 'sketch-right', label: '끝 쪽 휘어짐', min: 5, max: 200, step: 1, value: 50 })}</div></details>
           ${checkField({ id: 'sketch-minimum', label: '최저점 표시' })}
+          ${hint('곡선 더블클릭: 지나는 점 추가 · 점 더블클릭: 삭제')}
         </section><section id="fill-settings" class="panel-stack" aria-label="구역 설정" hidden>
           ${fillControls('edit')}${hint('선과 별도로 이동·삭제할 수 있습니다.')}
         </section><section id="point-settings" class="point-settings panel-stack" aria-label="점 설정" hidden>

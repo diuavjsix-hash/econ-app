@@ -133,7 +133,7 @@ test('creation, preference edits, repeated copies, history, graph isolation, del
     assert.deepEqual(store.getState().curves.find(c=>c.id===id),original);
     assert.equal(before.family,family);
   }
-  const doc=serializeActive(store.getState());assert.equal(doc.schemaVersion, 14);
+  const doc=serializeActive(store.getState());assert.equal(doc.schemaVersion, 15);
   assert.equal(doc.curves.length,3*Object.keys(INDIFFERENCE_FAMILIES).length);assert.deepEqual(doc.curves,doc.diagrams[0].curves);
   assert.ok(!JSON.stringify(doc).includes('quadratic-bezier'));
   for (const c of JSON.parse(JSON.stringify(doc)).curves) assert.ok(Number.isFinite(c.anchor.x) && Number.isFinite(c.anchor.y) && Number.isFinite(c.shape));

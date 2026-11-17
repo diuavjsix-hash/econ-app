@@ -10,9 +10,9 @@ import { QUADRANT_MODES, PANEL_NAMES, panelSheet, clampZoom, DEFAULT_LOWER_HEIGH
 import { CURVE_PRESETS } from './graph/curve.js';
 import { canReparent, objectsOf, descendantsOf, colorTargets } from './objects.js';
 import { sumError } from './graph/sum.js';
-import { validSketch, unitVector, projectOnLine } from './graph/sketch.js';
+import { validSketch, unitVector, projectOnLine, insertSketchPoint, removeSketchPoint } from './graph/sketch.js';
 import { resolveRelations, canAttach, dependencyId } from './relations.js';
-import { linkFor, replaceLinks, withoutShapes, LINK_ROLES } from './links.js';
+import { linkFor, replaceLinks, withoutShapes, withoutRole, LINK_ROLES } from './links.js';
 import { INDIFFERENCE_FAMILIES } from './graph/indifference.js';
 import { orientCurve, supportsOpposite } from './models/curve-families.js';
 import { followBoxOrigin, defaultOppositeOrigin } from './graph/axes.js';
@@ -31,7 +31,7 @@ export function createStore() {
     selectedIds: [],
     ...Object.fromEntries(OBJECT_COLLECTIONS.map(collection => [collection, []])), objectOrder: [], links: [],
     ...toolModeFlags('hand'), fillColor: INK.blue, fillAutoColor: true, fillOpacity: 0.24,
-    selectedId: null, indifferenceOpposite: false, sketchMode: 'auto', activeTool: 'point', rulerSelected: false, segmentSnap: true, lineKind: 'line', lineStyle: 'solid', pointSnap: true, pointCoordinates: false, showGrid: true,
+    selectedId: null, indifferenceOpposite: false, sketchMode: 'auto', sketchFocus: null, activeTool: 'point', rulerSelected: false, segmentSnap: true, lineKind: 'line', lineStyle: 'solid', pointSnap: true, pointCoordinates: false, showGrid: true,
     quadrantMode: 'first', axisNames: { x: 'x', y: 'y' }, boxSize: { width: 10, height: 8 }, boxAxisNames: { x: 'xᴮ', y: 'yᴮ' }, faceAxisName: 'x′', lowerHeight: DEFAULT_LOWER_HEIGHT, leftWidth: DEFAULT_LEFT_WIDTH, panelAxisNames: defaultPanelAxisNames(), axisGapEnabled: false, axisGap: DEFAULT_AXIS_GAP,
   };
   let nextId = 1, nextCurveId = 1, nextPointId = 1, nextGroupId = 1, nextRulerId = 1;
@@ -314,6 +314,41 @@ export function createStore() {
       const object=objectsOf(state).find(object=>object.id===state.selectedId);
       if (!object?.binding) return false;
       object.binding=null; emit(); return true;
+    },
+    /**
+     * Add a through point to the selected sketch where `at` is nearest on it; the curve keeps
+     * its shape. The new point gets the tangent and reach handles. One history step.
+     */
+    insertSketchPoint(at) {
+      const curve=state.sketches.find(curve=>curve.id===state.selectedId);
+      const result=curve && insertSketchPoint(curve,at);
+      if (!result) return null;
+      endHistory();
+      Object.assign(curve,result.curve);
+      state.sketchFocus={sketchId:curve.id,key:`through:${result.id}`};
+      historyRevision++;
+      emit();
+      return result.id;
+    },
+    /** Remove one through point of the selected sketch, with the links recorded for it. */
+    removeSketchPoint(id) {
+      const curve=state.sketches.find(curve=>curve.id===state.selectedId);
+      const next=curve && removeSketchPoint(curve,id);
+      if (!next) return false;
+      endHistory();
+      delete curve.through;
+      Object.assign(curve,next);
+      state.links=withoutRole(state.links,curve.id,`through:${id}`);
+      state.sketchFocus=null;
+      historyRevision++;
+      emit();
+      return true;
+    },
+    /** Which inner point of a sketch shows the tangent and reach handles (view state only). */
+    focusSketchPoint(sketchId,key) {
+      const next=key&&key!=='anchor'?{sketchId,key}:null;
+      if (JSON.stringify(next)===JSON.stringify(state.sketchFocus)) return;
+      state.sketchFocus=next; emit();
     },
     markMinimum() {
       const source=state.sketches.find(curve=>curve.id===state.selectedId);

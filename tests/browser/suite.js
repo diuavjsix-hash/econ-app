@@ -105,6 +105,20 @@ async function appSmoke(width, height) {
   check(shown.sketches.length===1&&shown.sketches[0].showMinimum&&shown.points.length===0&&doc.querySelectorAll('[data-minimum-for]').length===1,`${size}: minimum toggle stores display without generating point/line objects`);
   check(doc.getElementById('point-settings').hidden&&doc.getElementById('binding-settings').hidden,`${size}: minimum display exposes no point-following or binding actions`);
   minimum.click();check(!doc.querySelector('[data-minimum-for]'),`${size}: checkbox turns the display off`);
+  // Through points: a double press on the selected curve adds one, dragging it reshapes, a double press on it removes it.
+  const press=(node,p,type='pointerdown',flags={})=>{const r=svg.getBoundingClientRect(),v=createViewport(r.width,r.height,'edgeworth',{boxSize:{width:10,height:8}}),s=toScreen(p,v);node.dispatchEvent(new win.PointerEvent(type,{bubbles:true,cancelable:true,pointerId:95,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x,clientY:r.top+s.y,...flags}));};
+  const click=(selector,p)=>{press(doc.querySelector(selector),p);press(svg,p,'pointerup');};
+  click('.graph-sketch .line-hit',{x:2,y:3});click('.graph-sketch .line-hit',{x:2,y:3});
+  let curveJson=exported(doc).sketches[0];
+  check(curveJson.through?.length===1&&Math.hypot(curveJson.through[0].point.x-2,curveJson.through[0].point.y-3)<0.05&&doc.querySelector('[data-action="sketch-point:p1"]')&&doc.querySelector('[data-action="sketch-tangent:p1"]'),`${size}: a double press on the selected free curve adds a through point with its own handles`);
+  press(doc.querySelector('[data-action="sketch-point:p1"]'),curveJson.through[0].point);press(svg,{x:2.4,y:1},'pointermove',{altKey:true});press(svg,{x:2.4,y:1},'pointerup',{altKey:true});
+  curveJson=exported(doc).sketches[0];
+  check(Math.hypot(curveJson.through[0].point.x-2.4,curveJson.through[0].point.y-1)<0.05&&curveJson.geometry.controlPoints.some(piece=>Math.hypot(piece[2].x-curveJson.through[0].point.x,piece[2].y-curveJson.through[0].point.y)<1e-9),`${size}: dragging a through point makes the curve pass there`);
+  check(doc.querySelectorAll('#sketch-settings [data-sketch-shape]:disabled').length===4,`${size}: shape presets are off while the curve has through points`);
+  click('[data-action="sketch-point:p1"]',curveJson.through[0].point);click('[data-action="sketch-point:p1"]',curveJson.through[0].point);
+  check(!exported(doc).sketches[0].through&&!doc.querySelector('[data-action^="sketch-point:"]'),`${size}: a double press on a through point removes it`);
+  doc.getElementById('undo-action').click();check(exported(doc).sketches[0].through?.length===1,`${size}: removing a through point is one undo step`);
+  doc.getElementById('undo-action').click();doc.getElementById('undo-action').click();check(!exported(doc).sketches[0].through,`${size}: undo returns to the three-point curve`);
   // A cap touching the cup's bottom at (4,2): the real button starts the line on the shared tangent.
   // The inspector can resize the graph on narrow screens: map taps with the current box.
   const pointer=(p,flags={},type='pointerdown')=>{const r=svg.getBoundingClientRect(),v=createViewport(r.width,r.height,'edgeworth',{boxSize:{width:10,height:8}}),s=toScreen(p,v);svg.dispatchEvent(new win.PointerEvent(type,{bubbles:true,cancelable:true,pointerId:94,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x,clientY:r.top+s.y,...flags}));};

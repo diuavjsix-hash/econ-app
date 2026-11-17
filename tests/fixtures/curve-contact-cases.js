@@ -33,6 +33,19 @@ export const CURVE_CONTACT_CASES = [
     },
   },
   {
+    // Through points added on both sides keep the target's shape; the contact lies between two inner points.
+    name: 'free through points interior', axis: 'y', families: [],
+    setup() {
+      const store = createStore(), expected = { x: 4.37, y: 4.13 };
+      const target = parabola(store, 0.18, expected, -0.65);
+      store.selectObject(target);
+      const curve = store.getState().sketches.find(c => c.id === target);
+      for (const x of [2.6, 5.4]) store.insertSketchPoint({ x, y: curve.anchor.y });
+      const moving = parabola(store, -0.25, expected, -0.65, 0.08);
+      return { store, target, moving, expected };
+    },
+  },
+  {
     name: 'basic and free interior', axis: 'y', families: [],
     setup() {
       const store = createStore(); store.addCurve({ anchor: { x: 4, y: 4 }, span: 3, variant: 'descending' });

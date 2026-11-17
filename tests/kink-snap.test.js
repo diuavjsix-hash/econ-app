@@ -16,7 +16,7 @@ test('point placement captures the exact kink instead of sliding on an adjacent 
   assert.equal(result.kind,'kink');assert.deepEqual(result.point,curve.anchor);assert.deepEqual(result.ids,[curve.id]);
   assert.equal(snapFeedbackModel(result).label,'꺾임 맞춤');
   const store=createStore();store.addPoint(result.point);
-  const doc=serializeActive(store.getState());assert.deepEqual(doc.points[0].anchor,curve.anchor);assert.equal(doc.schemaVersion, 14);
+  const doc=serializeActive(store.getState());assert.deepEqual(doc.points[0].anchor,curve.anchor);assert.equal(doc.schemaVersion, 15);
 });
 
 test('an approaching kink takes over from a captured arm then holds to the shared release radius',()=>{

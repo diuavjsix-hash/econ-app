@@ -152,7 +152,7 @@ test('JSON version 9 exports point labels and mixed parent links in creation ord
   store.moveObject(curve, line);
   store.moveObject(point, line);
   const exported = JSON.parse(JSON.stringify(serializeActive(store.getState())));
-  assert.equal(exported.schemaVersion, 14);
+  assert.equal(exported.schemaVersion, 15);
   assert.deepEqual(exported.objectOrder, [line, curve, point, folder]);
   assert.equal(exported.lines[0].parentId, folder);
   assert.equal(exported.curves[0].parentId, line);

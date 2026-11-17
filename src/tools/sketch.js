@@ -1,5 +1,6 @@
 import { objectsOf } from '../objects.js';
-import { distance } from '../graph/sketch.js';
+import { distance, sketchKnotPatch } from '../graph/sketch.js';
+import { sketchFocusOf } from '../graph/sketch-view.js';
 
 export function mountSketchTool(root, store) {
   const button=root.querySelector('#sketch-tool'), options=root.querySelector('#sketch-options'), settings=root.querySelector('#sketch-settings');
@@ -7,7 +8,12 @@ export function mountSketchTool(root, store) {
   button.addEventListener('click',()=>store.toggleToolMode('sketch'));
   mode.addEventListener('change',()=>store.update({sketchMode:mode.value}));
   const reachControls={};
-  for (const [id,key] of [['sketch-left','leftReach'],['sketch-right','rightReach']]) reachControls[key]=new RangeControl(root,id).bind(value=>store.updateSelected({[key]:value/100}));
+  // The reach sliders edit the inner point whose handles show (the anchor, or a focused through point).
+  const selectedSketch=()=>{const state=store.getState();return state.sketches.find(curve=>curve.id===state.selectedId);};
+  for (const [id,key] of [['sketch-left','leftReach'],['sketch-right','rightReach']]) reachControls[key]=new RangeControl(root,id).bind(value=>{
+    const curve=selectedSketch(),patch=curve&&sketchKnotPatch(curve,sketchFocusOf(curve,store.getState()),{[key]:value/100});
+    if (patch) store.updateSelected(patch);
+  });
   root.querySelector('#sketch-minimum').addEventListener('change',event=>store.updateSelected({showMinimum:event.target.checked}));
   root.querySelector('#point-through-line').addEventListener('click',()=>{
     const state=store.getState(),point=state.points.find(point=>point.id===state.selectedId);
@@ -19,7 +25,7 @@ export function mountSketchTool(root, store) {
   root.querySelector('#detach-binding').addEventListener('click',()=>store.detachSelected());
   for (const button of root.querySelectorAll('[data-sketch-shape]')) button.addEventListener('click',()=>{
     const state=store.getState(), curve=state.sketches.find(curve=>curve.id===state.selectedId);
-    if (!curve || curve.binding) return;
+    if (!curve || curve.binding || curve.through?.length) return;
     const shape=button.dataset.sketchShape, a=curve.anchor;
     const width=Math.max(0.5,(distance(curve.start,a)+distance(curve.end,a))/2), height=width*0.6;
     const vertical=['left','right'].includes(shape), sign=['cup','left'].includes(shape)?1:-1;
@@ -39,8 +45,10 @@ export function mountSketchTool(root, store) {
     }
     if (!curve) return;
     root.querySelector('#sketch-minimum').checked=Boolean(curve.showMinimum);
-    reachControls.leftReach.setValue(Math.round(curve.leftReach*100)); reachControls.rightReach.setValue(Math.round(curve.rightReach*100));
-    for (const button of root.querySelectorAll('[data-sketch-shape]')) button.disabled=Boolean(curve.binding);
+    const focus=sketchFocusOf(curve,state),knot=focus==='anchor'?curve:curve.through.find(point=>`through:${point.id}`===focus);
+    reachControls.leftReach.setValue(Math.round(knot.leftReach*100)); reachControls.rightReach.setValue(Math.round(knot.rightReach*100));
+    // A preset reshapes start, anchor and end only; with through points it is off.
+    for (const button of root.querySelectorAll('[data-sketch-shape]')) button.disabled=Boolean(curve.binding||curve.through?.length);
   });
 }
 import { RangeControl } from '../ui/controls.js';

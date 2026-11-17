@@ -110,7 +110,7 @@ test('sketches copy independently, preserve hierarchy and export full internal g
   assert.equal(copy,'sketch-2');assert.equal(state.sketches[1].binding,null);
   for(const key of ['start','anchor','end']) near(state.sketches[1][key].x,state.sketches[0][key].x+1);
   const group=store.addGroup();store.moveObject(id,group);
-  const exportedState=store.getState(), doc=serializeActive(exportedState);assert.equal(doc.schemaVersion, 14);assert.deepEqual(doc.sketches,doc.diagrams[0].sketches);
+  const exportedState=store.getState(), doc=serializeActive(exportedState);assert.equal(doc.schemaVersion, 15);assert.deepEqual(doc.sketches,doc.diagrams[0].sketches);
   assert.equal(doc.sketches[0].parentId,group);assert.ok(!('binding' in doc.sketches[0]));
   assert.ok(doc.links.some(link=>link.follow&&link.type==='tangent'&&link.ids[0]===id&&link.ids[1]===source&&link.status==='holds'),'the following tangency is a link');
   assert.equal(doc.sketches[0].geometry.type,'piecewise-quadratic-bezier');assert.ok(!('collapsed' in doc.sketches[0]));

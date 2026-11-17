@@ -253,7 +253,7 @@ canvas는 빈 공간의 4px 이상 포인터 이동을 영역 선택으로 처�
 | `src/editor-ui.js` | 현재 작업별 편집 패널 문맥·그래프 설정 창 열기 |
 | `src/duplicate.js` | 원본을 바꾸지 않는 복제 준비, 기울기 배율·자동 옆 배치·숫자 검증 |
 | `src/graph/sum.js` | 수직합·수평합의 원본 평가·역함수·기여분 절단·분할·표시 근사 |
-| `src/graph/sketch.js`, `src/graph/sketch-view.js` | 세 점 자유 곡선의 내부 좌표 기하·최저점·표시·편집 손잡이 |
+| `src/graph/sketch.js`, `src/graph/sketch-view.js` | 자유 곡선(세 점 + 지나는 점)의 내부 좌표 기하·점 추가/삭제·최저점·표시·편집 손잡이 |
 | `src/tools/sketch.js`, `src/relations.js` | 세 점 생성 모드·곡선 설정·최저점 표시와 접점/일반 점 통과 직선 의존 관계 |
 | `src/tools/sum.js` | 같은 그래프의 합산 원본 체크·방향·음수 처리와 선택한 합 설정 |
 | `src/tools/hand.js` | 손 모드와 Esc 복귀; 도형을 생성하지 않음 |
@@ -458,9 +458,11 @@ Shift 입력은 movement.dragTranslation으로 드래그 시작점에서 변위�
 
 각 그래프의 `sketches`는 기존 단조 curve와 별개인 `type:'sketch'` 객체를 저장합니다. 데이터는 start·end·anchor(가운데 점)·단위 tangent·leftReach/rightReach(0.05~2)·binding·선택적 showMinimum과 공통 이름·색상·계층입니다. sketch-N ID를 단조 증가시키며 그래프 전환·숨김 배치·100단계 기록·JSON 10에 포함합니다. 두 이차 베지어 구간 [start, anchor−tangent×왼쪽거리×leftReach, anchor]와 [anchor, anchor+tangent×오른쪽거리×rightReach, end]가 세 점을 정확히 지나고 가운데에서 접선 방향을 공유합니다. 매개변수 미분 크기는 양쪽 휘어짐에 따라 다를 수 있습니다. 유한 구간만 그리며 임의의 x에 여러 y가 있을 수 있으므로 현재 합산 원본에는 포함하지 않습니다.
 
-`sketchSelected`는 손·점·점선·복제와 배타적인 생성 모드이고 `sketchMode`는 자동/수평/수직 접선 초기값입니다. canvas 로컬 sketchDraft에 시작점·끝점을 임시 보관하고 세 번째 클릭에서만 문서에 추가합니다. 직선 근처의 세 번째 클릭은 보이는 직선으로 투영해 tangent binding을 만듭니다. Alt는 자동 연결·스냅을 생략합니다. 완성은 한 단계 undo이며 Esc·도구/그래프·기록 전환은 draft를 취소합니다. 조절 손잡이는 선택한 자유 곡선에만 나타나고, 최저점 마커보다 나중에 그려 겹친 위치에서도 편집할 수 있습니다. 선 전체 이동·세 점·접선 방향·양쪽 reach의 드래그와 방향키를 지원합니다.
+`sketchSelected`는 손·점·점선·복제와 배타적인 생성 모드이고 `sketchMode`는 자동/수평/수직 접선 초기값입니다. canvas 로컬 sketchDraft에 시작점·끝점을 임시 보관하고 세 번째 클릭에서만 문서에 추가합니다. 직선 근처의 세 번째 클릭은 보이는 직선으로 투영하고 그 직선의 방향을 가운데 접선으로 씁니다. 2026-11-17부터 binding을 만들지 않고 `links`에 `tangent` 기록(follow:false)만 남깁니다(`addSketch`의 `lineId` 옵션과 binding 엔진은 기존 연결·검사용으로 유지). Alt는 자동 연결·스냅을 생략합니다. 완성은 한 단계 undo이며 Esc·도구/그래프·기록 전환은 draft를 취소합니다. 조절 손잡이는 선택한 자유 곡선에만 나타나고, 최저점 마커보다 나중에 그려 겹친 위치에서도 편집할 수 있습니다. 선 전체 이동·세 점·접선 방향·양쪽 reach의 드래그와 방향키를 지원합니다.
 
 binding은 `{kind:'tangent',sourceId:lineId,parameter}`(직선 기준점에서 정규화 방향을 따라 이동한 내부 좌표 거리), `{kind:'through-point',sourceId:pointId}` 두 종류입니다. 관계는 parentId와 별개이며 `resolveRelations`가 emit 전에 같은 그래프의 의존 관계를 먼저 계산합니다. canAttach는 순환을 거절합니다. 접점 연결은 직선의 이동·회전·정확한 수직 방향을 따라가고 시작점·끝점은 독립적으로 유지합니다. 곡선 전체 이동은 직선 방향으로 제한해 형태를 보존합니다. 일반 점의 통과 직선은 직접 이동 전에 연결을 해제하며 기울기는 자유롭게 수정합니다. 최저점은 showMinimum 표시 옵션이며 관계를 만들지 않습니다.
+
+**지나는 점(2026-11-16, schemaVersion 15):** 선택 필드 `through`는 곡선 순서의 안쪽 점 목록이며 각 점이 `side`(start/end)·단위 `tangent`·양쪽 reach를 가집니다. `sketchKnots`가 start·through(start 쪽)·anchor·through(end 쪽)·end를 한 줄로 세우고, `sketchPieces`가 끝점↔안쪽 점은 이차 조각 하나, 안쪽 점↔안쪽 점은 두 접선 조절점의 가운데에서 만나는 조각 두 개로 만듭니다. 세 점뿐이면 이전 두 조각과 비트 단위로 같습니다. `insertSketchPoint`는 가장 가까운 조각을 de Casteljau로 나누고 이웃 reach를 다시 정해 모양을 유지하며(끝 쪽 구간은 정확, 안쪽 점 사이는 먼 쪽 절반 근사), `removeSketchPoint`는 점만 뺍니다. 손잡이 동작은 `sketch-point:<id>`·`sketch-tangent:<id>`·`sketch-leftReach:<id>`·`sketch-rightReach:<id>`이고, 가운데 점은 기존 이름(`sketch-middle` 등)을 유지합니다. 접선·휘어짐 손잡이는 `state.sketchFocus`(문서·기록 밖)가 가리키는 안쪽 점 하나에만 그립니다. 더블 누름 판정은 canvas의 기존 450ms·6px 규칙을 쓰고 같은 동작(획 또는 같은 점)일 때만 추가·삭제합니다. 맞춤은 `sketchActionRole`·`sketchRolePoint`로 역할 `through:<id>`를 정해 `recordSnaps`에 넘기며, `links.js`의 역할 묶음 `through`가 전체 이동 때 모든 지나는 점 기록을 함께 바꿉니다. 접점 계산(`contactGeometry`)·자석 대상은 조각 수와 무관하게 `sketchControls`를 그대로 씁니다.
 
 `sketchMinimum`은 두 이차 구간의 끝점과 y 미분이 0인 내부 후보를 비교해 유한 곡선 전체의 최저점을 계산합니다. 화면의 가시 범위나 축 반전으로 최저점이 바뀌지 않으며 끝점이 최저일 수도 있습니다. 최소값이 여러 곳이면 가운데·시작·끝·구간 내부 후보의 순서로 선택합니다. 삭제·연결 해제는 마지막 기하를 유지하며, 복제본은 모든 binding을 끊고 start/anchor/end를 함께 오프셋해 독립적으로 만듭니다. undo/redo는 관계와 파생 좌표를 한꺼번에 복원합니다.
 

@@ -41,6 +41,7 @@ export class GraphObject {
       if (Boolean(a[key]) !== Boolean(b[key])) return false;
       if (a[key] && Math.hypot(a[key].x - b[key].x, a[key].y - b[key].y) > 1e-8) return false;
     }
+    if (JSON.stringify(a.through ?? []) !== JSON.stringify(b.through ?? [])) return false;
     return ['slope', 'span', 'bend', 'leftReach', 'rightReach', 'family', 'shape', 'linearAxis', 'orientation'].every(key => a[key] === b[key]);
   }
 }

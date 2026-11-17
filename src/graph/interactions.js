@@ -3,7 +3,7 @@ import { angleFromSlope, slopeFromAngle, directionOf } from './math.js';
 import { displayedLineSegments, lineEditingGeometry } from './display.js';
 import { bendFromPoint } from './curve.js';
 import { translateRuler } from './ruler.js';
-import { distance, unitVector, sketchHandlePoints, translatedSketch } from './sketch.js';
+import { distance, sketchHandlePoints, translatedSketch, sketchKnotPatch, reachFromPoint, sketchRolePoint } from './sketch.js';
 import { curveFamilyOf } from '../models/curve-families.js';
 import { snapMovingCurve } from './point-magnets.js';
 import { snapMovingLine } from './intercepts.js';
@@ -206,24 +206,31 @@ export class SketchInteraction extends MovableInteraction {
       const anchor = tangentSnap?.anchor ?? moved.anchor;
       return { patch: { ...translatedSketch(curve, { x: anchor.x - curve.anchor.x, y: anchor.y - curve.anchor.y }), translate: true }, tangentSnap };
     }
-    const key = action.replace('sketch-', '');
-    if (['start', 'end', 'middle'].includes(key)) {
-      const origin = key === 'middle' ? curve.anchor : curve[key];
+    // A handle action is sketch-<part>, or sketch-<part>:<id> for a through point.
+    const [key, id] = action.replace('sketch-', '').split(':');
+    const knot = id ? `through:${id}` : 'anchor';
+    if (['start', 'end', 'middle', 'point'].includes(key)) {
+      const role = key === 'middle' ? 'anchor' : key === 'point' ? knot : key, origin = sketchRolePoint(curve, role);
+      if (!origin) return null;
       const moved = event.shiftKey ? dragTranslation(origin, start ?? origin, point, true) : { anchor: point, axis: null };
       let anchor = ctx.snappedMove(moved.anchor, event, moved.axis);
       if (key === 'middle') anchor = this.lockedAnchor(curve, anchor, moved.axis, ctx.state);
+      if (key === 'point') return { patch: sketchKnotPatch(curve, knot, { point: anchor }) };
       return { patch: { [key === 'middle' ? 'anchor' : key]: anchor } };
     }
-    if (key === 'tangent') return distance(point, curve.anchor) > 1e-6 ? { patch: { tangent: { x: point.x - curve.anchor.x, y: point.y - curve.anchor.y } } } : null;
+    const center = sketchRolePoint(curve, knot);
+    if (!center) return null;
+    if (key === 'tangent') return distance(point, center) > 1e-6 ? { patch: sketchKnotPatch(curve, knot, { tangent: { x: point.x - center.x, y: point.y - center.y } }) } : null;
     if (key === 'leftReach' || key === 'rightReach') {
-      const endpoint = key === 'leftReach' ? curve.start : curve.end, sign = key === 'leftReach' ? -1 : 1, direction = unitVector(curve.tangent);
-      const length = sign * ((point.x - curve.anchor.x) * direction.x + (point.y - curve.anchor.y) * direction.y);
-      return { patch: { [key]: length / distance(endpoint, curve.anchor) } };
+      const reach = reachFromPoint(curve, knot, key, point);
+      return Number.isFinite(reach) ? { patch: sketchKnotPatch(curve, knot, { [key]: reach }) } : null;
     }
     return null;
   }
   keyboard(curve, action, event, ctx) {
-    const key = action.replace('sketch-', ''), origin = sketchHandlePoints(curve)[key] ?? curve.anchor;
+    const [key, id] = action.replace('sketch-', '').split(':'), handles = sketchHandlePoints(curve, id ? `through:${id}` : 'anchor');
+    const origin = key === 'point' ? handles.through[id] : handles[key] ?? curve.anchor;
+    if (!origin) return null;
     return this.drag(curve, action, origin, shifted(origin, deltaFor(event, event.shiftKey ? 1 : 0.1, ctx.viewport)),
       { key: event.key, shiftKey: event.shiftKey, altKey: true }, ctx);
   }

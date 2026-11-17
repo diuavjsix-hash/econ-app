@@ -112,7 +112,7 @@ test('toggling snap changes only the tool preference, and snapped coordinates re
   assert.equal(store.getState().selectedId, id);
   close(store.getState().points[0].anchor, { x: 4, y: 4 });
   const exported = serializeActive(store.getState());
-  assert.equal(exported.schemaVersion, 14);
+  assert.equal(exported.schemaVersion, 15);
   assert.equal('pointSnap' in exported, false);
   close(exported.points[0].anchor, { x: 4, y: 4 });
 });
@@ -234,7 +234,12 @@ test('a free curve pass-through point snaps to a placed point before touching a 
   const session = tool.createSession();
   tool.pointerDown(session, event(1, 6), ctx); tool.pointerDown(session, event(7, 6), ctx);
   tool.pointerDown(session, event(4, 4.05), ctx);
-  assert.equal(added.pop().options.lineId, lineId, 'near a line the curve touches it');
+  // Near a line the curve touches it once: the line's direction and a tangent link, no binding.
+  const touched = added.pop();
+  assert.equal(touched.options.lineId, undefined, 'drawing a tangent curve creates no following relation');
+  assert.deepEqual(touched.options.tangent, { x: 1, y: 0 });
+  assert.deepEqual(touched.anchor, { x: 4, y: 4 });
+  assert.deepEqual({ kind: touched.options.snaps.anchor.kind, ids: touched.options.snaps.anchor.ids }, { kind: 'tangent', ids: [lineId] });
   tool.pointerDown(session, event(1, 6), ctx); tool.pointerDown(session, event(7, 6), ctx);
   ctx.placed = { x: 4.1, y: 4 };
   tool.pointerMove(session, event(4, 4.05), ctx);

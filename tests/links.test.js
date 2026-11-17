@@ -124,3 +124,20 @@ test('link records are plain typed data with one shape for every kind', () => {
   const kept = replaceLinks([{ id: 'a', ids: ['line-1', 'axis-y'], role: 'start' }, { id: 'b', ids: ['line-1', 'point-2'], role: 'end' }], 'line-1', rolesChangedBy('line', 'line-to'));
   assert.deepEqual(kept.map(l => l.id), ['a'], 'dragging one end forgets only that end');
 });
+
+test('a free curve drawn touching a line records the contact and stays put when the line moves', async () => {
+  const { snapSketchTangent } = await import('../src/graph/sketch-magnets.js');
+  const { directionOf } = await import('../src/graph/math.js');
+  const store = createStore(), line = store.addLine({ x: 0, y: 8 }, { x: 8, y: 0 });
+  const target = snapSketchTangent({ x: 4.05, y: 4.02 }, store.getState(), bounds, unit);
+  assert.equal(target.kind, 'tangent');
+  const sketch = store.addSketch({ x: 1, y: 1 }, { x: 9, y: 3 }, target.point, { tangent: directionOf(target.line.slope), snaps: { anchor: target } });
+  const curve = () => store.getState().sketches.find(c => c.id === sketch);
+  assert.equal(curve().binding, null, 'no following relation');
+  const link = linksOf(store).find(l => l.ids[0] === sketch);
+  assert.deepEqual({ type: link.type, role: link.role, follow: link.follow, status: link.status, ids: link.ids }, { type: 'tangent', role: 'anchor', follow: false, status: 'holds', ids: [sketch, line] });
+  const before = structuredClone(curve());
+  store.selectObject(line); store.updateSelected({ anchor: { x: 1, y: 8 } });
+  assert.deepEqual(curve(), before, 'moving the line leaves the curve where it was drawn');
+  assert.equal(linksOf(store).find(l => l.ids[0] === sketch).status, 'broken');
+});

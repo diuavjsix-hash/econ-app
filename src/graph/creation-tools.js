@@ -186,9 +186,11 @@ export class SketchCreation extends CreationTool {
       session.points.push(point); session.snaps.push(ctx.snapTarget); session.hover = null; ctx.redraw(this); return true;
     }
     const target = this.passTarget(raw, event, ctx, session);
-    // Touching a line is a following relation (binding); other magnets are recorded as links.
-    const id = ctx.store.addSketch(session.points[0], session.points[1], target?.point ?? point, { lineId: target?.line.id,
-      snaps: { start: session.snaps[0], end: session.snaps[1], anchor: target ? null : ctx.snapTarget } });
+    // Touching a line sets the middle point and its direction once and is recorded as a link
+    // (follow: false): the curve stays free when the line moves later.
+    const id = ctx.store.addSketch(session.points[0], session.points[1], target?.point ?? point, {
+      ...(target ? { tangent: directionOf(target.line.slope) } : {}),
+      snaps: { start: session.snaps[0], end: session.snaps[1], anchor: target ?? ctx.snapTarget } });
     if (id) { session.points = []; session.snaps = []; session.hover = null; ctx.redraw(this); }
     return true;
   }

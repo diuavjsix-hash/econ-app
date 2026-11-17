@@ -42,7 +42,7 @@ export function mountWorkspace(root, store) {
           getState: () => diagramState(store.getState(), diagram.id),
           subscribe: listener => store.subscribe(snapshot => listener(diagramState(snapshot, diagram.id))),
           setZoom: zoom => store.setDiagramZoom(diagram.id, zoom),
-          ...Object.fromEntries(['beginHistory', 'endHistory', 'addLine', 'addPoint', 'addSketch', 'addDashedLine', 'addFill', 'selectObject', 'selectObjects', 'updateSelected', 'recordSnaps'].map(method => [method, (...args) => store[method](...args)])),
+          ...Object.fromEntries(['beginHistory', 'endHistory', 'addLine', 'addPoint', 'addSketch', 'addDashedLine', 'addFill', 'selectObject', 'selectObjects', 'updateSelected', 'recordSnaps', 'insertSketchPoint', 'removeSketchPoint', 'focusSketchPoint'].map(method => [method, (...args) => store[method](...args)])),
         };
         card = { element, button, dispose: mountGraph(graph, scoped) };
         cards.set(diagram.id, card);

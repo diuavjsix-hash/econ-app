@@ -40,7 +40,7 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
  document.dispatchEvent(new KeyboardEvent('keyup',{key:'Alt',altKey:false,bubbles:true}));check(marker()?.dataset.snapKind==='tangent','releasing Alt immediately restores the common tangent preview');
  move({x:6.29,y:4.29});check(marker()?.dataset.snapKind==='tangent','curve tangent remains captured beyond the capture radius');
  move({x:6.4,y:4.4});check(!marker(),'curve tangent releases beyond 24px');
- move({x:6.17,y:4.17});click({x:6.17,y:4.17});check(store.getState().sketches[0]?.binding?.sourceId===line,'third-click completion retains the original tangent binding');
+ move({x:6.17,y:4.17});click({x:6.17,y:4.17});const drawn=store.getState().sketches[0],touch=store.getState().links.find(l=>l.ids[0]===drawn?.id);check(drawn&&!drawn.binding&&touch?.type==='tangent'&&touch.role==='anchor'&&touch.ids[1]===line,'third-click completion records the tangent link without a following binding');
  store.undo();check(same(serializeDocument(store.getState()),before),'curve creation undoes in one step without feedback data in JSON');
  setup('hand');const point=store.addPoint({x:4,y:4});store.update({handSelected:true});send('pointerdown',{x:4,y:4},{},svg.querySelector(`[data-id="${point}"]`));move({x:6.17,y:4.17});
  check(same(style(),commonStyle)&&near(store.getState().points[0].anchor,{x:6,y:4}),'moving a point uses the same marker at its corrected coordinate');send('pointerup',{x:6.17,y:4.17});check(!marker(),'pointer release clears movement feedback');

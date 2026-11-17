@@ -64,7 +64,7 @@ test('JSON tells readers which side faces back and how to read its x', () => {
   const store = createStore();
   store.update({ quadrantMode: 'face', axisNames: { x: 'L₁', y: 'w' }, faceAxisName: 'L₂' });
   let document = serializeActive(store.getState());
-  assert.equal(document.schemaVersion, 14);
+  assert.equal(document.schemaVersion, 15);
   assert.equal(document.coordinateSystem.origin, 'bottom-center');
   assert.equal(document.coordinateSystem.type, 'face-to-face');
   assert.equal(document.coordinateSystem.sharedAxis, 'y');

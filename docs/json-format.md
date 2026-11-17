@@ -1,6 +1,12 @@
-# JSON 출력 형식 · schemaVersion 14
+# JSON 출력 형식 · schemaVersion 15
 
 구현 기준은 `src/export.js`의 `serializeDocument(state)`이고, 저장 창은 이를 `exportJson(state)`로 소수 6자리 반올림한 문자열을 보여 줍니다. 현재는 내보내기만 지원하며 JSON 불러오기 API와 UI는 없습니다. 화면에서 가려진 도형도 모두 내보냅니다.
+
+## 버전 15의 변경 (2026-11-16): 자유 곡선의 지나는 점
+
+- **`sketches[].through` (선택):** 시작·가운데·끝 말고 곡선이 더 지나는 점들입니다. 곡선 순서(start → end)로 적고, 각 항목은 `{ id, side, point, tangent, leftReach, rightReach }`입니다. `side: "start"`는 시작점과 가운데 점 사이, `"end"`는 가운데 점과 끝점 사이입니다. 지나는 점이 없으면 필드가 없고, 곡선은 버전 14와 같습니다.
+- **기하:** 곡선은 start, start 쪽 through, anchor, end 쪽 through, end를 차례로 지납니다. 끝점과 안쪽 점 사이는 이차 조각 하나 [끝점, 안쪽 점 ∓ tangent×이웃 거리×reach, 안쪽 점], 안쪽 점 두 개 사이는 두 접선 조절점 c₁ = P + t×거리×rightReach, c₂ = Q − t×거리×leftReach의 가운데에서 만나는 이차 조각 두 개입니다. `geometry.controlPoints`는 이 조각들을 순서대로 담습니다.
+- **`links[].role`:** 지나는 점은 `through:<id>`입니다(예: AVC 최저점에 맞춘 MC의 점은 `{ type: "minimum", role: "through:p1", ids: [MC, AVC] }`).
 
 ## 버전 14의 변경 (2026-11-16): 관계 목록 `links`
 
@@ -12,7 +18,7 @@
 - **`follow: false`:** 자석으로 맞춘 순간 기록한 의도입니다(점 찍기·직선 도구 두 점·Shift 접선 잠금·자유 곡선 세 점·도형 끌기/방향키 이동·끝 손잡이·묶음 이동). 도형을 붙잡지 않습니다. 주체를 자석 없이 다시 옮기면 그 부분의 기록은 지워지고, 대상이 움직이면 기록은 남습니다. 대상 도형을 지우면 함께 지워집니다.
 - **`status`:** 내보낼 때 `relations`와 같은 판정으로 다시 확인합니다. `holds`면 지금도 성립(`at`은 현재 위치), `broken`이면 맞췄었지만 그림이 바뀌어 더 이상 성립하지 않음(`at`은 맞춘 당시 위치).
 - **상대 기준:** `relations`와 `links`의 "위에 있음" 기준은 그림 크기(좌표 절댓값 최대)를 10으로 나눈 배율만큼 커집니다(가장 작게는 기본의 0.1배). 0~10 그래프는 이전과 같은 0.002입니다.
-- **예시:** [전체 예시](examples/editor-v14.json). 버전 13 예시는 [editor-v13.json](examples/editor-v13.json)에 남겼습니다.
+- **예시:** [전체 예시](examples/editor-v15.json). 버전 14 예시는 [editor-v14.json](examples/editor-v14.json), 버전 13 예시는 [editor-v13.json](examples/editor-v13.json)에 남겼습니다.
 
 ## 버전 13의 변경 (2026-11-12)
 
@@ -70,7 +76,7 @@
 
 | 필드 | 설명 |
 | --- | --- |
-| `schemaVersion` | 현재 14(버전 14: 관계 목록 `links`, 도형의 `binding` 제거, 상대 기준). 버전 13: 최상위 사본 제거·`legend`·그래프별 `relations`·소수 6자리 출력(버전 12: 별도 점선 도형 `dashedLines` 제거, 버전 11: 직선의 `style`·`extent`/`segment`, 버전 10: 칠한 구역 fills) |
+| `schemaVersion` | 현재 15(버전 15: 자유 곡선의 선택 필드 `through`와 링크 역할 `through:<id>`. 버전 14: 관계 목록 `links`, 도형의 `binding` 제거, 상대 기준). 버전 13: 최상위 사본 제거·`legend`·그래프별 `relations`·소수 6자리 출력(버전 12: 별도 점선 도형 `dashedLines` 제거, 버전 11: 직선의 `style`·`extent`/`segment`, 버전 10: 칠한 구역 fills) |
 | `legend` | 형식을 읽는 사람·AI를 위한 짧은 설명(버전 13) |
 | `activeDiagramId` | 내보낼 때 선택되어 있던 그래프 ID |
 | `diagrams` | 그래프 목록(2026-11-13부터 항상 하나; `layout`·`links`는 이때 없어짐). 각각 `id`, `name`, 아래의 좌표계·도형 필드를 보유 |
@@ -79,7 +85,7 @@
 | `lines` | 모든 직선 |
 | `curves` | 기본 곡선과 family가 있는 무차별곡선; 자유 곡선은 sketches에 별도 저장 |
 | `sums` | 수직합·수평합의 방향·음수 처리·같은 그래프 원본 ID |
-| `sketches` | 세 점 자유 곡선의 시작·끝·가운데 점·접선·양쪽 휘어짐·접점 관계 |
+| `sketches` | 자유 곡선의 시작·끝·가운데 점·접선·양쪽 휘어짐·선택적 지나는 점(`through`) |
 | `points` | 모든 점과 이름·좌표 표시 설정 |
 | `fills` | 칠한 구역의 수학 좌표 다각형 rings·색·진하기·이동 기준점·계층 |
 | `rulers` | 비활성화된 이전 자 자료 보존용 배열 |
@@ -128,7 +134,7 @@ shape는 0.15~20이며 완전보완재의 기하는 shape 대신 꺾임 anchor�
 
 ## 자유 곡선과 따라가기 관계
 
-각 그래프와 최상위 사본에 `sketches`를 기록합니다. 각 객체는 id·type='sketch'·name·color·parentId, 내부 좌표 start/end/anchor, 단위 방향 벡터 tangent, leftReach/rightReach, geometry를 포함합니다(버전 14부터 binding은 그래프의 `links`에 `follow: true`로 나옵니다). geometry.type='piecewise-quadratic-bezier'이고 controlPoints는 두 개의 [시작, 제어, 끝] 배열입니다. 렌더용 픽셀·근사 선분과 생성 도구 옵션은 출력하지 않습니다. 새 문서 형식에서 sketches가 없는 이전 출력은 빈 배열로 처리합니다(불러오기 기능은 아직 없음).
+각 그래프와 최상위 사본에 `sketches`를 기록합니다. 각 객체는 id·type='sketch'·name·color·parentId, 내부 좌표 start/end/anchor, 단위 방향 벡터 tangent, leftReach/rightReach, geometry를 포함합니다(버전 14부터 binding은 그래프의 `links`에 `follow: true`로 나옵니다). geometry.type='piecewise-quadratic-bezier'이고 controlPoints는 [시작, 제어, 끝] 배열들입니다(지나는 점이 없으면 두 개, 버전 15). 렌더용 픽셀·근사 선분과 생성 도구 옵션은 출력하지 않습니다. 새 문서 형식에서 sketches가 없는 이전 출력은 빈 배열로 처리합니다(불러오기 기능은 아직 없음).
 
 `showMinimum`은 선택적 boolean 표시 필드이며 생략하면 false입니다. true이면 원본 유한 곡선의 최저점 마커를 렌더합니다. 별도 points 항목·파생 좌표·최저점 binding은 만들지 않으며 현재 생성 문서에서 `kind:'minimum'` 관계는 지원하지 않습니다. 화면의 최저점 맞춤 후보(`kind:'minimum'`)는 저장하지 않습니다. JSON 버전은 10을 유지합니다.
 
@@ -247,7 +253,7 @@ schemaVersion 5에서 점 보조선 기능과 `guides` 필드를 제거했습니
 
 ## 예시
 
-[두 그래프의 전체 예시](examples/editor-v14.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, 최저점을 표시한 U자 곡선과 별도 일반 점의 통과 직선, 폴더와 점선 선분, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다(당시 형식이며 현재 출력과 다릅니다).
+[두 그래프의 전체 예시](examples/editor-v15.json)는 `node scripts/generate-doc-example.mjs`로 재생성합니다. 칠한 구역, 합산, 직선에 접한 자유 곡선, 최저점을 표시한 U자 곡선, 그 최저점을 지나는 점(`through`)을 가진 곡선과 별도 일반 점의 통과 직선, 폴더와 점선 선분, 네 종류의 무차별곡선과 직각 쌍곡선을 포함합니다. 실행 스크립트는 새 메모리 store에서 문서만 생성하며 실제 브라우저 작업을 읽거나 변경하지 않습니다. 아래 인라인 예시는 fills 추가 전의 버전 9 점/점선 예시로 보존합니다(당시 형식이며 현재 출력과 다릅니다).
 
 버전 9 당시 직렬화 함수로 생성한 점과 점선 문서입니다. 축 간격 기본 설정도 함께 포함합니다.
 

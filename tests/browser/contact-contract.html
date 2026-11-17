@@ -35,7 +35,9 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
    const p=setup.expected??{x:3,y:3},raw={...c.anchor,[fixture.axis??'y']:c.anchor[fixture.axis??'y']+0.01};
    send('pointerdown',c.anchor,{},svg.querySelector(`[data-id="${c.id}"][data-action="move"]`));move(raw,{shiftKey:Boolean(fixture.axis)});
    check(marker(),`${name}: movement finds the common contact`);send('pointerup',raw);
-   const curves=JSON.stringify([store.getState().curves,store.getState().sketches]);
+   // Key order can change when undo restores a shape, so compare the shapes field by field.
+   const canonical=value=>JSON.stringify(value,(key,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a<b?-1:a>b?1:0)):v);
+   const curves=canonical([store.getState().curves,store.getState().sketches]);
    store.update({mouseSelected:true});const pointer={x:p.x+0.08,y:p.y+0.06};move(pointer);
    check(marker()&&svg.querySelectorAll('.snap-feedback-ring').length===1,`${name}: point hover recovers one tangent marker after movement ends`);
    check(svg.querySelector(`[data-snap-source="${setup.target}"]`)&&svg.querySelector(`[data-snap-source="${setup.moving}"]`),`${name}: point hover highlights both sources`);
@@ -66,7 +68,7 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
    const shifted=segment();
    check(marker()&&near(second(),p)&&Math.abs((shifted.extent[1]-shifted.extent[0])-(drawnBefore.extent[1]-drawnBefore.extent[0]))<1e-9&&shifted.slope===drawnBefore.slope,`${name}: moving a segment snaps its end to the same target without stretching`);
    send('pointerup',{x:mid.x+0.08,y:mid.y+0.06});
-   check(curves===JSON.stringify([store.getState().curves,store.getState().sketches]),`${name}: downstream tools preserve both curves`);
+   check(curves===canonical([store.getState().curves,store.getState().sketches]),`${name}: downstream tools preserve both curves`);
    move(pointer); // Hand mode clears feedback; return to point hover for layout checking.
    store.update({mouseSelected:true});move(pointer);const b=svg.querySelector('.snap-feedback-label').getBBox();
    check(b.x>=0&&b.x+b.width<=stage.clientWidth,`${name}: shared contact label remains inside the canvas`);

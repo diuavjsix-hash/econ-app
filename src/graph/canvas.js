@@ -9,7 +9,7 @@ import { SnapTargetCache, snapPoint } from './snap.js';
 import { LINE_END_ACTIONS } from './line-extent.js';
 import { geometryKey, independentSnapState } from './snap-context.js';
 import { objectsOf, selectedIdsOf, canvasPick, outermostGroup, selectionClosure } from '../objects.js';
-import { distance, displayedSketchMinimum } from './sketch.js';
+import { distance, displayedSketchMinimum, sketchActionRole, sketchRolePoint } from './sketch.js';
 import { drawSketch } from './sketch-view.js';
 import { axisAlignedSnap } from './movement.js';
 import { selectionRectangle, objectsInRectangle } from './selection.js';
@@ -118,7 +118,7 @@ export function mountGraph(container, store) {
       if (drag.object.type==='line'&&Object.hasOwn(LINE_END_ACTIONS,drag.action)) {candidate=tangentSnap;coordinates=true;}
       else if (drag.object.type==='group') candidate=tangentSnap;
       else if (['line','curve','sketch'].includes(drag.object.type)&&(drag.action==='move'||drag.object.type==='line'&&drag.action==='rotate')) candidate=tangentSnap;
-      else if (drag.object.type==='point'||['sketch-start','sketch-end','sketch-middle'].includes(drag.action)) {candidate=snapTarget;coordinates=true;}
+      else if (drag.object.type==='point'||sketchActionRole(drag.action)) {candidate=snapTarget;coordinates=true;}
     } else if (inside&&drawingPointer) {
       const creation=activeCreation(),hover=creation?.tool.feedback(creation.session,creationContext,point);
       point=hover?hover.point:point??snappedPosition(worldPoint(pointer),pointer);
@@ -127,10 +127,9 @@ export function mountGraph(container, store) {
     }
     if (candidate&&drag) {
       const object=objectsOf(currentState).find(object=>object.id===drag.object.id);
-      const key=drag.object.type==='point'?'anchor'
-        :['sketch-start','sketch-end','sketch-middle'].includes(drag.action)?(drag.action==='sketch-middle'?'anchor':drag.action.slice(7)):null;
+      const placed=drag.object.type==='point'?object?.anchor:object?.type==='sketch'&&sketchActionRole(drag.action)?sketchRolePoint(object,sketchActionRole(drag.action)):null;
       // Relations or validation may reject a handle move. Never show a match the shape did not adopt.
-      if (key&&object?.[key]&&distance(object[key],candidate.point)>1e-8) candidate=null;
+      if (placed&&distance(placed,candidate.point)>1e-8) candidate=null;
     }
     if (!candidate&&visible&&!drag) candidate={kind:'free',point:point??worldPoint(pointer)};
     for (const line of svg.querySelectorAll('.line-draft')) line.classList.toggle('is-snapped',Boolean(candidate&&candidate.kind!=='free'));
@@ -388,11 +387,11 @@ export function mountGraph(container, store) {
       return;
     }
     const roles = rolesChangedBy(object.type, action), current = objectsOf(currentState).find(item => item.id === object.id);
-    const at = (key, candidate) => candidate && current?.[key] && distance(current[key], candidate.point) <= 1e-8 ? candidate : null;
+    const placed = key => current?.type === 'sketch' ? sketchRolePoint(current, key) : current?.[key];
+    const at = (key, candidate) => candidate && placed(key) && distance(placed(key), candidate.point) <= 1e-8 ? candidate : null;
     let snaps = {};
     if (object.type === 'point') snaps = { anchor: at('anchor', point) };
-    else if (action === 'sketch-start' || action === 'sketch-end') snaps = { [action.slice(7)]: at(action.slice(7), point) };
-    else if (action === 'sketch-middle') snaps = { anchor: at('anchor', point) };
+    else if (object.type === 'sketch' && sketchActionRole(action)) snaps = { [sketchActionRole(action)]: at(sketchActionRole(action), point) };
     else if (Object.hasOwn(LINE_END_ACTIONS, action)) snaps = { [LINE_END_ACTIONS[action] ? 'end' : 'start']: stroke };
     else if (stroke) snaps = String(stroke.key ?? '').startsWith('line-end') ? { [stroke.endIndex ? 'end' : 'start']: stroke } : { shape: stroke };
     store.recordSnaps(object.id, { roles, snaps });
@@ -450,7 +449,18 @@ export function mountGraph(container, store) {
     // dblclick here: the first press re-renders the SVG and captures the pointer.
     const rawId=target.dataset.id;
     const double=lastPress&&lastPress.id===rawId&&event.timeStamp-lastPress.time<DOUBLE_PRESS_MS&&Math.hypot(event.clientX-lastPress.x,event.clientY-lastPress.y)<DOUBLE_PRESS_PX;
-    lastPress=double?null:{id:rawId,time:event.timeStamp,x:event.clientX,y:event.clientY};
+    const sameAction=double&&lastPress.action===target.dataset.action;
+    lastPress=double?null:{id:rawId,action:target.dataset.action,time:event.timeStamp,x:event.clientX,y:event.clientY};
+    // On the selected free curve a double press adds a through point; on a through point it removes it.
+    const sketch=currentState.selectedId===rawId&&currentState.sketches.find(curve=>curve.id===rawId);
+    if (sameAction&&sketch) {
+      const through=/^sketch-point:(.+)$/.exec(target.dataset.action??'');
+      if (target.dataset.action==='move'||through) {
+        event.preventDefault();
+        if (through) store.removeSketchPoint(through[1]); else store.insertSketchPoint(worldPoint(event));
+        return;
+      }
+    }
     const pickedId=double&&outermostGroup(currentState,rawId)?rawId:canvasPick(currentState,rawId);
     const object = objectsOf(currentState).find((item) => item.id === pickedId);
     if (!object) return;
@@ -463,6 +473,12 @@ export function mountGraph(container, store) {
     if (!anchor) return;
     const startPatch=controller.startPatch(object,anchor);
     const { rebase, ...placed } = startPatch;
+    // Pressing an inner point of a free curve gives it the tangent and reach handles.
+    if (object.type==='sketch') {
+      const action=target.dataset.action, through=/^sketch-point:(.+)$/.exec(action??'');
+      if (through) store.focusSketchPoint(object.id,`through:${through[1]}`);
+      else if (action==='sketch-middle') store.focusSketchPoint(object.id,'anchor');
+    }
     drag = { pointerId: event.pointerId, action: target.dataset.action, start: worldPoint(event), client: { x: event.clientX, y: event.clientY }, moving: false, object: { ...structuredClone(object), ...placed, ...controller.dragSnapshot(object,interactionContext()) } };
     segmentSnap = null;
     snapTarget = null; tangentSnap = null;
