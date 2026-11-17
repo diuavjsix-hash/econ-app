@@ -21,6 +21,8 @@ send=(type,p,flags={},target=svg)=>{
   return sendRaw(type,p,flags,target);
 };
 const move=(p,flags={})=>send('pointermove',p,flags),click=(p,flags={})=>{send('pointerdown',p,flags);send('pointerup',p,flags)};
+const rightClick=(p,flags={})=>{send('pointerdown',p,{...flags,button:2,buttons:2});send('pointerup',p,{...flags,button:2,buttons:0})};
+const dblClick=(p,flags={})=>{click(p,flags);click(p,flags)};
 const marker=()=>svg.querySelector('.snap-feedback:not([data-snap-kind="free"])');
 const style=()=>{const ring=svg.querySelector('.snap-feedback-ring'),core=svg.querySelector('.snap-feedback-core'),text=svg.querySelector('.snap-feedback-label');return ring&&[ring.getAttribute('r'),core.getAttribute('r'),getComputedStyle(core).stroke,getComputedStyle(ring).strokeWidth,getComputedStyle(text).font,getComputedStyle(text).fill]};
 document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok,label)=>{if(!ok)throw Error(label);passed.push(label)};try{
@@ -40,8 +42,20 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
  document.dispatchEvent(new KeyboardEvent('keyup',{key:'Alt',altKey:false,bubbles:true}));check(marker()?.dataset.snapKind==='tangent','releasing Alt immediately restores the common tangent preview');
  move({x:6.29,y:4.29});check(marker()?.dataset.snapKind==='tangent','curve tangent remains captured beyond the capture radius');
  move({x:6.4,y:4.4});check(!marker(),'curve tangent releases beyond 24px');
- move({x:6.17,y:4.17});click({x:6.17,y:4.17});const drawn=store.getState().sketches[0],touch=store.getState().links.find(l=>l.ids[0]===drawn?.id);check(drawn&&!drawn.binding&&touch?.type==='tangent'&&touch.role==='anchor'&&touch.ids[1]===line,'third-click completion records the tangent link without a following binding');
+ const backspace=()=>document.dispatchEvent(new KeyboardEvent('keydown',{key:'Backspace',bubbles:true,cancelable:true}));
+ backspace();move({x:6.17,y:4.17});click({x:6.17,y:4.17});dblClick({x:7,y:7});const drawn=store.getState().sketches[0],touch=store.getState().links.find(l=>l.ids[0]===drawn?.id);check(drawn&&!drawn.binding&&touch?.type==='tangent'&&touch.role==='anchor'&&touch.ids[1]===line,'a point clicked on the line touches it; the double-click end records the tangent link without a following binding');
  store.undo();check(same(serializeDocument(store.getState()),before),'curve creation undoes in one step without feedback data in JSON');
+ // Clicks place points in the order the curve passes them; Backspace takes one back; a double click ends it.
+ setup('sketch');click({x:1,y:7});const plain=serializeDocument(store.getState());const banner=()=>svg.querySelector('.sketch-stage-banner'),draft=()=>svg.querySelector('.sketch-draft');
+ move({x:3,y:5.5},{altKey:true});click({x:3,y:5.5},{altKey:true});move({x:5,y:5.8},{altKey:true});click({x:5,y:5.8},{altKey:true});
+ check(!store.getState().sketches.length&&banner()?.dataset.sketchPoints==='3'&&svg.querySelectorAll('.sketch-pass').length===2&&same(serializeDocument(store.getState()),plain),'left clicks add points without making the curve');
+ check(draft()&&banner().textContent.includes('더블클릭'),'right after a click the preview still shows the curve through the points');
+ move({x:7,y:6.5},{altKey:true});check(draft(),'the preview runs on to the pointer');
+ rightClick({x:6,y:6},{altKey:true});check(banner().dataset.sketchPoints==='3'&&!store.getState().sketches.length,'the right button adds nothing');
+ backspace();check(banner().dataset.sketchPoints==='2'&&svg.querySelectorAll('.sketch-pass').length===1,'Backspace takes back the last point');
+ click({x:5,y:5.8},{altKey:true});dblClick({x:8,y:6.5},{altKey:true});const drawnThrough=store.getState().sketches[0];
+ const close=(a,b)=>a&&Math.hypot(a.x-b.x,a.y-b.y)<1e-3;check(close(drawnThrough?.anchor,{x:3,y:5.5})&&close(drawnThrough?.through?.[0]?.point,{x:5,y:5.8})&&close(drawnThrough?.end,{x:8,y:6.5})&&!svg.querySelector('.sketch-pass'),'the double click ends the curve through the points in the order drawn');
+ store.undo();check(!store.getState().sketches.length,'a curve with through points is one undo step');
  setup('hand');const point=store.addPoint({x:4,y:4});store.update({handSelected:true});send('pointerdown',{x:4,y:4},{},svg.querySelector(`[data-id="${point}"]`));move({x:6.17,y:4.17});
  check(same(style(),commonStyle)&&near(store.getState().points[0].anchor,{x:6,y:4}),'moving a point uses the same marker at its corrected coordinate');send('pointerup',{x:6.17,y:4.17});check(!marker(),'pointer release clears movement feedback');
  setup('hand');store.selectObject(line);store.removeSelected();const curve=store.addSketch({x:1,y:6},{x:7,y:6},{x:4,y:2}),moving=store.addLine();store.updateSelected({slope:0,anchor:{x:4,y:3}});const movingBefore=serializeDocument(store.getState());

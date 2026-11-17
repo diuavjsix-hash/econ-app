@@ -10,7 +10,7 @@ import { QUADRANT_MODES, PANEL_NAMES, panelSheet, clampZoom, DEFAULT_LOWER_HEIGH
 import { CURVE_PRESETS } from './graph/curve.js';
 import { canReparent, objectsOf, descendantsOf, colorTargets } from './objects.js';
 import { sumError } from './graph/sum.js';
-import { validSketch, unitVector, projectOnLine, insertSketchPoint, removeSketchPoint } from './graph/sketch.js';
+import { validSketch, projectOnLine, insertSketchPoint, removeSketchPoint, draftSketch } from './graph/sketch.js';
 import { resolveRelations, canAttach, dependencyId } from './relations.js';
 import { linkFor, replaceLinks, withoutShapes, withoutRole, LINK_ROLES } from './links.js';
 import { INDIFFERENCE_FAMILIES } from './graph/indifference.js';
@@ -292,16 +292,24 @@ export function createStore() {
       if (family==='quasilinear') curve.shape=Math.max(0.2,Math.min(20,ownX*0.7));
       return add('curves',curve);
     },
-    addSketch(start, end, anchor, { lineId=null, tangent=null, mode=state.sketchMode, snaps=null } = {}) {
+    /**
+     * A drawn curve: start → `before` → anchor → `after` → end, in that order. The extra points
+     * ({ point, tangent?, snap? }) become through points; each snap is recorded as a link of its
+     * through point.
+     */
+    addSketch(start, end, anchor, { lineId=null, tangent=null, mode=state.sketchMode, snaps=null, before=[], after=[] } = {}) {
       if (![start,end,anchor].every(validPoint)) return null;
       const target=state.lines.find(line=>line.id===lineId);
       const projection=target ? projectOnLine(anchor,target) : null;
-      const curve={ start:{...start}, end:{...end}, anchor:projection?.point ?? {...anchor},
-        tangent:unitVector(tangent ?? (mode==='horizontal' ? {x:1,y:0} : mode==='vertical' ? {x:0,y:1} : {x:end.x-start.x,y:end.y-start.y})), leftReach:0.5, rightReach:0.5 };
-      if (!validSketch(curve)) return null;
+      const inner=[...before,{ point:projection?.point ?? anchor, tangent },...after];
+      const drafted=draftSketch({ start, end, inner, anchorIndex:before.length,
+        anchorTangent:mode==='horizontal' ? {x:1,y:0} : mode==='vertical' ? {x:0,y:1} : null });
+      if (!drafted) return null;
+      const extraSnaps=Object.fromEntries(inner.map((knot,index)=>[`through:${drafted.ids[index]}`,knot.snap]).filter(([role,snap],index)=>snap&&index!==before.length));
       const index=nextSketchId++;
-      return add('sketches',{...curve,id:`sketch-${index}`,type:'sketch',name:`자유 곡선 ${String(index).padStart(2,'0')}`,color:ROLE_COLORS.sketch,
-        binding:target ? {kind:'tangent',sourceId:target.id,parameter:projection.parameter,direction:directionOf(target.slope)}:null }, snaps);
+      return add('sketches',{...drafted.curve,id:`sketch-${index}`,type:'sketch',name:`자유 곡선 ${String(index).padStart(2,'0')}`,color:ROLE_COLORS.sketch,
+        binding:target ? {kind:'tangent',sourceId:target.id,parameter:projection.parameter,direction:directionOf(target.slope)}:null },
+        snaps||before.length||after.length ? { ...snaps, ...extraSnaps } : null);
     },
     attachSelectedToLine(lineId) {
       const curve=state.sketches.find(curve=>curve.id===state.selectedId), line=state.lines.find(line=>line.id===lineId);

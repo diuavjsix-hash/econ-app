@@ -4,7 +4,7 @@ import { buildSnapTargets, snapPoint } from '../src/graph/snap.js';
 import { curvePoint } from '../src/graph/curve.js';
 import { createStore } from '../src/state.js';
 import { serializeActive } from './fixtures/document.js';
-import { sketchControls, quadraticPoint } from '../src/graph/sketch.js';
+import { sketchControls, quadraticPoint, sketchAnchorIndex } from '../src/graph/sketch.js';
 import { snapLineToTangency } from '../src/graph/tangency.js';
 import { segmentLine } from './fixtures/segments.js';
 
@@ -218,7 +218,7 @@ test('placed points come first for every point consumer: in range they beat cros
   assert.equal(pointSnapCandidates({ x: 3, y: 2 }, [placed], unit, { guide: { anchor: { x: 0, y: 0 }, slope: 2.1 / 3.2 } }).length, 1);
 });
 
-test('a free curve pass-through point snaps to a placed point before touching a line', async () => {
+test('a free curve is drawn click by click: inner points touch lines or snap to points, a double click or Enter ends it', async () => {
   const { CREATION_TOOLS } = await import('../src/graph/creation-tools.js');
   const tool = CREATION_TOOLS.sketch, added = [];
   const s = createStore(), lineId = s.addLine({ x: 0, y: 4 }, { x: 10, y: 4 });
@@ -227,24 +227,78 @@ test('a free curve pass-through point snaps to a placed point before touching a 
     state: base, viewport: { bounds, unit: 50 }, snapTarget: null,
     worldPoint: event => ({ x: event.x, y: event.y }), inside: () => true,
     snappedPosition(point) { this.snapTarget = this.placed ? { point: this.placed, kind: 'point', ids: ['p'] } : null; return this.placed ?? point; },
-    store: { addSketch: (start, end, anchor, options) => (added.push({ anchor, options }), 'sketch-1') },
+    store: { addSketch: (start, end, anchor, options) => (added.push({ start, end, anchor, options }), 'sketch-1') },
     redraw() {}, updateSnapFeedback() {},
   };
-  const event = (x, y) => ({ x, y, target: { closest: () => null }, preventDefault() {} });
+  let clock = 0;
+  const event = (x, y, gap = 1000) => ({ x, y, clientX: x * 50, clientY: y * 50, timeStamp: (clock += gap), target: { closest: () => null }, preventDefault() {} });
+  const click = (x, y) => tool.pointerDown(session, event(x, y), ctx);
+  const double = (x, y) => { tool.pointerDown(session, event(x, y), ctx); tool.pointerDown(session, event(x, y, 120), ctx); };
   const session = tool.createSession();
-  tool.pointerDown(session, event(1, 6), ctx); tool.pointerDown(session, event(7, 6), ctx);
-  tool.pointerDown(session, event(4, 4.05), ctx);
-  // Near a line the curve touches it once: the line's direction and a tangent link, no binding.
+  // Start, one point on the line, double-click end: the original three-point curve touching the line.
+  click(1, 6); click(4, 4.05); double(7, 6);
   const touched = added.pop();
+  assert.deepEqual([touched.start, touched.end, touched.anchor], [{ x: 1, y: 6 }, { x: 7, y: 6 }, { x: 4, y: 4 }]);
   assert.equal(touched.options.lineId, undefined, 'drawing a tangent curve creates no following relation');
   assert.deepEqual(touched.options.tangent, { x: 1, y: 0 });
-  assert.deepEqual(touched.anchor, { x: 4, y: 4 });
+  assert.deepEqual([touched.options.before, touched.options.after], [[], []]);
   assert.deepEqual({ kind: touched.options.snaps.anchor.kind, ids: touched.options.snaps.anchor.ids }, { kind: 'tangent', ids: [lineId] });
-  tool.pointerDown(session, event(1, 6), ctx); tool.pointerDown(session, event(7, 6), ctx);
-  ctx.placed = { x: 4.1, y: 4 };
+  assert.deepEqual(session.clicks, [], 'the double click ends the drawing');
+  // A placed point within reach wins over the line: the curve passes the point, no tangent.
+  click(1, 6); ctx.placed = { x: 4.1, y: 4 };
   tool.pointerMove(session, event(4, 4.05), ctx);
   assert.equal(session.hover.target, null, 'hover shows the point, not the line');
-  tool.pointerDown(session, event(4, 4.05), ctx);
+  click(4, 4.05); ctx.placed = null; double(7, 6);
   const result = added.pop();
-  assert.deepEqual(result.anchor, { x: 4.1, y: 4 }); assert.equal(result.options.lineId, undefined, 'a snapped point passes through it without a line binding');
+  assert.deepEqual(result.anchor, { x: 4.1, y: 4 }); assert.equal(result.options.tangent, null, 'a snapped point passes through it without touching the line');
+  // More points: Backspace takes the last back, Enter ends at the last one, the middle point is the anchor.
+  click(1, 6); click(2, 5); click(5, 4.05); click(6, 5.5); click(9, 7);
+  assert.equal(added.length, 0, 'left clicks never finish the curve');
+  assert.equal(tool.keyDown(session, { key: 'Backspace' }, ctx), true); assert.equal(session.clicks.length, 4, 'Backspace takes back the last point');
+  assert.equal(tool.keyDown(session, { key: 'Delete' }, ctx), false);
+  click(8, 6);
+  assert.equal(tool.keyDown(session, { key: 'Enter' }, ctx), true);
+  const many = added.pop();
+  assert.deepEqual([many.start, many.end, many.anchor], [{ x: 1, y: 6 }, { x: 8, y: 6 }, { x: 5, y: 4 }]);
+  assert.deepEqual(many.options.tangent, { x: 1, y: 0 }, 'the point on the line keeps the line direction');
+  assert.deepEqual([many.options.before.map(knot => knot.point), many.options.after.map(knot => knot.point)], [[{ x: 2, y: 5 }], [{ x: 6, y: 5.5 }]]);
+  // Too few points: the curve is not made and the drawing stays.
+  click(1, 6); double(3, 3);
+  assert.equal(added.length, 0); assert.equal(session.clicks.length, 2); assert.ok(session.notice);
+  assert.equal(tool.keyDown(session, { key: 'Enter' }, ctx), true); assert.equal(added.length, 0);
+  click(3, 3); assert.equal(session.clicks.length, 2, 'a slow click on the last point adds nothing');
+  assert.equal(tool.keyDown(session, { key: 'Escape' }, ctx), false, 'Esc is left to the tool switch');
+});
+
+test('a drawn curve passes its points in the order drawn, smoothly, with the middle direction on one point', () => {
+  const s = createStore();
+  const marked = s.addPoint({ x: 6, y: 3 });
+  const id = s.addSketch({ x: 1, y: 6 }, { x: 8, y: 6 }, { x: 4, y: 2 }, { mode: 'horizontal',
+    before: [{ point: { x: 2, y: 4 } }], after: [{ point: { x: 6, y: 3 }, snap: { kind: 'point', point: { x: 6, y: 3 }, ids: [marked] } }] });
+  const curve = s.getState().sketches.find(sketch => sketch.id === id);
+  assert.deepEqual(curve.through.map(point => [point.id, point.side, point.point]), [['p1', 'start', { x: 2, y: 4 }], ['p2', 'end', { x: 6, y: 3 }]]);
+  assert.deepEqual(curve.tangent, { x: 1, y: 0 }, 'the anchor keeps the chosen middle direction');
+  assert.deepEqual(s.getState().links.filter(link => link.ids[0] === id).map(link => [link.type, link.role, link.ids[1]]), [['point', 'through:p2', marked]],
+    'a through point records what it was aligned to under its own role');
+  // A through point's direction runs between its neighbours: (4,2) − (1,6) for p1.
+  const expected = { x: 3 / 5, y: -4 / 5 };
+  assert.ok(Math.hypot(curve.through[0].tangent.x - expected.x, curve.through[0].tangent.y - expected.y) < 1e-12);
+  for (const knot of [curve.through[0].point, curve.through[1].point, curve.anchor])
+    assert.ok(sketchControls(curve).some(piece => Math.hypot(piece[2].x - knot.x, piece[2].y - knot.y) < 1e-12), 'the curve passes every clicked point');
+  // One inner point: the original three-point curve.
+  const threeId = s.addSketch({ x: 1, y: 6 }, { x: 8, y: 6 }, { x: 4, y: 2 }, { mode: 'free' }), three = s.getState().sketches.find(sketch => sketch.id === threeId);
+  assert.equal(three.through, undefined);
+  assert.deepEqual([three.tangent, three.leftReach, three.rightReach], [{ x: 1, y: 0 }, 0.5, 0.5]);
+  // Drawn right to left, a horizontal middle still runs from start to end.
+  const backId = s.addSketch({ x: 8, y: 6 }, { x: 1, y: 6 }, { x: 4, y: 2 }, { mode: 'horizontal' }), back = s.getState().sketches.find(sketch => sketch.id === backId);
+  assert.ok(back.tangent.x === -1 && Math.abs(back.tangent.y) < 1e-12);
+});
+
+test('the middle direction goes to the point farthest from the start–end line; 자동 names the middle point', () => {
+  const start = { x: 1, y: 6 }, end = { x: 9, y: 6 }, points = [{ x: 2, y: 4 }, { x: 4, y: 2 }, { x: 6, y: 3 }];
+  assert.equal(sketchAnchorIndex(start, end, points, 'horizontal'), 1);
+  assert.equal(sketchAnchorIndex(start, end, points.slice(1), 'vertical'), 0);
+  assert.equal(sketchAnchorIndex(start, end, points, 'auto'), 1);
+  assert.equal(sketchAnchorIndex(start, end, points.slice(0, 2), 'auto'), 0);
+  assert.equal(sketchAnchorIndex(start, end, [{ x: 5, y: 1 }], 'horizontal'), 0);
 });

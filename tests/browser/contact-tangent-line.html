@@ -110,7 +110,7 @@ document.querySelector('#run').onclick=async()=>{const passed=[];const check=(ok
    store.setToolMode(mode);send('pointermove',on);
    check(label().includes('점 맞춤'),`${name}: ${mode} hover on the curve prefers the nearby point`);
   }
-  store.setToolMode('sketch');click(on);click({x:on.x+2.5,y:on.y+2.5});click({x:on.x+1.4,y:on.y+0.7});
+  store.setToolMode('sketch');click(on);click({x:on.x+1.4,y:on.y+1.6});click({x:on.x+2.5,y:on.y+2.5});click({x:on.x+2.5,y:on.y+2.5});
   const sketch=store.getState().sketches.at(-1);
   check(sketch&&near(sketch.start,placed),`${name}: the free curve starts exactly on the placed point`);
   // The mouse wheel zooms the view about the origin; the document and its history stay untouched.

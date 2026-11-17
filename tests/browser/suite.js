@@ -95,7 +95,7 @@ async function appSmoke(width, height) {
   doc.getElementById('sketch-tool').click();
   const svg=doc.querySelector('.graph-svg'),r=svg.getBoundingClientRect(),v=createViewport(r.width,r.height,'edgeworth',{boxSize:{width:10,height:8}});
   svg.setPointerCapture=()=>{};svg.hasPointerCapture=()=>false;svg.releasePointerCapture=()=>{};
-  for(const p of [{x:1,y:6},{x:7,y:6},{x:4,y:2}]) {
+  for(const p of [{x:1,y:6},{x:4,y:2},{x:7,y:6},{x:7,y:6}]) {
     const s=toScreen(p,v);
     for(const type of ['pointerdown','pointerup'])svg.dispatchEvent(new win.PointerEvent(type,{bubbles:true,cancelable:true,pointerId:94,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x,clientY:r.top+s.y,altKey:true}));
   }
@@ -124,7 +124,7 @@ async function appSmoke(width, height) {
   const pointer=(p,flags={},type='pointerdown')=>{const r=svg.getBoundingClientRect(),v=createViewport(r.width,r.height,'edgeworth',{boxSize:{width:10,height:8}}),s=toScreen(p,v);svg.dispatchEvent(new win.PointerEvent(type,{bubbles:true,cancelable:true,pointerId:94,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,clientX:r.left+s.x,clientY:r.top+s.y,...flags}));};
   const tap=(p,flags)=>{pointer(p,flags,'pointerdown');pointer(p,flags,'pointerup');};
   doc.getElementById('sketch-tool').click();const mode=doc.getElementById('sketch-mode');mode.value='horizontal';mode.dispatchEvent(new win.Event('change',{bubbles:true}));
-  for(const p of [{x:1,y:0.5},{x:7,y:0.5},{x:4,y:2}]) tap(p,{altKey:true});
+  [{x:1,y:0.5},{x:4,y:2},{x:7,y:0.5},{x:7,y:0.5}].forEach(p=>tap(p,{altKey:true}));
   doc.getElementById('finish-tool').click();doc.getElementById('mouse-tool').click();tap({x:4.08,y:2.06});
   // Taps round to pixels, so the contact is the shared anchor of both drawn curves.
   const touching=exported(doc),contactPoint=touching.points.at(-1),[cup,cap]=touching.sketches.map(k=>k.anchor);

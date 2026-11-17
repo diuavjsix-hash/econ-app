@@ -17,7 +17,7 @@ export const TOOL_MODES = Object.freeze({
   },
   sketch: {
     flag: 'sketchSelected', kind: 'creation', drawingPointer: true, keepSelection: keepNone,
-    context: () => ({ title: '곡선 그리기', mode: '곡선', detail: '시작점 → 끝점 → 지나는 점' }),
+    context: () => ({ title: '곡선 그리기', mode: '곡선', detail: '시작점 → 지나는 점 → 더블클릭 끝점' }),
   },
   fill: {
     flag: 'fillSelected', kind: 'creation', keepSelection: keepNone,

@@ -516,6 +516,13 @@ export function mountGraph(container, store) {
   };
   document.addEventListener('keydown',refreshModifiers);
   document.addEventListener('keyup',refreshModifiers);
+  const creationKey = event => {
+    if (event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey||event.isComposing||document.querySelector('dialog[open]')
+      ||event.target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
+    const creation=activeCreation();
+    if (creation?.tool.keyDown(creation.session,event,creationContext)) event.preventDefault();
+  };
+  document.addEventListener('keydown',creationKey);
   const stopDrag = (event) => {
     const creation = activeCreation();
     if (event.type==='pointercancel'&&!drag) {
@@ -612,5 +619,5 @@ export function mountGraph(container, store) {
     currentState = state;
     render();
   });
-  return () => { observer.disconnect(); unsubscribe(); document.removeEventListener('keydown',refreshModifiers); document.removeEventListener('keyup',refreshModifiers); cancelMarquee(false); svg.remove(); };
+  return () => { observer.disconnect(); unsubscribe(); document.removeEventListener('keydown',refreshModifiers); document.removeEventListener('keyup',refreshModifiers); document.removeEventListener('keydown',creationKey);cancelMarquee(false); svg.remove(); };
 }

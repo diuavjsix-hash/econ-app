@@ -59,8 +59,8 @@ const creationInspector = () => `
           ${hint('Shift: 수평·수직 · Alt: 보정 생략')}
         </section><section id="sketch-options" class="panel-stack" aria-label="자유 곡선 그리기" hidden>
           ${selectField({ id: 'sketch-mode', label: '가운데 방향', options: [['auto', '자동'], ['horizontal', '수평 · ∪ ∩'], ['vertical', '수직 · 옆으로']] })}
-          ${hint('시작점 → 끝점 → 지나는 점', { id: 'sketch-step', live: true })}
-          ${hint('세 번째 점을 직선 위에 찍으면 접합니다. Alt: 자유 배치 · Esc: 취소')}
+          ${hint('시작점 → 지나는 점 → 더블클릭 끝점', { id: 'sketch-step', live: true })}
+          ${hint('직선 위에 찍으면 접합니다. Enter: 마지막 점에서 끝 · Backspace: 점 취소 · Alt: 자유 배치 · Esc: 취소')}
           ${panelSection('무차별곡선', `${checkField({ id: 'indifference-opposite-new', label: '반대 방향' })}<div class="library indifference-library">
             ${libraryItem({ attr: 'data-add-indifference', value: 'cobb-douglas', label: '콥더글라스', path: 'M7 3C8 20 17 24 43 26' })}
             ${libraryItem({ attr: 'data-add-indifference', value: 'substitutes', label: '완전대체재', path: 'M6 4L43 27' })}

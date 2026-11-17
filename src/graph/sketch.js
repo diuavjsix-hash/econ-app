@@ -77,6 +77,57 @@ export function validSketch(curve) {
   }
   return sketchControls(curve).flat().every(validPoint);
 }
+/**
+ * Which drawn inner point carries the middle direction (the anchor). With 자동 every point
+ * takes the direction between its neighbours, so it only names a point: the middle one. With
+ * 수평/수직 it is the point farthest from the start–end line: the bottom of a ∪, the top of a ∩,
+ * the tip of a ⊂. With one inner point it is that point: the original three-point curve.
+ */
+export function sketchAnchorIndex(start, end, points, mode) {
+  const middle = Math.floor((points.length - 1) / 2);
+  if (mode !== 'horizontal' && mode !== 'vertical') return middle;
+  const dx = end.x - start.x, dy = end.y - start.y, length = Math.hypot(dx, dy);
+  if (!(length > 1e-12)) return middle;
+  let best = middle, far = -Infinity;
+  points.forEach((point, index) => {
+    const gap = Math.abs((point.x - start.x) * dy - (point.y - start.y) * dx) / length;
+    if (gap > far + 1e-12) { far = gap; best = index; }
+  });
+  return best;
+}
+
+/**
+ * The curve a drawing makes, through its clicks in the order they were made: start, the inner
+ * points ({ point, tangent? }) and end. inner[anchorIndex] becomes the anchor; the rest are
+ * through points on its start or end side. A point with no given direction (and the anchor
+ * without `anchorTangent`) takes the one between its neighbours, so the curve passes smoothly;
+ * given directions are turned to run from start to end. With one inner point and no direction
+ * this is the original three-point curve.
+ * Returns { curve, ids } (ids[i]: through id of inner[i], none for the anchor) or null.
+ */
+export function draftSketch({ start, end, inner = [], anchorIndex = 0, anchorTangent = null }) {
+  if (![start, end].every(validPoint) || !inner.length || !inner.every(knot => validPoint(knot?.point))) return null;
+  if (!(anchorIndex >= 0 && anchorIndex < inner.length)) return null;
+  const points = [start, ...inner.map(knot => knot.point), end], ids = [], through = [];
+  const forward = (vector, along) => vector.x * along.x + vector.y * along.y < 0 ? { x: -vector.x, y: -vector.y } : vector;
+  // Toward an end a side reaches half the span (the original curve); between two inner points
+  // a third each, so the turn between them stays round instead of folding at the join.
+  const reach = neighbour => neighbour === 0 || neighbour === points.length - 1 ? 0.5 : 1 / 3;
+  let curve = null;
+  inner.forEach((knot, i) => {
+    const before = points[i], after = points[i + 2], heading = { x: after.x - before.x, y: after.y - before.y };
+    const given = knot.tangent ?? (i === anchorIndex ? anchorTangent : null);
+    const tangent = unitVector(given ? forward(given, heading) : heading);
+    const reaches = { leftReach: reach(i), rightReach: reach(i + 2) };
+    if (i === anchorIndex) { curve = { start: { ...start }, end: { ...end }, anchor: { ...knot.point }, tangent, ...reaches }; return; }
+    const id = `p${through.length + 1}`;
+    ids[i] = id;
+    through.push({ id, side: i < anchorIndex ? 'start' : 'end', point: { ...knot.point }, tangent, ...reaches });
+  });
+  if (through.length) curve.through = through;
+  return validSketch(curve) ? { curve, ids } : null;
+}
+
 export function quadraticPoint([a, b, c], t) {
   return { x: (1-t)**2*a.x + 2*(1-t)*t*b.x + t*t*c.x, y: (1-t)**2*a.y + 2*(1-t)*t*b.y + t*t*c.y };
 }
